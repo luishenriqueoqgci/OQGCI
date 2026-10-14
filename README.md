@@ -1,0 +1,43 @@
+# Diagnóstico OQGCI
+
+Aplicação web do Diagnóstico OQGCI (método Venda com Propósito): página de entrada, referências científicas, cadastro e login, questionário de 33 afirmações e 6 situações, relatório com Índice OQGCI, perfil e trilha de 30 dias, e painel do facilitador com turmas por código.
+
+## Estrutura
+
+| Pasta ou arquivo | Conteúdo |
+| --- | --- |
+| `src/app.html` | Código da aplicação (fonte única) |
+| `build.py` | Gera `public/index.html` e a prévia a partir de `src/app.html` |
+| `public/` | O site publicado pelo Netlify |
+| `public/config.js` | Endereço e chave pública do Supabase. Vazio = modo demonstração |
+| `supabase/schema.sql` | Tabelas, regras de acesso e funções do banco |
+| `netlify.toml` | Configuração de publicação |
+
+## Publicação gratuita, passo a passo
+
+### 1. Supabase (login e banco de dados)
+1. Crie uma conta em supabase.com e um novo projeto (região South America, São Paulo).
+2. Abra **SQL Editor > New query**, cole o conteúdo de `supabase/schema.sql` e clique em **Run**.
+3. Em **Project Settings > API**, copie o **Project URL** e a chave **anon public**.
+4. Em **Authentication > URL Configuration**, preencha **Site URL** com o endereço do site no Netlify (passo 2) e adicione o mesmo endereço em **Redirect URLs**.
+
+### 2. Netlify (site)
+1. Crie uma conta em netlify.com entrando com o GitHub.
+2. **Add new site > Import an existing project > GitHub** e escolha o repositório `diagnostico-oqgci`.
+3. Deixe o comando de build vazio e a pasta de publicação como `public`. Clique em **Deploy**.
+4. Em **Site configuration > Change site name**, use `diagnostico-oqgci` para ter o endereço `diagnostico-oqgci.netlify.app`.
+
+### 3. Ligar os dois
+1. Preencha `public/config.js` com o Project URL e a chave anon public.
+2. Ao salvar no GitHub, o Netlify publica a nova versão sozinho.
+3. Crie a sua conta no site e, no SQL Editor do Supabase, rode:
+   `update public.profiles set role = 'facilitador' where email = 'seu-email';`
+4. Entre de novo no site: o menu **Facilitador** aparece.
+
+### 4. Domínio próprio (quando quiser)
+No Netlify, **Domain management > Add a domain**. Depois, atualize o Site URL no Supabase com o novo endereço.
+
+## Observações
+- A chave anon public pode ficar no site: o acesso aos dados é protegido pelas regras de RLS do `schema.sql`.
+- No plano gratuito do Supabase, o projeto pode pausar após um período sem uso. Ele é reativado pelo painel.
+- Para alterar a aplicação, edite `src/app.html` e rode `python3 build.py`.

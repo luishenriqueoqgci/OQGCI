@@ -1,0 +1,1265 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Diagnóstico de vendas com base em neurociência: Índice OQGCI, perfil e trilha de 30 dias.">
+<meta name="theme-color" content="#0F0E14">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="OQGCI">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<script src="config.js"></script>
+<title>Diagnóstico OQGCI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;600;700&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: uma coluna central de leitura (max 1080px) sobre fundo tinta-violeta; telas de questionário em cartão único, pensadas primeiro para o celular. */
+:root {
+  color-scheme: dark;
+  --bg: #0F0E14;
+  --surface: #18161F;
+  --surface-2: #211E2A;
+  --line: #2F2B3A;
+  --ink: #EFEBF5;
+  --ink-2: #B6B0C4;
+  --ink-3: #868097;
+  --accent: #F0B35E;
+  --accent-strong: #F6C77F;
+  --accent-ink: #1C1408;
+  --cool: #8DB8EE;
+  --c-warm: #C2831E;
+  --c-cool: #4A8BDC;
+  --c-third: #C2559F;
+  --good: #5FBF8F;
+  --warn: #E8B44A;
+  --crit: #E4707A;
+  --font-display: "Urbanist", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Manrope", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 14px;
+  --r-sm: 10px;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--ink); }
+body {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100%;
+}
+a { color: var(--accent); text-underline-offset: 3px; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+p { margin: 0; }
+.wrap { width: 100%; max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.narrow { max-width: 720px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
+.muted { color: var(--ink-2); }
+.small { font-size: 14px; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* Barra superior */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 12px; }
+.brand span { white-space: nowrap; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: 0.01em; }
+.brand svg { flex: none; }
+.nav { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.nav button, .nav a { background: none; border: 0; color: var(--ink-2); font-size: 14px; font-weight: 600; padding: 8px 10px; border-radius: 8px; cursor: pointer; text-decoration: none; }
+.nav button:hover, .nav a:hover { color: var(--ink); background: var(--surface); }
+.demo-strip { background: var(--surface); border-bottom: 1px solid var(--line); font-size: 13px; color: var(--ink-2); }
+.demo-strip .wrap { padding-block: 8px; display: flex; gap: 8px; align-items: center; }
+.demo-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+
+/* Botões */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; border-radius: 999px; padding: 14px 26px; font-weight: 700; font-size: 15px; letter-spacing: 0.04em; cursor: pointer; border: 1px solid transparent; text-decoration: none; transition: transform .15s ease, background-color .15s ease, border-color .15s ease; }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: linear-gradient(180deg, var(--accent-strong), var(--accent)); color: var(--accent-ink); }
+.btn-primary:hover { background: var(--accent-strong); }
+.btn-ghost { background: transparent; color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.btn-ghost:hover { border-color: var(--accent); }
+.btn-quiet { background: var(--surface-2); color: var(--ink); border-color: var(--line); }
+.btn-quiet:hover { border-color: var(--ink-3); }
+.btn-sm { padding: 9px 16px; font-size: 14px; letter-spacing: 0.02em; }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+.link-btn { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+
+/* Landing */
+.hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+.hero::before { content: ""; position: absolute; inset: -20% -10% auto -10%; height: 140%; background:
+  radial-gradient(40% 50% at 22% 40%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+  radial-gradient(38% 46% at 82% 55%, color-mix(in srgb, var(--cool) 16%, transparent), transparent 70%);
+  pointer-events: none; }
+.hero .wrap { position: relative; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr); gap: 48px; align-items: center; padding-block: 72px 64px; }
+.pill { display: inline-flex; align-items: center; gap: 10px; border: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 70%, transparent); border-radius: 999px; padding: 8px 16px; }
+.hero h1 { font-weight: 300; font-size: clamp(38px, 6vw, 64px); line-height: 1.04; margin-top: 24px; }
+.hero h1 .gold { display: block; font-weight: 600; color: var(--accent); }
+.hero .lead { font-size: 18px; color: var(--ink-2); max-width: 34em; margin-top: 22px; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; align-items: center; }
+.ref-link { display: inline-flex; gap: 8px; align-items: center; margin-top: 22px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-2); background: none; border: 0; cursor: pointer; padding: 4px 0; }
+.ref-link:hover { color: var(--ink); }
+
+.sample { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 22px; box-shadow: 0 30px 80px -40px rgba(0,0,0,.8); }
+.sample-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.tag { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); border: 1px dashed var(--line); padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.big-num { font-family: var(--font-display); font-weight: 300; font-size: 72px; line-height: 1; letter-spacing: -0.03em; }
+.big-num small { font-size: 22px; color: var(--ink-3); font-weight: 400; margin-left: 4px; }
+.level-chip { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 5px 12px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent-strong); font-weight: 700; font-size: 13px; }
+
+.section { padding-block: 64px; border-bottom: 1px solid var(--line); }
+.section-head { display: grid; gap: 10px; margin-bottom: 32px; max-width: 46em; }
+.section-head h2 { font-size: clamp(26px, 3.4vw, 36px); }
+.axis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.axis-col { border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; gap: 12px; align-content: start; background: var(--surface); }
+.axis-col h3 { font-size: 20px; display: flex; gap: 10px; align-items: center; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.dim-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.dim-code { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); padding-top: 3px; }
+.dim-row strong, .base-band strong { display: block; font-weight: 700; }
+.base-band { margin-top: 16px; border: 1px solid var(--line); border-radius: var(--r); padding: 20px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), color-mix(in srgb, var(--cool) 8%, var(--surface))); display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; }
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: s; }
+.step { border-top: 1px solid var(--accent); padding-top: 16px; display: grid; gap: 8px; }
+.step-n { font-family: var(--font-mono); font-size: 12px; color: var(--accent); letter-spacing: 0.12em; }
+.step h3 { font-size: 20px; }
+.who { display: flex; flex-wrap: wrap; gap: 8px; }
+.who span { border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; color: var(--ink-2); font-size: 14px; background: var(--surface); }
+.foot { padding-block: 40px 56px; color: var(--ink-3); font-size: 14px; }
+.foot .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; }
+
+/* Formulários e cartões */
+.page { padding-block: 40px 72px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 24px; }
+.stack { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+.stack-lg { display: grid; gap: 28px; grid-template-columns: minmax(0, 1fr); }
+.field { display: grid; gap: 6px; }
+.field label { font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.field input[type=text], .field input[type=email], .field input[type=password] { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 13px 14px; font-size: 16px; }
+.field input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.check { display: grid; grid-template-columns: 22px minmax(0,1fr); gap: 10px; font-size: 14px; color: var(--ink-2); align-items: start; }
+.check input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent); }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
+.tabs button { border: 0; background: none; padding: 10px; border-radius: 999px; font-weight: 700; color: var(--ink-2); cursor: pointer; }
+.tabs button[aria-selected=true] { background: var(--surface-2); color: var(--ink); }
+.msg { border-radius: var(--r-sm); padding: 12px 14px; font-size: 14px; border: 1px solid var(--line); background: var(--bg); }
+.msg-err { border-color: color-mix(in srgb, var(--crit) 55%, transparent); color: #F4B9BF; }
+.msg-ok { border-color: color-mix(in srgb, var(--good) 55%, transparent); color: #BFE8D2; }
+.divider { display: flex; align-items: center; gap: 12px; color: var(--ink-3); font-size: 13px; }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+/* Questionário */
+.quiz { max-width: 640px; margin: 0 auto; padding-block: 28px 64px; }
+.progress { display: grid; gap: 8px; margin-bottom: 22px; }
+.progress-top { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-3); font-family: var(--font-mono); letter-spacing: 0.06em; }
+.bar { height: 4px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); border-radius: 4px; transition: width .25s ease; }
+.q-text { font-family: var(--font-display); font-size: clamp(22px, 4.6vw, 28px); line-height: 1.28; font-weight: 500; min-height: 3.9em; }
+.q-hint { margin-top: 10px; color: var(--ink-3); font-size: 14px; }
+.opts { display: grid; gap: 10px; margin-top: 24px; }
+.opt { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: center; text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 16px; cursor: pointer; transition: border-color .12s ease, background-color .12s ease; }
+.opt:hover { border-color: var(--ink-3); }
+.opt[aria-pressed=true] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.opt-k { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-family: var(--font-mono); font-size: 13px; background: var(--surface-2); color: var(--ink-2); }
+.opt[aria-pressed=true] .opt-k { background: var(--accent); color: var(--accent-ink); }
+.opt-t { font-weight: 600; }
+.quiz-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 22px; gap: 12px; }
+.scene { border-left: 2px solid var(--cool); padding-left: 16px; }
+
+/* Relatório */
+.report-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: stretch; }
+.score-card { display: grid; gap: 14px; align-content: start; }
+.profile-card h2 { font-size: 30px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.h-sec { font-size: 22px; margin-bottom: 14px; }
+.alert { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; padding: 12px 14px; border-radius: var(--r-sm); background: var(--bg); border: 1px solid var(--line); }
+.alert-ico { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+.alert.warn .alert-ico { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
+.alert.crit .alert-ico { background: color-mix(in srgb, var(--crit) 22%, transparent); color: var(--crit); }
+.alert strong { display: block; }
+.meter { display: grid; gap: 6px; }
+.meter-top { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+.meter-track { height: 10px; background: var(--surface-2); border-radius: 6px; position: relative; overflow: hidden; }
+.meter-track > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 4px 4px 0; }
+.stackbar { display: flex; height: 26px; border-radius: 6px; overflow: hidden; gap: 2px; background: var(--surface); }
+.stackbar > i { display: block; height: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 14px; color: var(--ink-2); margin-top: 10px; }
+.legend span { display: inline-flex; gap: 8px; align-items: center; }
+.prio { display: grid; gap: 10px; }
+.prio-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.prio dl { margin: 0; display: grid; gap: 8px; }
+.prio dt { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+.prio dd { margin: 0; font-size: 15px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; gap: 8px; align-items: center; border-radius: 999px; padding: 6px 12px; border: 1px solid var(--line); background: var(--bg); font-size: 14px; }
+.chip b { font-variant-numeric: tabular-nums; }
+.weeks { display: grid; gap: 0; counter-reset: w; }
+.week { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 14px; padding-block: 14px; border-top: 1px solid var(--line); }
+.week:first-child { border-top: 0; }
+.week-n { font-family: var(--font-mono); font-size: 12px; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; padding-top: 3px; }
+.questions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.question { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 16px; background: var(--bg); display: grid; gap: 8px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-sm); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-family: var(--font-mono); font-weight: 500; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); background: var(--surface); }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.heat td.cell { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* Painéis */
+.hello { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 16px; }
+.list { display: grid; gap: 10px; }
+.row-btn { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 16px; cursor: pointer; }
+.row-btn:hover { border-color: var(--ink-3); }
+.row-meta { color: var(--ink-3); font-size: 13px; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 16px; display: grid; gap: 4px; }
+.kpi b { font-family: var(--font-display); font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.kpi span { font-size: 13px; color: var(--ink-3); }
+.hbars { display: grid; gap: 10px; }
+.hbar { display: grid; grid-template-columns: 128px minmax(0, 1fr) 44px; gap: 10px; align-items: center; font-size: 14px; }
+.hbar-track { height: 14px; background: var(--surface-2); border-radius: 4px; position: relative; }
+.hbar-track > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 4px 4px 0; background: var(--c-warm); }
+.hbar > span:first-child { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.hbar .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+.flag { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-strong); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
+.turma-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.turma-chips button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 14px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--ink-2); }
+.turma-chips button[aria-pressed=true] { border-color: var(--accent); color: var(--ink); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.inline-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.inline-form .field { flex: 1 1 240px; }
+.code-box { font-family: var(--font-mono); font-size: 22px; letter-spacing: 0.12em; color: var(--accent-strong); }
+.refs { display: grid; gap: 18px; }
+.ref-group { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.ref-group ul { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--ink-2); font-size: 15px; }
+.ev { display: inline-block; margin-top: 6px; font-size: 12px; color: var(--ink-3); }
+.install { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface-2); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.install .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 12px; }
+.toast { position: fixed; left: 50%; top: calc(76px + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 32px); text-align: center; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 14px; z-index: 40; }
+.radar-wrap svg { width: 100%; height: auto; display: block; }
+.empty { border: 1px dashed var(--line); border-radius: var(--r); padding: 28px; text-align: center; color: var(--ink-2); display: grid; gap: 12px; justify-items: center; }
+
+@media (max-width: 860px) {
+  .hero .wrap, .report-hero, .grid-2 { grid-template-columns: minmax(0, 1fr); }
+  .hero .wrap { padding-block: 48px 44px; gap: 36px; }
+  .steps, .grid-3 { grid-template-columns: minmax(0, 1fr); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ref-group { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+}
+@media (max-width: 600px) {
+  .axis-grid, .questions { grid-template-columns: minmax(0, 1fr); }
+  .hbar { grid-template-columns: 96px minmax(0, 1fr) 36px; }
+  .week { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .btn { width: 100%; }
+  .cta-row .btn, .actions .btn { width: 100%; }
+  .inline-form .btn { width: 100%; }
+  .nav .hide-sm { display: none; }
+  .brand { font-size: 16px; gap: 8px; }
+  .nav { gap: 2px; flex-wrap: nowrap; }
+  .nav button, .nav a { padding: 8px 7px; font-size: 13px; }
+  .card { padding: 18px; }
+}
+@media (max-width: 440px) { .hide-xs { display: none; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+@media print {
+  .top, .demo-strip, .install, .actions, .no-print { display: none !important; }
+  html, body { background: #fff; color: #111; }
+  .card, .kpi, .question, .alert { background: #fff; border-color: #ccc; color: #111; }
+  .muted, .row-meta { color: #444; }
+}
+</style>
+
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ============================== CONFIGURAÇÃO ============================== */
+const CONFIG = window.OQGCI_CONFIG || {};
+const LIVE = Boolean(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey);
+const SUPABASE_ESM = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
+
+/* ================================ MÉTODO ================================== */
+const SCALE = ['Nunca', 'Raramente', 'Às vezes', 'Frequentemente', 'Sempre'];
+
+const DIMS = [
+  { id: 'D1', nome: 'Propósito', eixo: 'base',
+    mede: 'Intenção de ajudar o cliente e honestidade quando o seu serviço não é o mais indicado.',
+    mecanismo: 'Julgamos a intenção de alguém antes da competência.',
+    pratica: 'Aplicar o teste da família antes de cada recomendação.',
+    exercicio: 'Antes de três conversas, responda por escrito: como esta conversa ajuda o cliente, mesmo que ele não compre comigo?',
+    indicador: 'Casos em que você indicou outro caminho ao cliente.' },
+  { id: 'D2', nome: 'Presença', eixo: 'aprox',
+    mede: 'A conversa que começa antes do primeiro oi: bio, conteúdo útil, avaliações e indicação.',
+    mecanismo: 'Quem chega por indicação já traz confiança emprestada.',
+    pratica: 'Fazer a bio e a apresentação começarem pelo problema do cliente.',
+    exercicio: 'Reescreva a bio e publique um conteúdo que ensine algo útil ao seu cliente.',
+    indicador: 'Avaliações e indicações pedidas no mês.' },
+  { id: 'D3', nome: 'Espelho', eixo: 'aprox',
+    mede: 'Conhecer a realidade do cliente, perguntar e aprofundar antes de apresentar o serviço.',
+    mecanismo: 'Falar de si ativa o circuito de recompensa do cérebro.',
+    pratica: 'Perguntar antes de apresentar.',
+    exercicio: 'Use "me conta mais sobre isso" pelo menos duas vezes em cada conversa.',
+    indicador: 'Conversas em que o serviço só apareceu depois de três perguntas.' },
+  { id: 'D4', nome: 'Virada', eixo: 'aprox',
+    mede: 'Levar ao cliente uma leitura nova sobre o próprio problema.',
+    mecanismo: 'A curiosidade ativa a dopamina e abre a janela da memória.',
+    pratica: 'Ter leituras novas preparadas para os problemas mais comuns.',
+    exercicio: 'Escreva três leituras novas sobre os problemas mais comuns dos seus clientes e teste cada uma numa conversa.',
+    indicador: 'Reações do tipo "nunca tinha pensado nisso desse jeito".' },
+  { id: 'D5', nome: 'Custo', eixo: 'afast',
+    mede: 'Ajudar o cliente a medir o custo de deixar como está, com números e uma história, sem exagero.',
+    mecanismo: 'Perder pesa cerca de duas vezes mais que ganhar.',
+    pratica: 'Deixar o próprio cliente fazer a conta.',
+    exercicio: 'Monte três perguntas de custo (tempo, dinheiro, energia) e um caso anônimo para cada serviço.',
+    indicador: 'Conversas em que o cliente calculou o custo de ficar parado.' },
+  { id: 'D6', nome: 'Caminho', eixo: 'afast',
+    mede: 'Recomendação clara, poucas opções, risco fora da mesa e próximo passo combinado.',
+    mecanismo: 'Uma recomendação clara retira o medo de errar, a maior causa da indecisão.',
+    pratica: 'Recomendar com clareza e tirar o risco da mesa.',
+    exercicio: 'Reduza a sua oferta a duas ou três opções e defina uma forma de reduzir o risco da decisão.',
+    indicador: 'Conversas encerradas com próximo passo e data.' },
+  { id: 'D7', nome: 'Quem decide', eixo: 'aprox',
+    mede: 'Identificar quem usa, quem paga e quem influencia, e falar com o ganho de cada um.',
+    mecanismo: 'Quem decide busca o apoio de quem está ao redor.',
+    pratica: 'Perguntar quem mais participa da decisão.',
+    exercicio: 'Crie um resumo de uma página para o cliente mostrar em casa ou ao sócio.',
+    indicador: 'Conversas em que você ouviu também quem paga ou quem influencia.' },
+  { id: 'D8', nome: 'Condução', eixo: 'afast',
+    mede: 'Postura assertiva em preço, desconto e retomada, com cuidado no melhor momento e no final do atendimento.',
+    mecanismo: 'Tensão moderada mantém o cliente pensando; pressão alta o coloca em defesa.',
+    pratica: 'Sustentar o valor do seu trabalho com respeito.',
+    exercicio: 'Ensaie as suas respostas para "quanto custa?", "faz desconto?" e para o cliente que sumiu.',
+    indicador: 'Descontos concedidos sem pedido do cliente (meta: zero).' }
+];
+const DIM = Object.fromEntries(DIMS.map(d => [d.id, d]));
+
+const ITEMS = [
+  ['1.1','D1','Quando percebo que meu serviço não é o mais indicado para alguém, digo isso ao cliente com clareza.',0],
+  ['1.2','D1','Recomendo aos clientes o mesmo que recomendaria a alguém da minha família na mesma situação.',0],
+  ['1.3','D1','Antes de uma conversa, penso em como ela pode ajudar o cliente mesmo que ele não compre comigo.',0],
+  ['1.4','D1','Ofereço a opção mais cara mesmo quando uma mais simples resolveria o caso do cliente.',1],
+  ['2.1','D2','As primeiras linhas da minha bio, site ou apresentação falam do problema do meu cliente.',0],
+  ['2.2','D2','Publico conteúdos que ensinam algo útil ao meu cliente, com regularidade.',0],
+  ['2.3','D2','Peço avaliações, depoimentos e indicações a clientes satisfeitos.',0],
+  ['2.4','D2','Minha apresentação começa pela minha formação, anos de experiência e lista de serviços.',1],
+  ['3.1','D3','Começo a conversa perguntando sobre a situação do cliente antes de falar do meu serviço.',0],
+  ['3.2','D3','Faço perguntas de aprofundamento, como "me conta mais sobre isso".',0],
+  ['3.3','D3','Consigo descrever a rotina e as preocupações típicas dos meus clientes com exemplos concretos.',0],
+  ['3.4','D3','Quando o cliente começa a contar o problema, interrompo para apresentar a solução.',1],
+  ['4.1','D4','Levo ao cliente uma informação ou leitura sobre o problema dele que ele ainda não tinha.',0],
+  ['4.2','D4','Ouço reações como "nunca tinha pensado nisso desse jeito" nas minhas conversas.',0],
+  ['4.3','D4','Tenho preparadas duas ou três leituras novas sobre os problemas mais comuns dos meus clientes.',0],
+  ['4.4','D4','Concordo com o diagnóstico que o cliente traz, mesmo quando enxergo o problema de outro jeito.',1],
+  ['5.1','D5','Ajudo o cliente a calcular o que o problema já custa em tempo, dinheiro ou energia.',0],
+  ['5.2','D5','Conto casos reais e anônimos de clientes parecidos para ilustrar o que está em jogo.',0],
+  ['5.3','D5','Mostro o custo de deixar como está com números reais, sem exagerar.',0],
+  ['5.4','D5','Evito falar das consequências do problema para não parecer que estou pressionando.',1],
+  ['6.1','D6','Faço uma recomendação clara, como "no seu caso, eu faria assim".',0],
+  ['6.2','D6','Apresento todas as opções e pacotes e deixo o cliente escolher sozinho.',1],
+  ['6.3','D6','Ofereço formas de reduzir o risco da decisão: primeira conversa, teste, troca ou garantia.',0],
+  ['6.4','D6','Termino cada conversa com um próximo passo combinado e uma data.',0],
+  ['7.1','D7','Pergunto quem mais vai participar da decisão.',0],
+  ['7.2','D7','Adapto os argumentos para quem usa, quem paga e quem influencia.',0],
+  ['7.3','D7','Ofereço ao cliente um resumo ou material para ele conversar com quem decide junto.',0],
+  ['7.4','D7','Quando o cliente diz "vou ver com meu marido" ou "com meu sócio", encerro a conversa e espero ele voltar.',1],
+  ['8.1','D8','Informo o preço com tranquilidade e sem rodeios quando o cliente pergunta.',0],
+  ['8.2','D8','Quando o cliente pede desconto, sustento o valor e ajusto formato, prazo ou quantidade.',0],
+  ['8.3','D8','Retomo o contato com quem sumiu trazendo algo útil e uma pergunta leve.',0],
+  ['8.4','D8','Cuido do melhor momento e do final de cada atendimento, para o cliente sair com uma boa lembrança.',0],
+  ['8.5','D8','Ofereço desconto antes de o cliente pedir.',1]
+].map(([c, d, t, inv]) => ({ c, d, t, inv: Boolean(inv) }));
+
+// Ordem de exibição das opções varia por cenário; o rótulo da postura nunca aparece para o respondente.
+const SJT = [
+  { id: 'S1', t: 'A primeira mensagem do cliente no WhatsApp é: "Quanto custa?"', ops: [
+    ['assertiva', '"A sessão é R$ X. É para você? Me conta um pouco, que eu te digo se faz sentido."'],
+    ['passiva', '"Depende! Te mando a tabela com todos os pacotes e você escolhe."'],
+    ['agressiva', '"Antes de falar de preço, preciso que você agende uma avaliação. Só tenho dois horários esta semana."'] ] },
+  { id: 'S2', t: 'O cliente pede desconto.', ops: [
+    ['passiva', '"Claro, faço 15% para você."'],
+    ['agressiva', '"Esse já é o mínimo. Quem quer qualidade paga por ela."'],
+    ['assertiva', '"O que pesa mais para você agora? Se for o valor de uma vez, consigo dividir em etapas."'] ] },
+  { id: 'S3', t: 'O cliente diz: "Vou ver com meu marido."', ops: [
+    ['agressiva', '"Mas a decisão não é sua? Essa condição vale só até hoje."'],
+    ['assertiva', '"Ótimo. Quer que eu te mande um resumo para mostrar a ele, ou prefere uma conversa rápida com os dois?"'],
+    ['passiva', '"Tudo bem, qualquer coisa me chama."'] ] },
+  { id: 'S4', t: 'O cliente sumiu há cinco dias, depois de receber o orçamento.', ops: [
+    ['passiva', 'Espero o cliente voltar a falar.'],
+    ['assertiva', 'Envio um conteúdo útil ligado ao caso dele e pergunto: "Ficou alguma dúvida que eu possa esclarecer?"'],
+    ['agressiva', '"Oi, vai fechar ou não? Preciso liberar a agenda."'] ] },
+  { id: 'S5', t: 'O cliente chega com um diagnóstico próprio que você considera equivocado.', ops: [
+    ['assertiva', '"Posso te mostrar uma coisa que costuma pesar mais no resultado?" e explico com um exemplo.'],
+    ['agressiva', '"Isso que você está pensando está errado. Deixa que eu sei do que você precisa."'],
+    ['passiva', 'Vendo exatamente o que ele pediu.'] ] },
+  { id: 'S6', t: 'Você percebe que o seu serviço não é o mais indicado para o caso do cliente.', ops: [
+    ['agressiva', 'Insisto que o meu serviço resolve o caso.'],
+    ['passiva', 'Vendo assim mesmo, para não perder a venda.'],
+    ['assertiva', 'Explico o motivo e indico outro caminho ou outro profissional.'] ] }
+].map(s => ({ ...s, ops: s.ops.map(([k, t]) => ({ k, t })) }));
+
+const LEVELS = [
+  { min: 80, n: 4, nome: 'Propósito', leitura: 'Você conduz do Espelho ao Caminho com interesse genuíno, de forma consistente.' },
+  { min: 60, n: 3, nome: 'Conversa', leitura: 'Você aplica os quatro movimentos com consistência parcial.' },
+  { min: 40, n: 2, nome: 'Atendimento', leitura: 'Você atende com cuidado e responde bem ao que o cliente pergunta. Conduz pouco.' },
+  { min: 0, n: 1, nome: 'Vitrine', leitura: 'A conversa gira em torno do serviço, e o cliente decide sozinho.' }
+];
+const levelOf = v => LEVELS.find(l => v >= l.min);
+
+const PROFILES = {
+  insistente: { nome: 'Insistente', conversa: 'Conduz com força e gera resistência. Fecha a venda e perde a indicação.', foco: 'Trabalhe a postura nas situações e o Espelho: a firmeza rende mais quando o cliente se sente ouvido e percebe a intenção de ajudar.' },
+  reativo: { nome: 'Reativo', conversa: 'Responde ao que o cliente pergunta e espera a decisão acontecer.', foco: 'Comece por Espelho e Caminho: perguntar antes de apresentar e terminar cada conversa com um próximo passo.' },
+  prestativo: { nome: 'Prestativo', conversa: 'Escuta muito bem e agrada. Evita dizer o que o cliente ainda não quer ouvir e perde a venda na decisão.', foco: 'Trabalhe Virada, Custo e Caminho: ajudar inclui, às vezes, dizer ao cliente algo que ele ainda não quer ouvir.' },
+  especialista: { nome: 'Especialista', conversa: 'Domina o próprio serviço e fala dele cedo. O cliente não se reconhece na conversa.', foco: 'Trabalhe Espelho e Quem decide: o conhecimento rende mais depois que o cliente se sentiu ouvido.' },
+  conselheiro: { nome: 'Conselheiro', conversa: 'Traz uma leitura nova, mostra o custo com ética e recomenda com firmeza.', foco: 'Mantenha a consistência e refine as dimensões abaixo de 80. Você pode servir de referência para outras pessoas da equipe ou do grupo.' },
+  desenvolvimento: { nome: 'Em desenvolvimento', conversa: 'Combina pontos fortes e lacunas sem um padrão dominante.', foco: 'Siga as três prioridades abaixo, uma por semana.' }
+};
+
+const QUESTIONS = [
+  ['Propósito', 'Como essa conversa ajuda o meu cliente, mesmo que ele não compre comigo?'],
+  ['Virada', 'O que o meu cliente ainda não enxerga sobre o próprio problema?'],
+  ['Quem decide', 'Quem mais participa dessa decisão, e o que importa para cada um?'],
+  ['Caminho', 'Qual recomendação clara e qual próximo passo eu vou propor?']
+];
+
+const REFS = [
+  { g: 'OQGCI · aproximação e afastamento', ev: 'Evidência sólida para o circuito de recompensa; a aplicação à venda é leitura do método.', r: [
+    'Knutson, B. et al. (2007). Neural predictors of purchases. Neuron, 53(1).',
+    'Barrett, L. F. (2017). How Emotions Are Made: The Secret Life of the Brain. Houghton Mifflin Harcourt.',
+    'Barrett, L. F. (2020). Seven and a Half Lessons About the Brain. Houghton Mifflin Harcourt.',
+    'Lieberman, D. Z. e Long, M. E. (2018). The Molecule of More. BenBella Books.' ] },
+  { g: 'D1 · Propósito', ev: 'Evidência sólida.', r: [
+    'Mayer, R. C., Davis, J. H. e Schoorman, F. D. (1995). An integrative model of organizational trust. Academy of Management Review, 20(3).',
+    'Fiske, S. T., Cuddy, A. J. C. e Glick, P. (2007). Universal dimensions of social cognition: warmth and competence. Trends in Cognitive Sciences, 11(2).',
+    'Grant, A. M. et al. (2007). Impact and the art of motivation maintenance. Organizational Behavior and Human Decision Processes, 103(1).',
+    'Campbell, M. C. e Kirmani, A. (2000). Consumers’ use of persuasion knowledge. Journal of Consumer Research, 27(1).',
+    'Franke, G. R. e Park, J.-E. (2006). Salesperson adaptive selling behavior and customer orientation: a meta-analysis. Journal of Marketing Research, 43(4).' ] },
+  { g: 'D2 · Presença', ev: 'Evidência moderada: estudos isolados e robustos.', r: [
+    'Schmitt, P., Skiera, B. e Van den Bulte, C. (2011). Referral programs and customer value. Journal of Marketing, 75(1).',
+    'Klucharev, V. et al. (2009). Reinforcement learning signal predicts social conformity. Neuron, 61(1).' ] },
+  { g: 'D3 · Espelho', ev: 'Evidência sólida.', r: [
+    'Rogers, T. B., Kuiper, N. A. e Kirker, W. S. (1977). Self-reference and the encoding of personal information. Journal of Personality and Social Psychology, 35(9).',
+    'Kelley, W. M. et al. (2002). Finding the self? An event-related fMRI study. Journal of Cognitive Neuroscience, 14(5).',
+    'Tamir, D. I. e Mitchell, J. P. (2012). Disclosing information about the self is intrinsically rewarding. PNAS, 109(21).',
+    'Huang, K. et al. (2017). It doesn’t hurt to ask: question-asking increases liking. Journal of Personality and Social Psychology, 113(3).' ] },
+  { g: 'D4 · Virada', ev: 'Evidência sólida para curiosidade e predição; a aplicação à venda é leitura do método.', r: [
+    'Gruber, M. J., Gelman, B. D. e Ranganath, C. (2014). States of curiosity modulate hippocampus-dependent learning via the dopaminergic circuit. Neuron, 84(2).',
+    'Schultz, W., Dayan, P. e Montague, P. R. (1997). A neural substrate of prediction and reward. Science, 275(5306).',
+    'Clark, A. (2023). The Experience Machine. Pantheon.' ] },
+  { g: 'D5 · Custo', ev: 'Evidência sólida para aversão à perda e narrativa; marcadores somáticos em debate.', r: [
+    'Brown, A. L., Imai, T., Vieider, F. M. e Camerer, C. F. (2024). Meta-analysis of empirical estimates of loss aversion. Journal of Economic Literature, 62(2).',
+    'Gal, D. e Rucker, D. D. (2018). The loss of loss aversion. Journal of Consumer Psychology, 28(3).',
+    'van Laer, T. et al. (2014). The extended transportation-imagery model. Journal of Consumer Research, 40(5).',
+    'Stephens, G. J., Silbert, L. J. e Hasson, U. (2010). Speaker–listener neural coupling underlies successful communication. PNAS, 107(32).',
+    'Damasio, A. (1994). O Erro de Descartes. Companhia das Letras.' ] },
+  { g: 'D6 · Caminho', ev: 'Evidência moderada: o efeito do excesso de escolha depende do contexto.', r: [
+    'Dixon, M. e McKenna, T. (2022). The JOLT Effect. Portfolio.',
+    'Knutson, B. et al. (2007). Neural predictors of purchases. Neuron, 53(1).',
+    'Chernev, A., Böckenholt, U. e Goodman, J. (2015). Choice overload: a conceptual review and meta-analysis. Journal of Consumer Psychology, 25(2).' ] },
+  { g: 'D7 · Quem decide', ev: 'Evidência moderada.', r: [
+    'Klucharev, V. et al. (2009). Reinforcement learning signal predicts social conformity. Neuron, 61(1).',
+    'Dixon, M. e Adamson, B. (2011). The Challenger Sale. Portfolio.' ] },
+  { g: 'D8 · Condução', ev: 'Evidência sólida para estresse e regra do pico-fim; janela de tolerância é modelo clínico.', r: [
+    'Arnsten, A. F. T. (2009). Stress signalling pathways that impair prefrontal cortex structure and function. Nature Reviews Neuroscience, 10(6).',
+    'Kahneman, D., Fredrickson, B. L., Schreiber, C. A. e Redelmeier, D. A. (1993). When more pain is preferred to less: adding a better end. Psychological Science, 4(6).',
+    'Siegel, D. J. (1999). The Developing Mind. Guilford Press.',
+    'Sapolsky, R. M. (2017). Behave. Penguin Press.' ] }
+];
+
+/* =============================== PONTUAÇÃO ================================ */
+const avg = a => a.reduce((s, x) => s + x, 0) / a.length;
+const r0 = v => Math.round(v);
+
+function scoreAnswers(items, sjt) {
+  const dims = {};
+  let d8Items = 0;
+  for (const d of DIMS) {
+    const vals = ITEMS.filter(i => i.d === d.id).map(i => i.inv ? 6 - items[i.c] : items[i.c]);
+    dims[d.id] = (avg(vals) - 1) / 4 * 100;
+  }
+  d8Items = dims.D8;
+  const postura = { passiva: 0, assertiva: 0, agressiva: 0 };
+  for (const s of SJT) postura[sjt[s.id]] += 1;
+  const pctAssert = postura.assertiva / SJT.length * 100;
+  dims.D8 = 0.7 * d8Items + 0.3 * pctAssert;
+
+  const aprox = avg(['D2', 'D3', 'D4', 'D7'].map(k => dims[k]));
+  const afast = avg(['D5', 'D6', 'D8'].map(k => dims[k]));
+  const indice = avg(DIMS.map(d => dims[d.id]));
+
+  const alerts = [];
+  const base = dims.D1 < 50 || sjt.S6 !== 'assertiva';
+  if (base) alerts.push({ k: 'base', sev: 'crit', t: 'Base frágil', d: 'A técnica sem a linha de base reduz a sinceridade percebida pelo cliente. Propósito passa a ser a sua primeira prioridade.' });
+  if (postura.agressiva >= 2) alerts.push({ k: 'pressao', sev: 'crit', t: 'Pressão', d: 'Em duas ou mais situações, a sua resposta pressiona o cliente. Sob pressão, ele entra em modo de defesa e decide pior.' });
+  if (postura.passiva >= 3) alerts.push({ k: 'concessao', sev: 'warn', t: 'Concessão', d: 'Em três ou mais situações, o valor do seu trabalho cede antes de o cliente pedir.' });
+  if (aprox - afast >= 20) alerts.push({ k: 'deseq', sev: 'warn', t: 'Desequilíbrio OQGCI', d: 'O cliente percebe o ganho e adia a decisão. Fortaleça Custo, Caminho e Condução.' });
+  if (afast - aprox >= 20) alerts.push({ k: 'deseq', sev: 'warn', t: 'Desequilíbrio OQGCI', d: 'O cliente sente a urgência e ainda não enxerga o ganho. Fortaleça Presença, Espelho, Virada e Quem decide.' });
+
+  const has = k => alerts.some(a => a.k === k);
+  const minDim = Math.min(...DIMS.map(d => dims[d.id]));
+  let perfil = 'desenvolvimento';
+  if (has('pressao') || (d8Items >= 60 && dims.D1 < 50)) perfil = 'insistente';
+  else if (indice < 45) perfil = 'reativo';
+  else if (dims.D1 >= 65 && dims.D3 >= 65 && avg([dims.D4, dims.D5, dims.D6]) < 55 && has('concessao')) perfil = 'prestativo';
+  else if ((dims.D2 >= 60 || dims.D4 >= 60) && dims.D3 < 50) perfil = 'especialista';
+  else if (indice >= 70 && minDim >= 55 && postura.assertiva >= 4) perfil = 'conselheiro';
+
+  const sorted = DIMS.map(d => d.id).sort((a, b) => dims[a] - dims[b]);
+  let prioridades = sorted.slice(0, 3);
+  if (base && !prioridades.includes('D1')) prioridades = ['D1', ...prioridades.slice(0, 2)];
+  else if (base) prioridades = ['D1', ...prioridades.filter(x => x !== 'D1')];
+  const forcas = sorted.slice().reverse().filter(x => !prioridades.includes(x)).slice(0, 3);
+
+  const round = {};
+  for (const k in dims) round[k] = r0(dims[k]);
+  return {
+    v: 1,
+    dims: round,
+    indice: r0(indice), aprox: r0(aprox), afast: r0(afast),
+    nivel: levelOf(r0(indice)).nome,
+    postura, perfil, alerts, prioridades, forcas
+  };
+}
+
+/* ============================== UTILITÁRIOS =============================== */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const LS = {
+  get(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* armazenamento indisponível */ } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) { /* */ } }
+};
+const fmtDate = iso => { try { return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }); } catch (e) { return iso; } };
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36));
+const genCode = () => { const a = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += a[Math.floor(Math.random() * a.length)]; return 'OQG-' + s; };
+function toast(t) { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => { el.hidden = true; }, 2600); }
+async function copyText(t, fallbackEl) {
+  try { await navigator.clipboard.writeText(t); toast('Copiado'); }
+  catch (e) {
+    if (fallbackEl) { fallbackEl.hidden = false; fallbackEl.value = t; fallbackEl.select(); }
+    toast('Selecione o texto e copie');
+  }
+}
+const hashStr = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return 'h' + (h >>> 0).toString(36); };
+
+/* ===================== ARMAZENAMENTO · DEMONSTRAÇÃO ======================= */
+function seedExamples() {
+  const now = Date.now();
+  const mk = (n, means, sjtPattern) => {
+    const items = {};
+    const offs = [0.4, -0.4, 0.2, -0.2, 0];
+    for (const d of DIMS) {
+      const its = ITEMS.filter(i => i.d === d.id);
+      its.forEach((it, k) => {
+        let v = Math.min(5, Math.max(1, Math.round(means[d.id] + offs[k % offs.length])));
+        items[it.c] = it.inv ? 6 - v : v;
+      });
+    }
+    const sjt = {};
+    SJT.forEach((s, k) => { sjt[s.id] = sjtPattern[k]; });
+    const resultado = scoreAnswers(items, sjt);
+    return { id: 'ex-' + n, user_id: 'ex-user-' + n, nome: 'Exemplo ' + n, turma_id: 'turma-exemplo', respostas: { items, sjt }, resultado, created_at: new Date(now - n * 86400000 * 0.7).toISOString(), exemplo: true };
+  };
+  const A = 'assertiva', P = 'passiva', G = 'agressiva';
+  const all = v => Object.fromEntries(DIMS.map(d => [d.id, v]));
+  return [
+    mk(1, all(4.6), [A, A, A, A, A, A]),
+    mk(2, { D1: 4.7, D2: 3.4, D3: 4.5, D4: 2.6, D5: 2.2, D6: 2.6, D7: 3.2, D8: 2.8 }, [P, P, P, A, A, A]),
+    mk(3, { D1: 3.6, D2: 4.3, D3: 2.5, D4: 4.1, D5: 3.3, D6: 3.4, D7: 3.0, D8: 3.4 }, [A, A, P, A, G, A]),
+    mk(4, { D1: 2.3, D2: 3.4, D3: 3.0, D4: 3.3, D5: 3.8, D6: 3.9, D7: 3.1, D8: 4.3 }, [G, G, A, G, A, A]),
+    mk(5, all(2.3), [P, P, A, P, A, A]),
+    mk(6, { D1: 3.8, D2: 3.1, D3: 3.6, D4: 3.0, D5: 3.2, D6: 3.5, D7: 2.8, D8: 3.4 }, [A, A, A, P, A, A]),
+    mk(7, { D1: 4.4, D2: 4.0, D3: 4.3, D4: 3.9, D5: 3.7, D6: 4.2, D7: 3.9, D8: 4.0 }, [A, A, A, A, P, A]),
+    mk(8, { D1: 4.1, D2: 2.9, D3: 4.0, D4: 3.1, D5: 2.9, D6: 3.0, D7: 3.6, D8: 3.0 }, [P, A, P, A, A, A])
+  ];
+}
+
+function DemoStore() {
+  const KEY = 'oqgci-demo-v1';
+  let db = LS.get(KEY);
+  if (!db || db.v !== 1) {
+    db = { v: 1, users: [], session: null, results: seedExamples(), turmas: [{ id: 'turma-exemplo', nome: 'Exemplo · Workshop Venda com Propósito', codigo: 'OQG-DEMO', created_at: new Date().toISOString(), exemplo: true }] };
+  }
+  const save = () => LS.set(KEY, db);
+  save();
+  const pub = u => u ? { id: u.id, nome: u.nome, email: u.email, role: u.role } : null;
+  return {
+    mode: 'demo',
+    async init() {},
+    async getSession() { const u = db.users.find(x => x.id === db.session); return pub(u); },
+    async signUp({ nome, email, senha }) {
+      email = email.trim().toLowerCase();
+      if (db.users.some(u => u.email === email)) throw new Error('Já existe uma conta com este e-mail. Use a aba Entrar.');
+      const u = { id: uid(), nome: nome.trim(), email, pw: hashStr(senha), role: 'respondente', consentimento_em: new Date().toISOString() };
+      db.users.push(u); db.session = u.id; save();
+      return { user: pub(u) };
+    },
+    async signIn({ email, senha }) {
+      email = email.trim().toLowerCase();
+      const u = db.users.find(x => x.email === email && x.pw === hashStr(senha));
+      if (!u) throw new Error('E-mail ou senha não conferem. Confira os dados ou crie uma conta.');
+      db.session = u.id; save(); return pub(u);
+    },
+    async signInFacilitatorDemo() {
+      let u = db.users.find(x => x.email === 'facilitador@demo');
+      if (!u) { u = { id: uid(), nome: 'Luis', email: 'facilitador@demo', pw: '', role: 'facilitador' }; db.users.push(u); }
+      db.session = u.id; save(); return pub(u);
+    },
+    async resetPassword() { return { demo: true }; },
+    async signOut() { db.session = null; save(); },
+    async findTurma(codigo) { const t = db.turmas.find(x => x.codigo.toUpperCase() === codigo.trim().toUpperCase()); return t ? { id: t.id, nome: t.nome } : null; },
+    async saveResult({ turma_id, respostas, resultado }) {
+      const u = db.users.find(x => x.id === db.session);
+      const rec = { id: uid(), user_id: u.id, nome: u.nome, turma_id: turma_id || null, respostas, resultado, created_at: new Date().toISOString() };
+      db.results.push(rec); save(); return rec;
+    },
+    async myResults() { return db.results.filter(r => r.user_id === db.session).sort((a, b) => b.created_at.localeCompare(a.created_at)); },
+    async getResult(id) { return db.results.find(r => r.id === id) || null; },
+    async listTurmas() { return db.turmas.slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')); },
+    async createTurma(nome) { const t = { id: uid(), nome: nome.trim(), codigo: genCode(), created_at: new Date().toISOString() }; db.turmas.push(t); save(); return t; },
+    async turmaResults(turmaId) {
+      return db.results.filter(r => turmaId === 'todos' ? true : turmaId === 'sem' ? !r.turma_id : r.turma_id === turmaId).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    }
+  };
+}
+
+/* ======================= ARMAZENAMENTO · SUPABASE ========================= */
+function LiveStore() {
+  let sb = null;
+  let profileCache = null;
+  const toRec = r => ({ id: r.id, user_id: r.user_id, nome: r.profiles?.nome || '', turma_id: r.turma_id, respostas: r.respostas, resultado: r.resultado, created_at: r.created_at });
+  const errPt = e => {
+    const m = (e && e.message) || '';
+    if (/Invalid login credentials/i.test(m)) return new Error('E-mail ou senha não conferem. Confira os dados ou crie uma conta.');
+    if (/Email not confirmed/i.test(m)) return new Error('Confirme o seu e-mail pelo link que enviamos antes de entrar.');
+    if (/already registered/i.test(m)) return new Error('Já existe uma conta com este e-mail. Use a aba Entrar.');
+    if (/Password should be at least/i.test(m)) return new Error('A senha precisa ter pelo menos 6 caracteres.');
+    if (/rate limit/i.test(m)) return new Error('Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente de novo.');
+    return new Error(m || 'Não foi possível concluir. Verifique a conexão e tente de novo.');
+  };
+  async function profile() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { profileCache = null; return null; }
+    if (profileCache && profileCache.id === session.user.id) return profileCache;
+    const { data } = await sb.from('profiles').select('id, nome, email, role').eq('id', session.user.id).maybeSingle();
+    profileCache = data || { id: session.user.id, nome: session.user.user_metadata?.nome || '', email: session.user.email, role: 'respondente' };
+    return profileCache;
+  }
+  return {
+    mode: 'live',
+    async init(onRecovery) {
+      const mod = await import(SUPABASE_ESM);
+      sb = mod.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
+      sb.auth.onAuthStateChange((ev) => { profileCache = null; if (ev === 'PASSWORD_RECOVERY' && onRecovery) onRecovery(); });
+    },
+    getSession: profile,
+    async signUp({ nome, email, senha }) {
+      const { data, error } = await sb.auth.signUp({ email: email.trim(), password: senha, options: { data: { nome: nome.trim() }, emailRedirectTo: location.origin + location.pathname } });
+      if (error) throw errPt(error);
+      return { user: data.session ? await profile() : null, needsConfirm: !data.session };
+    },
+    async signIn({ email, senha }) {
+      const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password: senha });
+      if (error) throw errPt(error);
+      return profile();
+    },
+    async resetPassword(email) {
+      const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: location.origin + location.pathname });
+      if (error) throw errPt(error);
+      return {};
+    },
+    async updatePassword(senha) { const { error } = await sb.auth.updateUser({ password: senha }); if (error) throw errPt(error); },
+    async signOut() { await sb.auth.signOut(); profileCache = null; },
+    async findTurma(codigo) { const { data, error } = await sb.rpc('turma_por_codigo', { p_codigo: codigo.trim() }); if (error) throw errPt(error); return (data && data[0]) || null; },
+    async saveResult({ turma_id, respostas, resultado }) {
+      const p = await profile();
+      const { data, error } = await sb.from('resultados').insert({ user_id: p.id, turma_id: turma_id || null, respostas, resultado, indice: resultado.indice, nivel: resultado.nivel, perfil: resultado.perfil }).select('*, profiles(nome)').single();
+      if (error) throw errPt(error);
+      return toRec(data);
+    },
+    async myResults() {
+      const p = await profile();
+      const { data, error } = await sb.from('resultados').select('*, profiles(nome)').eq('user_id', p.id).order('created_at', { ascending: false });
+      if (error) throw errPt(error); return data.map(toRec);
+    },
+    async getResult(id) { const { data, error } = await sb.from('resultados').select('*, profiles(nome)').eq('id', id).maybeSingle(); if (error) throw errPt(error); return data ? toRec(data) : null; },
+    async listTurmas() { const { data, error } = await sb.from('turmas').select('*').order('created_at', { ascending: false }); if (error) throw errPt(error); return data; },
+    async createTurma(nome) {
+      for (let i = 0; i < 4; i++) {
+        const { data, error } = await sb.from('turmas').insert({ nome: nome.trim(), codigo: genCode() }).select().single();
+        if (!error) return data;
+        if (!/duplicate/i.test(error.message)) throw errPt(error);
+      }
+      throw new Error('Não foi possível gerar um código único. Tente de novo.');
+    },
+    async turmaResults(turmaId) {
+      let q = sb.from('resultados').select('*, profiles(nome)').order('created_at', { ascending: false });
+      if (turmaId === 'sem') q = q.is('turma_id', null); else if (turmaId !== 'todos') q = q.eq('turma_id', turmaId);
+      const { data, error } = await q; if (error) throw errPt(error); return data.map(toRec);
+    }
+  };
+}
+
+const store = LIVE ? LiveStore() : DemoStore();
+
+/* ================================ ESTADO ================================== */
+const DRAFT_KEY = 'oqgci-rascunho';
+const S = {
+  session: null,
+  route: 'inicio',
+  authTab: 'entrar',
+  authMsg: null,
+  busy: false,
+  quiz: null,
+  result: null,
+  myResults: null,
+  fac: { turmas: null, sel: null, results: null, newCode: null },
+  installEvt: null,
+  installHidden: false
+};
+const ROUTES = ['inicio', 'referencias', 'entrar', 'painel', 'diagnostico', 'resultado', 'facilitador', 'nova-senha'];
+const PRIVATE = ['painel', 'diagnostico', 'resultado', 'facilitador'];
+
+function go(route) {
+  if (location.hash.slice(1) !== route) { location.hash = route; } else { route_(); }
+}
+async function route_() {
+  let r = location.hash.slice(1) || 'inicio';
+  if (!ROUTES.includes(r)) r = 'inicio';
+  if (PRIVATE.includes(r) && !S.session) { S.authMsg = null; r = 'entrar'; }
+  if (r === 'facilitador' && S.session?.role !== 'facilitador') r = 'painel';
+  if (r === 'resultado' && !S.result) r = 'painel';
+  if (r === 'entrar' && S.session) r = 'painel';
+  if (r === 'nova-senha' && !LIVE) r = 'entrar';
+  S.route = r;
+  if (r === 'painel') { S.myResults = null; render(); try { S.myResults = await store.myResults(); } catch (e) { S.myResults = []; } }
+  if (r === 'facilitador') { await loadFac(); }
+  if (r === 'diagnostico' && !S.quiz) startQuiz();
+  render();
+  window.scrollTo(0, 0);
+}
+
+/* ============================ COMPONENTES ================================ */
+const LOGO = `<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="12.5" fill="none" stroke="var(--line)" stroke-width="1"/><path d="M14 2.5 A11.5 11.5 0 0 0 14 25.5 Z" fill="var(--accent)"/><path d="M14 6.5 A7.5 7.5 0 0 1 14 21.5 Z" fill="var(--cool)" opacity=".85"/></svg>`;
+
+function topBar() {
+  const s = S.session;
+  const links = s
+    ? `<button data-go="painel">Meu painel</button>${s.role === 'facilitador' ? '<button data-go="facilitador">Facilitador</button>' : ''}<button class="hide-sm" data-go="referencias">Referências</button><button data-act="sair">Sair</button>`
+    : `<button class="hide-sm" data-go="referencias">Referências</button><button data-go="entrar">Entrar</button>`;
+  return `<header class="top"><div class="wrap"><a class="brand" href="#inicio" aria-label="Diagnóstico OQGCI">${LOGO}<span><span class="hide-xs">Diagnóstico </span>OQGCI</span></a><nav class="nav" aria-label="Principal">${links}</nav></div></header>
+  ${store.mode === 'demo' ? `<div class="demo-strip"><div class="wrap"><span class="demo-dot"></span><span>Prévia em modo demonstração: contas e respostas ficam salvas só neste aparelho.</span></div></div>` : ''}`;
+}
+
+function viewInicio() {
+  const ex = { indice: 64, nivel: 'Conversa', perfil: 'Prestativo', aprox: 71, afast: 52 };
+  const group = eixo => DIMS.filter(d => d.eixo === eixo).map(d => `<div class="dim-row"><span class="dim-code">${d.id}</span><div><strong>${d.nome}</strong><span class="muted small">${esc(d.mede)}</span></div></div>`).join('');
+  const d1 = DIM.D1;
+  return `
+  <section class="hero"><div class="wrap">
+    <div>
+      <span class="pill"><span class="demo-dot" aria-hidden="true"></span><span class="eyebrow">Neurociência aplicada à venda</span></span>
+      <h1>Todo cliente decide com uma pergunta: <span class="gold">o que eu ganho com isto?</span></h1>
+      <p class="lead">Em cerca de 15 minutos, o Diagnóstico OQGCI mostra como você conduz a conversa de venda, qual é o seu perfil e o que praticar nos próximos 30 dias.</p>
+      <div class="cta-row">
+        <button class="btn btn-primary" data-go="${S.session ? 'diagnostico' : 'entrar'}">${S.session ? 'Iniciar diagnóstico' : 'Entrar no diagnóstico'} <span aria-hidden="true">→</span></button>
+        ${S.session ? '' : '<button class="btn btn-ghost" data-act="criar">Criar conta gratuita</button>'}
+      </div>
+      <button class="ref-link" data-go="referencias"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h4.5A1.5 1.5 0 0 1 8 4.5V14a1 1 0 0 0-1-1H2zM14 3H9.5A1.5 1.5 0 0 0 8 4.5V14a1 1 0 0 1 1-1h5z" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>Referências científicas</button>
+    </div>
+    <aside class="sample" aria-label="Exemplo de relatório">
+      <div class="sample-head"><span class="eyebrow">Índice OQGCI</span><span class="tag">Exemplo de relatório</span></div>
+      <div style="display:flex;align-items:end;gap:14px;margin-top:10px;flex-wrap:wrap"><div class="big-num tnum">${ex.indice}<small>/100</small></div><span class="level-chip">Nível 3 · ${ex.nivel}</span></div>
+      <p class="muted small" style="margin-top:10px">Perfil <strong style="color:var(--ink)">${ex.perfil}</strong>: escuta muito bem e agrada, e perde a venda na hora da decisão.</p>
+      <div class="stack" style="margin-top:18px;gap:12px">
+        ${meter('Aproximação', ex.aprox, 'var(--c-warm)')}
+        ${meter('Afastamento', ex.afast, 'var(--c-cool)')}
+      </div>
+      <div class="alert warn" style="margin-top:16px"><span class="alert-ico" aria-hidden="true">!</span><div><strong>Desequilíbrio OQGCI</strong><span class="muted small">O cliente percebe o ganho e adia a decisão.</span></div></div>
+    </aside>
+  </div></section>
+
+  <section class="section"><div class="wrap">
+    <div class="section-head"><span class="eyebrow">O que o diagnóstico mede</span><h2>Oito dimensões, organizadas pela pergunta do cliente</h2><p class="muted">O cliente se aproxima do que lhe faz bem e se afasta do que lhe faz mal. Cada dimensão mede quanto você ajuda nesse movimento.</p></div>
+    <div class="axis-grid">
+      <div class="axis-col"><h3><span class="swatch" style="background:var(--c-warm)"></span>Aproximação</h3><p class="muted small">O cliente percebe o que ganha.</p>${group('aprox')}</div>
+      <div class="axis-col"><h3><span class="swatch" style="background:var(--c-cool)"></span>Afastamento</h3><p class="muted small">O cliente se afasta do custo de ficar parado, do medo de errar e da pressão.</p>${group('afast')}</div>
+    </div>
+    <div class="base-band"><span class="dim-code">${d1.id}</span><div><strong>${d1.nome}, a linha de base</strong><span class="muted small">${esc(d1.mede)} Ela sustenta as outras sete dimensões.</span></div></div>
+  </div></section>
+
+  <section class="section"><div class="wrap">
+    <div class="section-head"><span class="eyebrow">Como funciona</span><h2>Do diagnóstico à prática em três passos</h2></div>
+    <div class="steps">
+      <div class="step"><span class="step-n">PASSO 1</span><h3>Responda</h3><p class="muted">33 afirmações sobre as suas conversas dos últimos 30 dias e 6 situações do dia a dia, como "quanto custa?" e o cliente que sumiu.</p></div>
+      <div class="step"><span class="step-n">PASSO 2</span><h3>Receba o relatório</h3><p class="muted">Índice OQGCI, nível de maturidade, perfil, postura na conversa, forças e as três prioridades.</p></div>
+      <div class="step"><span class="step-n">PASSO 3</span><h3>Pratique por 30 dias</h3><p class="muted">Uma prioridade por semana, com exercício e indicador. Depois de 60 a 90 dias, refaça o diagnóstico e compare.</p></div>
+    </div>
+  </div></section>
+
+  <section class="section"><div class="wrap">
+    <div class="section-head"><span class="eyebrow">Para quem</span><h2>Feito para quem vende o próprio trabalho</h2><p class="muted">Facilitadores criam turmas com código de acesso e acompanham o resultado do grupo.</p></div>
+    <div class="who"><span>Empreendedores</span><span>Terapeutas</span><span>Prestadores de serviço</span><span>Lojistas</span><span>Equipes de venda</span><span>Grupos de networking</span><span>Facilitadores de workshops</span></div>
+  </div></section>
+
+  <footer class="foot"><div class="wrap"><span>Diagnóstico OQGCI · Método Venda com Propósito</span><span><button class="link-btn" data-go="referencias">Referências científicas</button></span></div></footer>`;
+}
+
+function meter(label, v, color) {
+  return `<div class="meter"><div class="meter-top"><span>${label}</span><b class="tnum">${v}</b></div><div class="meter-track" role="img" aria-label="${label}: ${v} de 100"><i style="width:${Math.max(2, v)}%;background:${color}"></i></div></div>`;
+}
+
+function viewReferencias() {
+  return `<main class="page"><div class="wrap narrow stack-lg">
+    <div class="stack"><span class="eyebrow">Referências científicas</span><h1 style="font-size:clamp(30px,5vw,44px)">A base do Diagnóstico OQGCI</h1>
+    <p class="muted">Cada dimensão se apoia em pesquisas de psicologia, neurociência e vendas. O nível de evidência indica quanto o achado está consolidado na literatura.</p></div>
+    <div class="refs">${REFS.map(g => `<div class="ref-group"><div><strong>${esc(g.g)}</strong><span class="ev">${esc(g.ev)}</span></div><ul>${g.r.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`).join('')}</div>
+    <p class="muted small">A relação entre oxitocina e confiança fica fora do núcleo científico do diagnóstico, porque as tentativas de replicação tiveram resultados inconsistentes.</p>
+    <p class="muted small">O instrumento está em fase de validação. Use o resultado como ferramenta de desenvolvimento.</p>
+    <div><button class="btn btn-quiet btn-sm" data-go="${S.session ? 'painel' : 'inicio'}">Voltar</button></div>
+  </div></main>`;
+}
+
+function viewEntrar() {
+  const t = S.authTab;
+  const m = S.authMsg ? `<div class="msg ${S.authMsg.ok ? 'msg-ok' : 'msg-err'}" role="${S.authMsg.ok ? 'status' : 'alert'}">${esc(S.authMsg.t)}</div>` : '';
+  const form = t === 'entrar' ? `
+    <form id="f-entrar" class="stack" novalidate>
+      <div class="field"><label for="in-email">E-mail</label><input id="in-email" type="email" autocomplete="email" required></div>
+      <div class="field"><label for="in-senha">Senha</label><input id="in-senha" type="password" autocomplete="current-password" required></div>
+      ${m}
+      <button class="btn btn-primary" type="submit" ${S.busy ? 'disabled' : ''}>Entrar <span aria-hidden="true">→</span></button>
+      <button type="button" class="link-btn small" data-act="esqueci" style="justify-self:start">Esqueci minha senha</button>
+    </form>` : t === 'criar' ? `
+    <form id="f-criar" class="stack" novalidate>
+      <div class="field"><label for="cr-nome">Nome</label><input id="cr-nome" type="text" autocomplete="name" required></div>
+      <div class="field"><label for="cr-email">E-mail</label><input id="cr-email" type="email" autocomplete="email" required></div>
+      <div class="field"><label for="cr-senha">Senha</label><input id="cr-senha" type="password" autocomplete="new-password" minlength="6" required><span class="muted small">Pelo menos 6 caracteres.</span></div>
+      <label class="check" for="cr-lgpd"><input id="cr-lgpd" type="checkbox" required><span>Autorizo o uso das minhas respostas para gerar o meu relatório e, de forma agregada e sem identificação, para a validação do método, conforme a LGPD. Posso pedir a exclusão dos meus dados a qualquer momento.</span></label>
+      ${m}
+      <button class="btn btn-primary" type="submit" ${S.busy ? 'disabled' : ''}>Criar conta <span aria-hidden="true">→</span></button>
+    </form>` : `
+    <form id="f-esqueci" class="stack" novalidate>
+      <p class="muted small">Informe o seu e-mail. Enviamos um link para você criar uma nova senha.</p>
+      <div class="field"><label for="rs-email">E-mail</label><input id="rs-email" type="email" autocomplete="email" required></div>
+      ${m}
+      <button class="btn btn-primary" type="submit" ${S.busy ? 'disabled' : ''}>Enviar link</button>
+      <button type="button" class="link-btn small" data-tab="entrar" style="justify-self:start">Voltar para Entrar</button>
+    </form>`;
+  return `<main class="page"><div class="wrap" style="max-width:480px"><div class="stack-lg">
+    <div class="stack" style="gap:8px"><span class="eyebrow">Diagnóstico OQGCI</span><h1 style="font-size:34px">${t === 'criar' ? 'Crie a sua conta' : t === 'esqueci' ? 'Recuperar senha' : 'Entre na sua conta'}</h1></div>
+    <div class="card stack">
+      ${t !== 'esqueci' ? `<div class="tabs" role="tablist"><button role="tab" data-tab="entrar" aria-selected="${t === 'entrar'}">Entrar</button><button role="tab" data-tab="criar" aria-selected="${t === 'criar'}">Criar conta</button></div>` : ''}
+      ${form}
+    </div>
+    ${store.mode === 'demo' ? `<div class="stack" style="gap:12px"><div class="divider">Prévia</div><button class="btn btn-quiet" data-act="fac-demo">Ver o painel do facilitador com dados de exemplo</button></div>` : ''}
+  </div></div></main>`;
+}
+
+function viewNovaSenha() {
+  const m = S.authMsg ? `<div class="msg ${S.authMsg.ok ? 'msg-ok' : 'msg-err'}">${esc(S.authMsg.t)}</div>` : '';
+  return `<main class="page"><div class="wrap" style="max-width:480px"><div class="card stack">
+    <h1 style="font-size:28px">Crie uma nova senha</h1>
+    <form id="f-nova" class="stack" novalidate><div class="field"><label for="nv-senha">Nova senha</label><input id="nv-senha" type="password" autocomplete="new-password" minlength="6" required></div>${m}<button class="btn btn-primary" type="submit">Salvar nova senha</button></form>
+  </div></div></main>`;
+}
+
+function viewPainel() {
+  const s = S.session;
+  const list = S.myResults;
+  const rows = list === null ? '<p class="muted">Carregando seus diagnósticos…</p>'
+    : list.length === 0 ? `<div class="empty"><strong>Você ainda não fez nenhum diagnóstico</strong><span class="small">O primeiro leva cerca de 15 minutos. O resultado aparece aqui e fica salvo para você comparar depois.</span><button class="btn btn-primary btn-sm" data-go="diagnostico">Iniciar diagnóstico</button></div>`
+    : `<div class="list">${list.map(r => `<button class="row-btn" data-open="${esc(r.id)}"><span><strong>Índice ${r.resultado.indice} · ${esc(r.resultado.nivel)}</strong><br><span class="row-meta">${fmtDate(r.created_at)} · perfil ${esc(PROFILES[r.resultado.perfil].nome)}</span></span><span aria-hidden="true" class="muted">→</span></button>`).join('')}</div>`;
+  const draft = LS.get(DRAFT_KEY);
+  return `<main class="page"><div class="wrap narrow stack-lg">
+    <div class="hello"><div class="stack" style="gap:6px"><span class="eyebrow">Meu painel</span><h1 style="font-size:clamp(28px,5vw,40px)">Olá${s.nome ? ', ' + esc(s.nome.split(' ')[0]) : ''}</h1></div>
+    <button class="btn btn-primary" data-go="diagnostico">${draft ? 'Continuar diagnóstico' : 'Iniciar diagnóstico'} <span aria-hidden="true">→</span></button></div>
+    ${s.role === 'facilitador' ? `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><strong>Painel do facilitador</strong><br><span class="muted small">Turmas, códigos de acesso e resultados dos grupos.</span></span><button class="btn btn-ghost btn-sm" data-go="facilitador">Abrir</button></div>` : ''}
+    <div class="stack"><h2 class="h-sec" style="margin:0">Meus diagnósticos</h2>${rows}</div>
+  </div></main>`;
+}
+
+/* ============================== QUESTIONÁRIO ============================== */
+function startQuiz() {
+  const d = LS.get(DRAFT_KEY);
+  S.quiz = d && d.v === 1 && (!d.uid || d.uid === S.session?.id) ? d : { v: 1, uid: S.session?.id, step: 0, items: {}, sjt: {}, turma: null, code: '' };
+}
+const TOTAL = ITEMS.length + SJT.length;
+function saveDraft() { LS.set(DRAFT_KEY, S.quiz); }
+
+function viewDiagnostico() {
+  const q = S.quiz;
+  if (q.step === 0) {
+    return `<main class="quiz wrap"><div class="stack-lg">
+      <div class="stack" style="gap:10px"><span class="eyebrow">Antes de começar</span><h1 style="font-size:clamp(28px,5vw,38px)">Pense nas suas conversas com clientes nos últimos 30 dias</h1>
+      <p class="muted">São duas partes: 33 afirmações sobre o que você costuma fazer e 6 situações do dia a dia. Responda pelo que você realmente faz. O resultado é mais útil quando reflete a sua prática atual.</p></div>
+      <div class="card stack">
+        <div class="field"><label for="qz-code">Código da turma <span class="muted">(opcional)</span></label><input id="qz-code" type="text" autocomplete="off" placeholder="OQG-XXXX" value="${esc(q.code)}" style="text-transform:uppercase"><span class="muted small">Se você está num workshop ou numa equipe, use o código que o facilitador passou.${store.mode === 'demo' ? ' Na prévia, o código OQG-DEMO entra na turma de exemplo.' : ''}</span></div>
+        <div id="qz-msg"></div>
+        <button class="btn btn-primary" data-act="qz-start" ${S.busy ? 'disabled' : ''}>Começar <span aria-hidden="true">→</span></button>
+      </div>
+      <p class="muted small">Leva cerca de 15 minutos. O progresso fica salvo neste aparelho, e você pode continuar depois.</p>
+    </div></main>`;
+  }
+  const idx = q.step - 1;
+  const pct = Math.round(idx / TOTAL * 100);
+  const isItem = idx < ITEMS.length;
+  const head = `<div class="progress"><div class="progress-top"><span>${isItem ? 'PARTE 1 · SUA PRÁTICA' : 'PARTE 2 · SITUAÇÕES'}</span><span class="tnum">${idx + 1} de ${TOTAL}</span></div><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div></div>`;
+  let body;
+  if (isItem) {
+    const it = ITEMS[idx];
+    const cur = q.items[it.c];
+    body = `<p class="q-text">${esc(it.t)}</p><p class="q-hint">Com que frequência isso aconteceu nos últimos 30 dias?</p>
+      <div class="opts" role="group" aria-label="Frequência">${SCALE.map((s, k) => `<button class="opt" data-ans="${k + 1}" aria-pressed="${cur === k + 1}"><span class="opt-k">${k + 1}</span><span class="opt-t">${s}</span></button>`).join('')}</div>`;
+  } else {
+    const sc = SJT[idx - ITEMS.length];
+    const cur = q.sjt[sc.id];
+    body = `<div class="scene"><p class="eyebrow" style="margin-bottom:8px">Situação ${idx - ITEMS.length + 1} de ${SJT.length}</p><p class="q-text" style="min-height:0">${esc(sc.t)}</p></div><p class="q-hint">Escolha a resposta mais parecida com o que você faria.</p>
+      <div class="opts" role="group" aria-label="Respostas">${sc.ops.map((o, k) => `<button class="opt" data-sjt="${o.k}" aria-pressed="${cur === o.k}"><span class="opt-k">${'ABC'[k]}</span><span class="opt-t" style="font-weight:500">${esc(o.t)}</span></button>`).join('')}</div>`;
+  }
+  const answered = isItem ? q.items[ITEMS[idx].c] != null : q.sjt[SJT[idx - ITEMS.length].id] != null;
+  return `<main class="quiz wrap">${head}${body}
+    <div class="quiz-nav"><button class="btn btn-quiet btn-sm" data-act="qz-back" style="width:auto">← Voltar</button>
+    ${idx === TOTAL - 1 ? `<button class="btn btn-primary btn-sm" data-act="qz-finish" style="width:auto" ${answered && !S.busy ? '' : 'disabled'}>Ver meu resultado</button>` : `<button class="btn btn-quiet btn-sm" data-act="qz-next" style="width:auto" ${answered ? '' : 'disabled'}>Avançar →</button>`}</div>
+  </main>`;
+}
+
+async function quizStart() {
+  const q = S.quiz;
+  const code = ($('#qz-code')?.value || '').trim();
+  q.code = code; q.turma = null;
+  if (code) {
+    S.busy = true; render();
+    try {
+      const t = await store.findTurma(code);
+      S.busy = false;
+      if (!t) { render(); $('#qz-msg').innerHTML = '<div class="msg msg-err" role="alert">Não encontramos uma turma com esse código. Confira com o facilitador ou deixe o campo em branco.</div>'; return; }
+      q.turma = t;
+    } catch (e) { S.busy = false; render(); $('#qz-msg').innerHTML = `<div class="msg msg-err" role="alert">${esc(e.message)}</div>`; return; }
+  }
+  q.step = 1; saveDraft(); render();
+  if (q.turma) toast('Turma: ' + q.turma.nome);
+}
+
+async function quizFinish() {
+  const q = S.quiz;
+  if (Object.keys(q.items).length < ITEMS.length || Object.keys(q.sjt).length < SJT.length) {
+    const miss = ITEMS.findIndex(i => q.items[i.c] == null);
+    q.step = miss >= 0 ? miss + 1 : ITEMS.length + SJT.findIndex(s => !q.sjt[s.id]) + 1; render(); toast('Falta responder esta pergunta'); return;
+  }
+  S.busy = true; render();
+  const resultado = scoreAnswers(q.items, q.sjt);
+  try {
+    const rec = await store.saveResult({ turma_id: q.turma?.id, respostas: { items: q.items, sjt: q.sjt }, resultado });
+    LS.del(DRAFT_KEY); S.quiz = null; S.busy = false; S.result = rec; go('resultado');
+  } catch (e) { S.busy = false; render(); toast(e.message || 'Não foi possível salvar. Tente de novo.'); }
+}
+
+/* =============================== RELATÓRIO ================================ */
+function radar(dims) {
+  const cx = 200, cy = 178, R = 118;
+  const order = ['D1', 'D2', 'D3', 'D4', 'D7', 'D5', 'D6', 'D8'];
+  const ang = i => -Math.PI / 2 + i * 2 * Math.PI / order.length;
+  const pt = (i, v) => [cx + Math.cos(ang(i)) * R * v / 100, cy + Math.sin(ang(i)) * R * v / 100];
+  const rings = [25, 50, 75, 100].map(v => `<polygon points="${order.map((_, i) => pt(i, v).join(',')).join(' ')}" fill="none" stroke="var(--line)" stroke-width="1"/>`).join('');
+  const spokes = order.map((_, i) => { const [x, y] = pt(i, 100); return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`; }).join('');
+  const poly = order.map((k, i) => pt(i, dims[k]).join(',')).join(' ');
+  const dots = order.map((k, i) => { const [x, y] = pt(i, dims[k]); return `<circle cx="${x}" cy="${y}" r="4.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"><title>${DIM[k].nome}: ${dims[k]}</title></circle>`; }).join('');
+  const labels = order.map((k, i) => {
+    const [x, y] = pt(i, 100); const a = ang(i); const c = Math.cos(a);
+    const lx = x + Math.cos(a) * 16, ly = y + Math.sin(a) * 16 + 4;
+    const anchor = Math.abs(c) < 0.2 ? 'middle' : c > 0 ? 'start' : 'end';
+    const col = DIM[k].eixo === 'aprox' ? 'var(--c-warm)' : DIM[k].eixo === 'afast' ? 'var(--cool)' : 'var(--ink-2)';
+    return `<text x="${lx}" y="${ly}" text-anchor="${anchor}" font-size="12.5" fill="var(--ink-2)" font-family="Manrope, sans-serif"><tspan fill="${col}">●</tspan> ${DIM[k].nome} <tspan font-weight="700" fill="var(--ink)">${dims[k]}</tspan></text>`;
+  }).join('');
+  const ticks = [50, 100].map(v => { const [x, y] = pt(0, v); return `<text x="${x + 5}" y="${y + 12}" font-size="10.5" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace">${v}</text>`; }).join('');
+  return `<svg viewBox="-40 0 480 350" role="img" aria-label="Radar das oito dimensões">${rings}${spokes}<polygon points="${poly}" fill="var(--accent)" fill-opacity=".16" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>${dots}${labels}${ticks}</svg>`;
+}
+
+function resumoTexto(rec) {
+  const r = rec.resultado;
+  const p = PROFILES[r.perfil];
+  return [
+    `Diagnóstico OQGCI · ${fmtDate(rec.created_at)}`,
+    `Índice OQGCI: ${r.indice}/100 · Nível ${levelOf(r.indice).n}, ${r.nivel}`,
+    `Perfil: ${p.nome}`,
+    `Aproximação ${r.aprox} · Afastamento ${r.afast}`,
+    `Postura nas situações: ${r.postura.assertiva} assertiva, ${r.postura.passiva} passiva, ${r.postura.agressiva} agressiva`,
+    '',
+    'Dimensões:',
+    ...DIMS.map(d => `- ${d.nome}: ${r.dims[d.id]}`),
+    '',
+    'Prioridades:',
+    ...r.prioridades.map((k, i) => `${i + 1}. ${DIM[k].nome}: ${DIM[k].pratica}`)
+  ].join('\n');
+}
+
+function viewResultado() {
+  const rec = S.result; const r = rec.resultado; const lvl = levelOf(r.indice); const p = PROFILES[r.perfil];
+  const total = SJT.length;
+  const seg = (k, c) => r.postura[k] ? `<i style="width:${r.postura[k] / total * 100}%;background:${c}" title="${k}: ${r.postura[k]} de ${total}"></i>` : '';
+  const balance = Math.abs(r.aprox - r.afast) < 20 ? 'Os dois eixos estão equilibrados.' : r.aprox > r.afast ? 'O cliente percebe o ganho e adia a decisão.' : 'O cliente sente a urgência e ainda não enxerga o ganho.';
+  const weeks = [
+    ...r.prioridades.map((k, i) => `<div class="week"><span class="week-n">Semana ${i + 1}</span><div><strong>${DIM[k].nome}</strong><p class="muted">${esc(DIM[k].exercicio)}</p></div></div>`),
+    `<div class="week"><span class="week-n">Semana 4</span><div><strong>Apresentação de 60 segundos</strong><p class="muted">Reescreva a sua apresentação com os quatro movimentos: Espelho, Virada, Custo e Caminho. O seu nome e o seu serviço entram só no Caminho. Leia as quatro perguntas abaixo antes de cada conversa.</p></div></div>`
+  ].join('');
+  const refine = DIMS.filter(d => !r.prioridades.includes(d.id) && !r.forcas.includes(d.id) && r.dims[d.id] >= 60 && r.dims[d.id] < 80);
+  const isMine = rec.user_id === S.session?.id;
+  return `<main class="page"><div class="wrap stack-lg">
+    <div class="hello"><div class="stack" style="gap:6px"><span class="eyebrow">Relatório · ${fmtDate(rec.created_at)}${rec.nome && !isMine ? ' · ' + esc(rec.nome) : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">Seu Diagnóstico OQGCI</h1></div>
+      <div class="actions no-print"><button class="btn btn-quiet btn-sm" data-act="copiar-resumo">Copiar resumo</button>${LIVE ? '<button class="btn btn-quiet btn-sm" data-act="imprimir">Salvar em PDF</button>' : ''}</div></div>
+    <textarea id="resumo-fallback" hidden readonly style="width:100%;min-height:160px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px"></textarea>
+
+    <div class="report-hero">
+      <div class="card score-card">
+        <span class="eyebrow">Índice OQGCI</span>
+        <div style="display:flex;align-items:end;gap:14px;flex-wrap:wrap"><div class="big-num tnum">${r.indice}<small>/100</small></div><span class="level-chip">Nível ${lvl.n} · ${lvl.nome}</span></div>
+        <p class="muted">${esc(lvl.leitura)}</p>
+        <div class="stack" style="gap:12px">${meter('Aproximação · o cliente percebe o ganho', r.aprox, 'var(--c-warm)')}${meter('Afastamento · o cliente se livra do que faz mal', r.afast, 'var(--c-cool)')}</div>
+        <p class="small muted">${balance}</p>
+      </div>
+      <div class="card profile-card stack">
+        <span class="eyebrow">Seu perfil</span>
+        <h2>${p.nome}</h2>
+        <p>${esc(p.conversa)}</p>
+        <p class="muted">${esc(p.foco)}</p>
+        <div><p class="small muted" style="margin-bottom:8px">Postura nas seis situações</p>
+          <div class="stackbar" role="img" aria-label="Postura: ${r.postura.assertiva} assertiva, ${r.postura.passiva} passiva, ${r.postura.agressiva} agressiva">${seg('assertiva', 'var(--c-warm)')}${seg('passiva', 'var(--c-cool)')}${seg('agressiva', 'var(--c-third)')}</div>
+          <div class="legend"><span><i class="swatch" style="background:var(--c-warm)"></i>Assertiva <b class="tnum">${r.postura.assertiva}</b></span><span><i class="swatch" style="background:var(--c-cool)"></i>Passiva <b class="tnum">${r.postura.passiva}</b></span><span><i class="swatch" style="background:var(--c-third)"></i>Agressiva <b class="tnum">${r.postura.agressiva}</b></span></div>
+        </div>
+      </div>
+    </div>
+
+    ${r.alerts.length ? `<div class="stack"><h2 class="h-sec" style="margin:0">Pontos de atenção</h2>${r.alerts.map(a => `<div class="alert ${a.sev}"><span class="alert-ico" aria-hidden="true">!</span><div><strong>${esc(a.t)}</strong><span class="muted small">${esc(a.d)}</span></div></div>`).join('')}</div>` : ''}
+
+    <div class="grid-2">
+      <div class="card"><h2 class="h-sec">As oito dimensões</h2><div class="radar-wrap">${radar(r.dims)}</div>
+        <div class="legend"><span><i class="swatch" style="background:var(--c-warm)"></i>Aproximação</span><span><i class="swatch" style="background:var(--cool)"></i>Afastamento</span><span><i class="swatch" style="background:var(--ink-2)"></i>Linha de base</span></div></div>
+      <div class="card"><h2 class="h-sec">Suas forças</h2>
+        <div class="stack">${r.forcas.map(k => `<div class="prio"><div class="prio-head"><strong>${DIM[k].nome}</strong><b class="tnum">${r.dims[k]}</b></div><p class="muted small">${esc(DIM[k].mecanismo)}</p></div>`).join('<hr style="border:0;border-top:1px solid var(--line);margin:0">')}</div>
+        ${refine.length ? `<p class="small muted" style="margin-top:18px">Para refinar: ${refine.map(d => `${d.nome} (${d.pratica.charAt(0).toLowerCase() + d.pratica.slice(1, -1)})`).join('; ')}.</p>` : ''}
+      </div>
+    </div>
+
+    <div class="stack"><h2 class="h-sec" style="margin:0">Suas três prioridades</h2>
+      <div class="grid-3">${r.prioridades.map((k, i) => `<div class="card prio"><div class="prio-head"><span class="eyebrow">Prioridade ${i + 1}</span><b class="tnum">${r.dims[k]}</b></div><h3 style="font-size:22px">${DIM[k].nome}</h3>
+        <dl><dt>Prática</dt><dd>${esc(DIM[k].pratica)}</dd><dt>Exercício</dt><dd>${esc(DIM[k].exercicio)}</dd><dt>Indicador em 30 dias</dt><dd>${esc(DIM[k].indicador)}</dd></dl></div>`).join('')}</div>
+    </div>
+
+    <div class="card"><h2 class="h-sec">Trilha de 30 dias</h2><div class="weeks">${weeks}</div></div>
+
+    <div class="stack"><h2 class="h-sec" style="margin:0">Quatro perguntas antes da próxima conversa</h2>
+      <div class="questions">${QUESTIONS.map(([k, t]) => `<div class="question"><span class="eyebrow">${k}</span><strong style="font-family:var(--font-display);font-size:19px;font-weight:600">${esc(t)}</strong></div>`).join('')}</div></div>
+
+    <details class="card"><summary style="cursor:pointer;font-weight:700">Tabela das pontuações</summary>
+      <div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Dimensão</th><th>Eixo</th><th class="num">Pontuação</th><th>Nível</th></tr></thead><tbody>
+      ${DIMS.map(d => `<tr><td>${d.id} · ${d.nome}</td><td>${d.eixo === 'aprox' ? 'Aproximação' : d.eixo === 'afast' ? 'Afastamento' : 'Linha de base'}</td><td class="num">${r.dims[d.id]}</td><td>${levelOf(r.dims[d.id]).nome}</td></tr>`).join('')}
+      </tbody></table></div></details>
+
+    <div class="actions no-print">${isMine ? '<button class="btn btn-primary" data-go="painel">Voltar ao meu painel</button>' : '<button class="btn btn-primary" data-go="facilitador">Voltar ao painel do facilitador</button>'}<button class="btn btn-ghost" data-go="referencias">Referências científicas</button></div>
+  </div></main>`;
+}
+
+/* ============================== FACILITADOR =============================== */
+async function loadFac() {
+  try {
+    S.fac.turmas = await store.listTurmas();
+    if (!S.fac.sel) S.fac.sel = S.fac.turmas[0]?.id || 'todos';
+    S.fac.results = await store.turmaResults(S.fac.sel);
+  } catch (e) { S.fac.turmas = S.fac.turmas || []; S.fac.results = []; toast(e.message); }
+}
+
+function csvOf(results) {
+  const head = ['nome', 'data', 'indice', 'nivel', 'perfil', 'aproximacao', 'afastamento', ...DIMS.map(d => d.id + '_' + d.nome), 'assertiva', 'passiva', 'agressiva', 'alertas'];
+  const q = v => /[",;\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
+  const rows = results.map(x => { const r = x.resultado; return [x.nome || '', x.created_at.slice(0, 10), r.indice, r.nivel, PROFILES[r.perfil].nome, r.aprox, r.afast, ...DIMS.map(d => r.dims[d.id]), r.postura.assertiva, r.postura.passiva, r.postura.agressiva, r.alerts.map(a => a.t).join(' | ')].map(q).join(','); });
+  return [head.map(q).join(','), ...rows].join('\n');
+}
+
+function viewFacilitador() {
+  const F = S.fac; const res = F.results || []; const turmas = F.turmas || [];
+  const selT = turmas.find(t => t.id === F.sel);
+  const n = res.length;
+  const mean = k => n ? Math.round(avg(res.map(x => x.resultado.dims[k]))) : 0;
+  const idxMean = n ? Math.round(avg(res.map(x => x.resultado.indice))) : 0;
+  const dimMeans = DIMS.map(d => ({ d, v: mean(d.id) }));
+  const low3 = dimMeans.slice().sort((a, b) => a.v - b.v).slice(0, 3).map(x => x.d.id);
+  const pCount = {}; res.forEach(x => { pCount[x.resultado.perfil] = (pCount[x.resultado.perfil] || 0) + 1; });
+  const pList = Object.keys(PROFILES).map(k => ({ k, c: pCount[k] || 0 })).filter(x => x.c > 0).sort((a, b) => b.c - a.c);
+  const maxP = Math.max(1, ...pList.map(x => x.c));
+  const topP = pList[0] ? PROFILES[pList[0].k].nome : '—';
+  const heat = v => `background:color-mix(in srgb, var(--c-warm) ${Math.round(6 + v * 0.6)}%, var(--surface))`;
+  const chips = [...turmas.map(t => `<button data-turma="${esc(t.id)}" aria-pressed="${F.sel === t.id}">${esc(t.nome)}</button>`), `<button data-turma="sem" aria-pressed="${F.sel === 'sem'}">Sem turma</button>`, `<button data-turma="todos" aria-pressed="${F.sel === 'todos'}">Todos</button>`].join('');
+  const body = n === 0 ? `<div class="empty"><strong>Nenhum diagnóstico nesta turma ainda</strong><span class="small">Passe o código ${selT ? `<b class="code-box" style="font-size:16px">${esc(selT.codigo)}</b>` : 'da turma'} aos participantes. Cada pessoa cria a conta, informa o código no início do diagnóstico e aparece aqui ao terminar.</span></div>` : `
+    <div class="kpis">
+      <div class="kpi"><b>${n}</b><span>Respondentes</span></div>
+      <div class="kpi"><b>${idxMean}</b><span>Índice OQGCI médio</span></div>
+      <div class="kpi"><b>${levelOf(idxMean).nome}</b><span>Nível médio</span></div>
+      <div class="kpi"><b style="font-size:22px;padding-block:4px">${topP}</b><span>Perfil mais frequente</span></div>
+    </div>
+    <div class="grid-2">
+      <div class="card"><h2 class="h-sec">Média por dimensão</h2><div class="hbars">${dimMeans.map(({ d, v }) => `<div class="hbar" title="${d.nome}: média ${v}"><span>${d.nome}${low3.includes(d.id) ? '<span class="flag">prioridade</span>' : ''}</span><span class="hbar-track"><i style="width:${Math.max(1, v)}%"></i></span><span class="v">${v}</span></div>`).join('')}</div>
+        <p class="small muted" style="margin-top:14px">As três dimensões com menor média são as prioridades de capacitação da turma.</p></div>
+      <div class="card"><h2 class="h-sec">Distribuição de perfis</h2><div class="hbars">${pList.map(x => `<div class="hbar" title="${PROFILES[x.k].nome}: ${x.c}"><span>${PROFILES[x.k].nome}</span><span class="hbar-track"><i style="width:${x.c / maxP * 100}%;background:var(--c-cool)"></i></span><span class="v">${x.c}</span></div>`).join('')}</div></div>
+    </div>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><h2 class="h-sec" style="margin:0">Mapa da turma</h2><div class="actions"><button class="btn btn-quiet btn-sm" data-act="copiar-csv">Copiar CSV</button>${LIVE ? '<button class="btn btn-quiet btn-sm" data-act="baixar-csv">Baixar CSV</button>' : ''}</div></div>
+      <textarea id="csv-fallback" hidden readonly style="width:100%;min-height:120px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px"></textarea>
+      <div class="table-wrap"><table class="heat"><thead><tr><th>Pessoa</th><th class="num">Índice</th><th>Perfil</th>${DIMS.map(d => `<th class="num" title="${d.nome}">${d.nome}</th>`).join('')}<th>Data</th><th>Alertas</th></tr></thead><tbody>
+      ${res.map(x => { const r = x.resultado; return `<tr><td><button class="link-btn" data-fac-open="${esc(x.id)}">${esc(x.nome || 'Sem nome')}</button>${x.exemplo ? ' <span class="tag">exemplo</span>' : ''}</td><td class="num"><b>${r.indice}</b></td><td>${PROFILES[r.perfil].nome}</td>${DIMS.map(d => `<td class="cell" style="${heat(r.dims[d.id])}">${r.dims[d.id]}</td>`).join('')}<td>${fmtDate(x.created_at)}</td><td>${r.alerts.map(a => esc(a.t)).join(', ') || '—'}</td></tr>`; }).join('')}
+      </tbody></table></div>
+      <p class="small muted" style="margin-top:10px">Cor mais intensa indica pontuação mais alta. Toque no nome para abrir o relatório da pessoa.</p>
+    </div>`;
+  return `<main class="page"><div class="wrap stack-lg">
+    <div class="stack" style="gap:6px"><span class="eyebrow">Painel do facilitador</span><h1 style="font-size:clamp(28px,5vw,40px)">Turmas e resultados</h1></div>
+    <div class="card stack">
+      <form id="f-turma" class="inline-form" novalidate><div class="field"><label for="tm-nome">Nova turma</label><input id="tm-nome" type="text" placeholder="Ex.: Workshop Venda com Propósito · novembro" required></div><button class="btn btn-primary btn-sm" type="submit">Criar turma e gerar código</button></form>
+      ${F.newCode ? `<div class="msg msg-ok" role="status">Turma criada. Código de acesso: <span class="code-box">${esc(F.newCode)}</span> <button type="button" class="link-btn" data-copy="${esc(F.newCode)}">Copiar</button></div>` : ''}
+    </div>
+    <div class="stack" style="gap:10px"><span class="small muted">Turma selecionada${selT ? ` · código <b class="tnum" style="color:var(--ink)">${esc(selT.codigo)}</b> <button type="button" class="link-btn small" data-copy="${esc(selT.codigo)}">copiar</button>` : ''}</span><div class="turma-chips">${chips}</div></div>
+    ${F.results === null ? '<p class="muted">Carregando…</p>' : body}
+  </div></main>`;
+}
+
+/* ================================ RENDER ================================== */
+function installBar() {
+  if (!S.installEvt || S.installHidden) return '';
+  return `<div class="install no-print"><div class="wrap"><span class="small">Instale o Diagnóstico OQGCI como aplicativo no seu celular.</span><span class="actions" style="flex-wrap:nowrap"><button class="btn btn-primary btn-sm" data-act="instalar" style="width:auto">Instalar</button><button class="btn btn-quiet btn-sm" data-act="fechar-instalar" style="width:auto" aria-label="Fechar aviso">✕</button></span></div></div>`;
+}
+
+function render() {
+  const views = { inicio: viewInicio, referencias: viewReferencias, entrar: viewEntrar, painel: viewPainel, diagnostico: viewDiagnostico, resultado: viewResultado, facilitador: viewFacilitador, 'nova-senha': viewNovaSenha };
+  $('#app').innerHTML = topBar() + views[S.route]() + installBar();
+}
+
+/* ================================ EVENTOS ================================= */
+document.addEventListener('click', async (ev) => {
+  const t = ev.target.closest('[data-go],[data-act],[data-tab],[data-ans],[data-sjt],[data-open],[data-fac-open],[data-turma],[data-copy]');
+  if (!t) return;
+  if (t.dataset.go) { if (t.dataset.go === 'diagnostico' && !S.quiz) startQuiz(); go(t.dataset.go); return; }
+  if (t.dataset.tab) { S.authTab = t.dataset.tab; S.authMsg = null; render(); return; }
+  if (t.dataset.copy) { copyText(t.dataset.copy); return; }
+  if (t.dataset.ans) {
+    const q = S.quiz; const it = ITEMS[q.step - 1]; q.items[it.c] = Number(t.dataset.ans); saveDraft(); render();
+    setTimeout(() => { if (S.route === 'diagnostico' && S.quiz === q && q.step - 1 < TOTAL - 1) { q.step += 1; saveDraft(); render(); } }, 220);
+    return;
+  }
+  if (t.dataset.sjt) {
+    const q = S.quiz; const sc = SJT[q.step - 1 - ITEMS.length]; q.sjt[sc.id] = t.dataset.sjt; saveDraft(); render();
+    setTimeout(() => { if (S.route === 'diagnostico' && S.quiz === q && q.step - 1 < TOTAL - 1) { q.step += 1; saveDraft(); render(); } }, 220);
+    return;
+  }
+  if (t.dataset.open) { const r = await store.getResult(t.dataset.open); if (r) { S.result = r; go('resultado'); } return; }
+  if (t.dataset.facOpen) { const r = (S.fac.results || []).find(x => x.id === t.dataset.facOpen); if (r) { S.result = r; go('resultado'); } return; }
+  if (t.dataset.turma) { S.fac.sel = t.dataset.turma; S.fac.results = null; S.fac.newCode = null; render(); try { S.fac.results = await store.turmaResults(S.fac.sel); } catch (e) { S.fac.results = []; toast(e.message); } render(); return; }
+  const act = t.dataset.act;
+  if (act === 'criar') { S.authTab = 'criar'; S.authMsg = null; go('entrar'); }
+  else if (act === 'esqueci') { S.authTab = 'esqueci'; S.authMsg = null; render(); }
+  else if (act === 'sair') { await store.signOut(); S.session = null; S.result = null; S.quiz = null; S.fac = { turmas: null, sel: null, results: null, newCode: null }; go('inicio'); }
+  else if (act === 'fac-demo') { S.session = await store.signInFacilitatorDemo(); go('facilitador'); }
+  else if (act === 'qz-start') { quizStart(); }
+  else if (act === 'qz-back') { const q = S.quiz; q.step = Math.max(0, q.step - 1); saveDraft(); render(); }
+  else if (act === 'qz-next') { const q = S.quiz; q.step = Math.min(TOTAL, q.step + 1); saveDraft(); render(); }
+  else if (act === 'qz-finish') { quizFinish(); }
+  else if (act === 'copiar-resumo') { copyText(resumoTexto(S.result), $('#resumo-fallback')); }
+  else if (act === 'imprimir') { window.print(); }
+  else if (act === 'copiar-csv') { copyText(csvOf(S.fac.results || []), $('#csv-fallback')); }
+  else if (act === 'baixar-csv') {
+    const blob = new Blob(['﻿' + csvOf(S.fac.results || [])], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagnostico-oqgci.csv'; document.body.appendChild(a); a.click(); a.remove();
+  }
+  else if (act === 'instalar') { const e = S.installEvt; S.installEvt = null; render(); if (e) { e.prompt(); try { await e.userChoice; } catch (x) { /* */ } } }
+  else if (act === 'fechar-instalar') { S.installHidden = true; render(); }
+});
+
+document.addEventListener('keydown', (ev) => {
+  if (S.route !== 'diagnostico' || !S.quiz || S.quiz.step === 0) return;
+  if (ev.target.closest('input,textarea')) return;
+  const idx = S.quiz.step - 1;
+  const n = idx < ITEMS.length ? 5 : 3;
+  const k = idx < ITEMS.length ? Number(ev.key) : ' abc'.indexOf(ev.key.toLowerCase());
+  if (k >= 1 && k <= n) { const btn = document.querySelectorAll('.opt')[k - 1]; if (btn) btn.click(); }
+});
+
+document.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const f = ev.target;
+  const val = id => ($('#' + id)?.value || '');
+  const fail = t => { S.busy = false; S.authMsg = { t }; render(); };
+  if (f.id === 'f-entrar') {
+    const email = val('in-email'), senha = val('in-senha');
+    if (!email || !senha) return fail('Informe o e-mail e a senha.');
+    S.busy = true; S.authMsg = null; render();
+    try { S.session = await store.signIn({ email, senha }); S.busy = false; go('painel'); } catch (e) { fail(e.message); }
+  } else if (f.id === 'f-criar') {
+    const nome = val('cr-nome'), email = val('cr-email'), senha = val('cr-senha');
+    if (!nome.trim() || !email.trim()) return fail('Informe o seu nome e o seu e-mail.');
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return fail('O e-mail parece incompleto. Confira e tente de novo.');
+    if (senha.length < 6) return fail('A senha precisa ter pelo menos 6 caracteres.');
+    if (!$('#cr-lgpd').checked) return fail('Para criar a conta, marque a autorização de uso das respostas.');
+    S.busy = true; S.authMsg = null; render();
+    try {
+      const r = await store.signUp({ nome, email, senha });
+      S.busy = false;
+      if (r.needsConfirm) { S.authTab = 'entrar'; S.authMsg = { ok: true, t: 'Conta criada. Enviamos um link de confirmação para o seu e-mail. Depois de confirmar, entre com a sua senha.' }; render(); }
+      else { S.session = r.user; go('painel'); }
+    } catch (e) { fail(e.message); }
+  } else if (f.id === 'f-esqueci') {
+    const email = val('rs-email');
+    if (!email.trim()) return fail('Informe o seu e-mail.');
+    S.busy = true; render();
+    try {
+      const r = await store.resetPassword(email); S.busy = false;
+      S.authMsg = { ok: true, t: r.demo ? 'Na prévia não há envio de e-mail. Na versão publicada, você recebe um link para criar uma nova senha.' : 'Se houver uma conta com esse e-mail, você vai receber um link para criar uma nova senha.' }; render();
+    } catch (e) { fail(e.message); }
+  } else if (f.id === 'f-nova') {
+    const senha = val('nv-senha');
+    if (senha.length < 6) return fail('A senha precisa ter pelo menos 6 caracteres.');
+    try { await store.updatePassword(senha); S.session = await store.getSession(); S.authMsg = null; toast('Senha atualizada'); go('painel'); } catch (e) { fail(e.message); }
+  } else if (f.id === 'f-turma') {
+    const nome = val('tm-nome');
+    if (!nome.trim()) { toast('Dê um nome para a turma'); return; }
+    try { const t = await store.createTurma(nome); S.fac.newCode = t.codigo; S.fac.sel = t.id; S.fac.turmas = await store.listTurmas(); S.fac.results = await store.turmaResults(t.id); render(); }
+    catch (e) { toast(e.message); }
+  }
+});
+
+window.addEventListener('hashchange', route_);
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); S.installEvt = e; render(); });
+
+/* ================================ INÍCIO ================================== */
+(async function boot() {
+  $('#app').innerHTML = topBar() + '<main class="page"><div class="wrap"><p class="muted">Carregando…</p></div></main>';
+  try {
+    await store.init(() => { S.authMsg = null; S.route = 'nova-senha'; location.hash = 'nova-senha'; render(); });
+    S.session = await store.getSession();
+  } catch (e) {
+    S.session = null;
+    console.error(e);
+  }
+  if (location.hash.slice(1) === 'nova-senha' && LIVE) { S.route = 'nova-senha'; render(); return; }
+  route_();
+})();
+
+window.__OQGCI = { scoreAnswers, ITEMS, SJT, DIMS };
+})();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
