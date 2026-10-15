@@ -181,6 +181,8 @@ p { margin: 0; }
 .lk[aria-pressed=true] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
 .lk[aria-pressed=true] .lk-n { background: var(--accent); color: var(--accent-ink); }
 .lk[aria-pressed=true] .lk-t { color: var(--ink); }
+.lk-sub { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.lk[aria-pressed=true] .lk-sub { color: var(--accent-strong); }
 .likert-ends { display: flex; justify-content: space-between; margin-top: 8px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
 .field textarea { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 13px 14px; font-size: 16px; line-height: 1.5; resize: vertical; min-height: 160px; }
 .field textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
@@ -402,6 +404,7 @@ const SUPABASE_ESM = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2
 
 /* ================================ MÉTODO ================================== */
 const SCALE = ['Nunca', 'Raramente', 'Às vezes', 'Frequentemente', 'Sempre'];
+const SCALE_SUB = ['0 de 10', '1 a 3', '4 a 6', '7 a 9', '10 de 10'];
 
 const DIMS = [
   { id: 'D1', nome: 'Propósito', eixo: 'base',
@@ -483,94 +486,100 @@ const BANDS = {
         baixo: 'Preço, desconto e retomada são pontos frágeis. O valor do trabalho cede, ou a pressão afasta o cliente.' }
 };
 
+// Afirmações sobre as últimas 10 conversas. Cerca de 40% são invertidas e soam como boas práticas, para reduzir o direcionamento.
 const ITEMS = [
-  ['1.1','D1','Quando percebo que meu serviço não é o mais indicado para alguém, digo isso ao cliente com clareza.',0],
-  ['1.2','D1','Recomendo aos clientes o mesmo que recomendaria a alguém da minha família na mesma situação.',0],
-  ['1.3','D1','Antes de uma conversa, penso em como ela pode ajudar o cliente mesmo que ele não compre comigo.',0],
-  ['1.4','D1','Ofereço a opção mais cara mesmo quando uma mais simples resolveria o caso do cliente.',1],
-  ['2.1','D2','As primeiras linhas da minha bio, site ou apresentação falam do problema do meu cliente.',0],
-  ['2.2','D2','Publico conteúdos que ensinam algo útil ao meu cliente, com regularidade.',0],
-  ['2.3','D2','Peço avaliações, depoimentos e indicações a clientes satisfeitos.',0],
-  ['2.4','D2','Minha apresentação começa pela minha formação, anos de experiência e lista de serviços.',1],
-  ['3.1','D3','Começo a conversa perguntando sobre a situação do cliente antes de falar do meu serviço.',0],
-  ['3.2','D3','Faço perguntas de aprofundamento, como "me conta mais sobre isso".',0],
-  ['3.3','D3','Consigo descrever a rotina e as preocupações típicas dos meus clientes com exemplos concretos.',0],
-  ['3.4','D3','Quando o cliente começa a contar o problema, interrompo para apresentar a solução.',1],
-  ['4.1','D4','Levo ao cliente uma informação ou leitura sobre o problema dele que ele ainda não tinha.',0],
-  ['4.2','D4','Ouço reações como "nunca tinha pensado nisso desse jeito" nas minhas conversas.',0],
-  ['4.3','D4','Tenho preparadas duas ou três leituras novas sobre os problemas mais comuns dos meus clientes.',0],
-  ['4.4','D4','Concordo com o diagnóstico que o cliente traz, mesmo quando enxergo o problema de outro jeito.',1],
-  ['5.1','D5','Ajudo o cliente a calcular o que o problema já custa em tempo, dinheiro ou energia.',0],
-  ['5.2','D5','Conto casos reais e anônimos de clientes parecidos para ilustrar o que está em jogo.',0],
-  ['5.3','D5','Mostro o custo de deixar como está com números reais, sem exagerar.',0],
-  ['5.4','D5','Evito falar das consequências do problema para não parecer que estou pressionando.',1],
-  ['6.1','D6','Faço uma recomendação clara, como "no seu caso, eu faria assim".',0],
-  ['6.2','D6','Apresento todas as opções e pacotes e deixo o cliente escolher sozinho.',1],
-  ['6.3','D6','Ofereço formas de reduzir o risco da decisão: primeira conversa, teste, troca ou garantia.',0],
-  ['6.4','D6','Termino cada conversa com um próximo passo combinado e uma data.',0],
-  ['7.1','D7','Pergunto quem mais vai participar da decisão.',0],
-  ['7.2','D7','Adapto os argumentos para quem usa, quem paga e quem influencia.',0],
-  ['7.3','D7','Ofereço ao cliente um resumo ou material para ele conversar com quem decide junto.',0],
-  ['7.4','D7','Quando o cliente diz "vou ver com meu marido" ou "com meu sócio", encerro a conversa e espero ele voltar.',1],
-  ['8.1','D8','Informo o preço com tranquilidade e sem rodeios quando o cliente pergunta.',0],
-  ['8.2','D8','Quando o cliente pede desconto, sustento o valor e ajusto formato, prazo ou quantidade.',0],
-  ['8.3','D8','Retomo o contato com quem sumiu trazendo algo útil e uma pergunta leve.',0],
-  ['8.4','D8','Cuido do melhor momento e do final de cada atendimento, para o cliente sair com uma boa lembrança.',0],
-  ['8.5','D8','Ofereço desconto antes de o cliente pedir.',1]
+  ['1.1','D1','Quando percebi que outra opção serviria melhor ao cliente, eu disse isso a ele com clareza.',0],
+  ['1.2','D1','Mantive a minha proposta mesmo achando que outra opção atenderia melhor, para não confundir o cliente.',1],
+  ['1.3','D1','Recomendei ao cliente o mesmo que recomendaria a alguém da minha família na mesma situação.',0],
+  ['1.4','D1','Apresentei primeiro a opção mais completa, porque o cliente merece o melhor.',1],
+  ['2.1','D2','Ao me apresentar a um cliente novo, comecei pelo problema que ele vive, antes de falar de mim.',0],
+  ['2.2','D2','Ao me apresentar, comecei pela minha formação e experiência, para o cliente confiar no meu trabalho.',1],
+  ['2.3','D2','Compartilhei com o cliente um conteúdo meu que ensina algo útil sobre o problema dele.',0],
+  ['2.4','D2','Ao final de um atendimento que deu certo, pedi uma avaliação ou uma indicação.',0],
+  ['3.1','D3','Fiz pelo menos três perguntas sobre a situação do cliente antes de falar do meu serviço.',0],
+  ['3.2','D3','Expliquei logo no início como o meu serviço funciona, para não tomar o tempo do cliente.',1],
+  ['3.3','D3','Aprofundei uma resposta do cliente com perguntas como "me conta mais sobre isso".',0],
+  ['3.4','D3','Quando entendi o problema, apresentei a solução antes de o cliente terminar de contar, para agilizar.',1],
+  ['4.1','D4','Levei ao cliente uma informação ou leitura sobre o problema dele que ele ainda não tinha.',0],
+  ['4.2','D4','Concordei com o diagnóstico que o cliente trouxe, para ele se sentir respeitado, mesmo enxergando o problema de outro jeito.',1],
+  ['4.3','D4','Ouvi do cliente algo como "nunca tinha pensado nisso desse jeito".',0],
+  ['4.4','D4','Respondi exatamente o que o cliente perguntou, sem acrescentar pontos que ele não tinha levantado.',1],
+  ['5.1','D5','Ajudei o cliente a calcular o que o problema já custa em tempo, dinheiro ou energia.',0],
+  ['5.2','D5','Evitei falar das consequências de deixar o problema como está, para não parecer que eu estava pressionando.',1],
+  ['5.3','D5','Contei um caso real e anônimo de alguém parecido com o cliente para mostrar o que estava em jogo.',0],
+  ['5.4','D5','Mostrei o custo de ficar parado com os números do próprio cliente, sem exagerar.',0],
+  ['6.1','D6','Fiz uma recomendação clara, como "no seu caso, eu faria assim".',0],
+  ['6.2','D6','Apresentei todas as opções e pacotes e deixei o cliente escolher com liberdade.',1],
+  ['6.3','D6','Terminei a conversa com um próximo passo combinado e uma data.',0],
+  ['6.4','D6','Ofereci uma forma de reduzir o risco da decisão: primeira conversa, teste, troca ou garantia.',0],
+  ['7.1','D7','Perguntei quem mais participaria da decisão.',0],
+  ['7.2','D7','Conduzi a conversa só com quem estava na minha frente, porque é essa pessoa quem decide.',1],
+  ['7.3','D7','Ofereci ao cliente um resumo ou material para ele conversar com quem decide junto.',0],
+  ['7.4','D7','Quando o cliente disse que ia conversar em casa, respeitei e esperei ele voltar a me procurar.',1],
+  ['8.1','D8','Informei o preço com tranquilidade e sem rodeios quando o cliente perguntou.',0],
+  ['8.2','D8','Antes de dizer o preço, expliquei tudo o que está incluído, para o valor não assustar.',1],
+  ['8.3','D8','Quando o cliente pediu desconto, mantive o valor e ajustei formato, prazo ou quantidade.',0],
+  ['8.4','D8','Ofereci uma condição especial antes de o cliente pedir, para facilitar a decisão.',1],
+  ['8.5','D8','Retomei o contato com um cliente que sumiu, trazendo algo útil e uma pergunta leve.',0]
 ].map(([c, d, t, inv]) => ({ c, d, t, inv: Boolean(inv) }));
+// Ordem de exibição intercalada: dimensões alternadas e pares de consistência distantes entre si.
+const ITEM_ORDER = ['1.1', '5.2', '7.2', '5.4', '8.2', '6.1', '4.1', '8.4', '2.2', '3.3', '6.3', '7.1', '5.3', '8.1', '1.4', '4.3', '3.2', '8.3', '6.2', '2.1', '5.1', '1.3', '2.4', '3.4', '7.3', '4.4', '1.2', '8.5', '6.4', '7.4', '2.3', '4.2', '3.1'];
+const ITEMS_SHOWN = ITEM_ORDER.map(c => ITEMS.find(i => i.c === c));
+// Pares que descrevem comportamentos opostos: concordar com os dois indica resposta pouco consistente.
+const PAIRS = [['1.1', '1.2'], ['2.1', '2.2'], ['3.1', '3.2'], ['4.1', '4.2'], ['5.1', '5.2'], ['6.1', '6.2'], ['7.1', '7.2'], ['8.1', '8.2'], ['8.3', '8.4']];
 
 // Ordem de exibição das opções varia por cenário; o rótulo da postura nunca aparece para o respondente.
 const SJT = [
   { id: 'S1', t: 'A primeira mensagem do cliente no WhatsApp é: "Quanto custa?"', ops: [
     ['assertiva', '"A sessão é R$ X. É para você? Me conta um pouco, que eu te digo se faz sentido."'],
-    ['passiva', '"Depende! Te mando a tabela com todos os pacotes e você escolhe."'],
-    ['agressiva', '"Antes de falar de preço, preciso que você agende uma avaliação. Só tenho dois horários esta semana."'] ] },
+    ['passiva', '"Claro! Te mando a tabela completa com todos os pacotes, assim você escolhe com calma o que faz mais sentido."'],
+    ['agressiva', '"Os valores eu passo numa conversa rápida, porque cada caso é um caso. Tenho um horário amanhã às 10h, posso reservar para você?"'] ] },
   { id: 'S2', t: 'O cliente pede desconto.', ops: [
-    ['passiva', '"Claro, faço 15% para você."'],
-    ['agressiva', '"Esse já é o mínimo. Quem quer qualidade paga por ela."'],
+    ['passiva', '"Para você, consigo fazer 10% à vista. Fica bom assim?"'],
+    ['agressiva', '"Entendo, mas o meu preço reflete a qualidade do trabalho. Por isso, eu não trabalho com desconto."'],
     ['assertiva', '"O que pesa mais para você agora? Se for o valor de uma vez, consigo dividir em etapas."'] ] },
   { id: 'S3', t: 'O cliente diz: "Vou ver com meu marido."', ops: [
-    ['agressiva', '"Mas a decisão não é sua? Essa condição vale só até hoje."'],
+    ['agressiva', '"Claro. Só te aviso que essa condição vale até sexta, para vocês considerarem na conversa."'],
     ['assertiva', '"Ótimo. Quer que eu te mande um resumo para mostrar a ele, ou prefere uma conversa rápida com os dois?"'],
-    ['passiva', '"Tudo bem, qualquer coisa me chama."'] ] },
+    ['passiva', '"Claro, conversem com calma. Fico à disposição quando vocês decidirem."'] ] },
   { id: 'S4', t: 'O cliente sumiu há cinco dias, depois de receber o orçamento.', ops: [
-    ['passiva', 'Espero o cliente voltar a falar.'],
+    ['passiva', 'Dou espaço ao cliente e aguardo o retorno dele, para não parecer insistente.'],
     ['assertiva', 'Envio um conteúdo útil ligado ao caso dele e pergunto: "Ficou alguma dúvida que eu possa esclarecer?"'],
-    ['agressiva', '"Oi, vai fechar ou não? Preciso liberar a agenda."'] ] },
+    ['agressiva', '"Oi! Ainda estou segurando o seu horário, mas preciso da confirmação até hoje para não perder a vaga."'] ] },
   { id: 'S5', t: 'O cliente chega com um diagnóstico próprio que você considera equivocado.', ops: [
     ['assertiva', '"Posso te mostrar uma coisa que costuma pesar mais no resultado?" e explico com um exemplo.'],
-    ['agressiva', '"Isso que você está pensando está errado. Deixa que eu sei do que você precisa."'],
-    ['passiva', 'Vendo exatamente o que ele pediu.'] ] },
+    ['agressiva', '"Pelo que você descreveu, isso não vai resolver. O que você precisa é de outra abordagem, e eu te explico qual."'],
+    ['passiva', 'Atendo ao que ele pediu, porque o cliente conhece a própria realidade melhor do que ninguém.'] ] },
   { id: 'S6', t: 'Você percebe que o seu serviço não é o mais indicado para o caso do cliente.', ops: [
-    ['agressiva', 'Insisto que o meu serviço resolve o caso.'],
-    ['passiva', 'Vendo assim mesmo, para não perder a venda.'],
+    ['agressiva', 'Mostro casos de sucesso e reforço que o meu serviço pode resolver, desde que ele se comprometa.'],
+    ['passiva', 'Ofereço o meu serviço mesmo assim, explicando que consigo adaptar ao caso dele.'],
     ['assertiva', 'Explico o motivo e indico outro caminho ou outro profissional.'] ] }
 ].map(s => ({ ...s, ops: s.ops.map(([k, t]) => ({ k, t })) }));
 // Embasamento de cada situação: por que a resposta assertiva funciona, o efeito das outras posturas e como soaria no negócio da pessoa.
 const SJT_WHY = {
   S1: { why: 'Responder o valor logo de início mostra transparência, e a pergunta que vem em seguida devolve a conversa para a necessidade do cliente. Quando o preço chega junto com interesse genuíno, o cliente avalia a intenção antes do valor: as pesquisas sobre percepção social mostram que julgamos primeiro se o outro quer o nosso bem, e só depois a competência dele (Fiske, Cuddy e Glick, 2007).',
-        passiva: 'Mandar a tabela inteira transfere a decisão para o cliente sem nenhuma referência de valor. Ele passa a comparar números, e o preço vira o único critério. Opções demais também alimentam a indecisão (Chernev, Böckenholt e Goodman, 2015).',
+        passiva: 'Mandar a tabela inteira, por mais gentil que pareça, transfere a decisão para o cliente sem nenhuma referência de valor. Ele passa a comparar números, e o preço vira o único critério. Opções demais também alimentam a indecisão (Chernev, Böckenholt e Goodman, 2015).',
         agressiva: 'Esconder o preço e criar urgência gera desconfiança já na primeira mensagem. Quando o cliente percebe uma intenção de pressionar, a sinceridade percebida cai e ele se protege (Campbell e Kirmani, 2000).',
         frase: 'O valor é R$ X. É para você? Me conta um pouco do que você procura, que eu te digo se faz sentido.' },
   S2: { why: 'Perguntar o que pesa mais revela a objeção real, que muitas vezes é o valor de uma vez só ou o receio de o investimento não valer a pena. Ajustar formato, prazo ou quantidade resolve essa objeção e preserva o valor do seu trabalho.',
         passiva: 'Conceder o desconto na hora mostra ao cliente que o preço era negociável e reduz o valor percebido do que você entrega. A próxima conversa tende a começar com um novo pedido de desconto.',
-        agressiva: 'Uma resposta seca transforma a negociação em disputa. Sob ameaça, o cérebro passa ao modo de defesa e a região que usamos para avaliar e decidir perde força (Arnsten, 2009). O cliente deixa de pensar no valor e passa a pensar em se proteger.',
+        agressiva: 'Recusar o pedido sem entender o motivo transforma a negociação em disputa. Sob ameaça, o cérebro passa ao modo de defesa e a região que usamos para avaliar e decidir perde força (Arnsten, 2009). O cliente deixa de pensar no valor e passa a pensar em se proteger.',
         frase: 'O que pesa mais para você agora? Se for o valor de uma vez, consigo dividir em etapas ou ajustar o formato.' },
   S3: { why: 'Quem decide junto busca o apoio de quem está ao redor: discordar do grupo gera no cérebro um sinal parecido com o de erro e leva a pessoa a se alinhar a ele (Klucharev e colegas, 2009). Oferecer um resumo ou uma conversa com os dois ajuda o cliente a conduzir essa conversa em casa, com os argumentos certos.',
-        passiva: 'Encerrar com "qualquer coisa me chama" deixa a decisão nas mãos de quem não ouviu você. Sem argumentos, a outra pessoa tende a dizer não ou a adiar.',
+        passiva: 'Encerrar dizendo que fica à disposição deixa a decisão nas mãos de quem não ouviu você. Sem argumentos, a outra pessoa tende a dizer não ou a adiar.',
         agressiva: 'Questionar a autonomia do cliente ou impor um prazo cria constrangimento. A venda pode até sair, mas a indicação e a recompra vão embora.',
         frase: 'Que bom que vocês decidem juntos. Quer que eu te mande um resumo para mostrar, ou prefere marcar {primeiro} com os dois?' },
   S4: { why: 'Grande parte das negociações termina sem decisão, e a principal causa é o medo de escolher errado (Dixon e McKenna, 2022). Um retorno útil, ligado ao caso do cliente, e uma pergunta leve reduzem esse medo e reabrem a conversa sem pressão.',
-        passiva: 'Esperar deixa o cliente sozinho com a dúvida. Na maioria das vezes, o silêncio vira desistência por falta de um próximo passo.',
+        passiva: 'Esperar o retorno, por mais respeitoso que pareça, deixa o cliente sozinho com a dúvida. Na maioria das vezes, o silêncio vira desistência por falta de um próximo passo.',
         agressiva: 'Cobrar a decisão aumenta o medo de errar e confirma a sensação de pressão. O cliente tende a se afastar de vez.',
         frase: 'Lembrei do seu caso ao ver isto: [conteúdo útil ligado ao problema dele]. Ficou alguma dúvida que eu possa esclarecer?' },
   S5: { why: 'Pedir licença antes de trazer uma nova leitura preserva a autonomia do cliente e desperta curiosidade. A curiosidade ativa o circuito de recompensa e melhora a memória do que vem em seguida (Gruber, Gelman e Ranganath, 2014). É o movimento da Virada: o cliente passa a enxergar o próprio problema de outro jeito.',
         passiva: 'Vender o que o cliente pediu, sabendo que não resolve, leva a um resultado ruim, e o cliente atribui o fracasso a você. Entre os vendedores de melhor desempenho, o perfil mais comum é justamente o que leva ao cliente uma visão nova sobre o problema (Dixon e Adamson, 2011).',
-        agressiva: 'Dizer que o cliente está errado ataca a imagem que ele tem de si. A reação natural é defender a própria opinião, e a conversa vira disputa.',
+        agressiva: 'Corrigir o cliente de forma direta, antes de ele se sentir ouvido, ataca a imagem que ele tem de si. A reação natural é defender a própria opinião, e a conversa vira disputa.',
         frase: 'Posso te mostrar uma coisa que costuma pesar mais no resultado para quem está na sua situação?' },
   S6: { why: 'Indicar outro caminho demonstra benevolência, um dos três pilares da confiança, ao lado de competência e integridade (Mayer, Davis e Schoorman, 1995). O cliente lembra de quem o orientou bem: volta quando precisar e indica outras pessoas.',
         passiva: 'Vender assim mesmo entrega um resultado que não atende ao cliente. A frustração aparece depois e costuma vir junto com avaliações ruins e o fim das indicações.',
-        agressiva: 'Insistir que o seu serviço resolve, quando não resolve, é a forma mais rápida de perder credibilidade. O cliente percebe a intenção, e a confiança dificilmente volta.',
+        agressiva: 'Insistir que o seu serviço resolve, quando ele não é o mais indicado, é a forma mais rápida de perder credibilidade. O cliente percebe a intenção, e a confiança dificilmente volta.',
         frase: 'Pelo que você me contou, eu não sou a melhor opção para isso agora. Quem pode te ajudar melhor é [profissional ou solução indicada], e eu te passo o contato.' }
 };
 // Dimensão a que cada situação mais se relaciona, usada só na leitura dos sinais de resposta.
@@ -726,7 +735,33 @@ function analyzeSignals(meta) {
   return { medianaSeg: Math.round(mI / 100) / 10, hesitacoes: hes, trocas: chg, porDim, interrupcoes, rapido: mI < 2500 };
 }
 
+// Índice de confiabilidade: consistência entre pares opostos, excesso de máximos, sequência de respostas iguais, ritmo e coerência com as situações.
+function analyzeReliability(items, sjt, dims, sinais) {
+  const adj = c => { const it = ITEMS.find(i => i.c === c); const r = items[c]; return it.inv ? 6 - r : r; };
+  const incons = PAIRS.filter(([a, b]) => items[a] != null && items[b] != null && Math.abs(adj(a) - adj(b)) >= 3).map(p => p.join('/'));
+  const vals = ITEMS.map(i => items[i.c]).filter(v => v != null);
+  const maxShare = ITEMS.filter(i => items[i.c] != null && adj(i.c) === 5).length / Math.max(1, vals.length);
+  let run = 1, longest = 1;
+  for (let k = 1; k < ITEM_ORDER.length; k++) { if (items[ITEM_ORDER[k]] === items[ITEM_ORDER[k - 1]]) { run++; longest = Math.max(longest, run); } else run = 1; }
+  const SJT_CLAIM = { S1: 'D8', S2: 'D8', S3: 'D7', S4: 'D8', S5: 'D4', S6: 'D1' };
+  const discrep = SJT.filter(x => sjt[x.id] && sjt[x.id] !== 'assertiva' && dims[SJT_CLAIM[x.id]] >= 75).map(x => x.id);
+  const flags = [];
+  let score = 100;
+  if (incons.length) { score -= Math.min(40, incons.length * 10); flags.push(`${incons.length} ${incons.length === 1 ? 'par' : 'pares'} de respostas contraditórias`); }
+  if (maxShare >= 0.75) { score -= 20; flags.push('excesso de respostas no ponto mais favorável'); }
+  if (longest >= 8) { score -= 20; flags.push(`${longest} respostas iguais em sequência`); }
+  if (sinais && sinais.rapido) { score -= 15; flags.push('ritmo muito rápido'); }
+  if (discrep.length) { score -= Math.min(24, discrep.length * 8); flags.push(`${discrep.length} ${discrep.length === 1 ? 'situação diverge' : 'situações divergem'} do que a pessoa declarou`); }
+  score = Math.max(0, score);
+  return { score, nivel: score >= 75 ? 'Alta' : score >= 50 ? 'Moderada' : 'Baixa', flags, incons, discrep, maxShare: Math.round(maxShare * 100), longest };
+}
+
 function scoreAnswers(items, sjt, meta) {
+  const out = scoreCore(items, sjt, meta);
+  out.confiab = analyzeReliability(items, sjt, out.dims, out.sinais);
+  return out;
+}
+function scoreCore(items, sjt, meta) {
   const dims = {};
   let d8Items = 0;
   for (const d of DIMS) {
@@ -774,7 +809,8 @@ function scoreAnswers(items, sjt, meta) {
     indice: r0(indice), aprox: r0(aprox), afast: r0(afast),
     nivel: levelOf(r0(indice)).nome,
     postura, perfil, alerts, prioridades, forcas,
-    sinais: analyzeSignals(meta)
+    sinais: analyzeSignals(meta),
+    confiab: null
   };
 }
 
@@ -1062,7 +1098,7 @@ function viewInicio() {
   <section class="section"><div class="wrap">
     <div class="section-head"><span class="eyebrow">Como funciona</span><h2>Do diagnóstico ao desenvolvimento em três passos</h2></div>
     <div class="steps">
-      <div class="step"><span class="step-n">PASSO 1</span><h3>Responda</h3><p class="muted">33 afirmações sobre as suas conversas dos últimos 30 dias, 6 situações do dia a dia, como "quanto custa?" e o cliente que sumiu, e uma pergunta aberta sobre a sua última venda que não fechou.</p></div>
+      <div class="step"><span class="step-n">PASSO 1</span><h3>Responda</h3><p class="muted">33 afirmações sobre as suas últimas 10 conversas com clientes, 6 situações do dia a dia, como "quanto custa?" e o cliente que sumiu, e uma pergunta aberta sobre a sua última venda que não fechou.</p></div>
       <div class="step"><span class="step-n">PASSO 2</span><h3>Receba o diagnóstico completo</h3><p class="muted">Índice OQGCI, perfil, leitura de cada dimensão, a sua postura nas situações e a leitura da sua história de venda.</p></div>
       <div class="step"><span class="step-n">PASSO 3</span><h3>Desenvolva</h3><p class="muted">As prioridades mostram por onde começar, com passos práticos para cada uma. Refaça o diagnóstico depois e compare a evolução.</p></div>
     </div>
@@ -1152,7 +1188,7 @@ function viewPainel() {
 const HIST_MIN = 20;
 function startQuiz() {
   const d = LS.get(DRAFT_KEY);
-  S.quiz = d && d.v === 2 && (!d.uid || d.uid === S.session?.id) ? d : { v: 2, uid: S.session?.id, step: 0, items: {}, sjt: {}, historia: '', meta: {}, turma: null, code: '' };
+  S.quiz = d && d.v === 3 && (!d.uid || d.uid === S.session?.id) ? d : { v: 3, uid: S.session?.id, step: 0, items: {}, sjt: {}, historia: '', meta: {}, turma: null, code: '' };
   if (!S.quiz.meta) S.quiz.meta = {};
 }
 const TOTAL = ITEMS.length + SJT.length + 1;
@@ -1160,7 +1196,7 @@ function saveDraft() { LS.set(DRAFT_KEY, S.quiz); }
 function keyOfStep(step) {
   const idx = step - 1;
   if (idx < 0) return null;
-  if (idx < ITEMS.length) return ITEMS[idx].c;
+  if (idx < ITEMS.length) return ITEMS_SHOWN[idx].c;
   if (idx < ITEMS.length + SJT.length) return SJT[idx - ITEMS.length].id;
   return 'historia';
 }
@@ -1212,8 +1248,8 @@ function viewDiagnostico() {
   }
   if (q.step === 0) {
     return `<main class="quiz wrap"><div class="stack-lg">
-      <div class="stack" style="gap:10px"><span class="eyebrow">Antes de começar</span><h1 style="font-size:clamp(28px,5vw,38px)">Pense nas suas conversas com clientes nos últimos 30 dias</h1>
-      <p class="muted">São três partes: 33 afirmações sobre o que você costuma fazer, 6 situações do dia a dia e uma pergunta aberta sobre a sua última venda que não fechou. Responda pelo que você realmente faz. O resultado é mais útil quando reflete a sua prática atual.</p></div>
+      <div class="stack" style="gap:10px"><span class="eyebrow">Antes de começar</span><h1 style="font-size:clamp(28px,5vw,38px)">Pense nas suas últimas 10 conversas com clientes</h1>
+      <p class="muted">São três partes: 33 afirmações sobre o que você fez nessas conversas, 6 situações do dia a dia e uma pergunta aberta sobre a sua última venda que não fechou. Muitas afirmações descrevem práticas comuns e bem-intencionadas. Responda pelo que você faz hoje, sem pensar no que seria o ideal: o diagnóstico é mais útil quando reflete a sua prática real.</p></div>
       <div class="card stack">
         <div class="field"><label for="qz-code">Código da turma <span class="muted">(opcional)</span></label><input id="qz-code" type="text" autocomplete="off" placeholder="OQG-XXXX" value="${esc(q.code)}" style="text-transform:uppercase"><span class="muted small">Se você está num workshop ou numa equipe, use o código que o facilitador passou.${store.mode === 'demo' ? ' Na prévia, o código OQG-DEMO entra na turma de exemplo.' : ''}</span></div>
         <div id="qz-msg"></div>
@@ -1229,12 +1265,12 @@ function viewDiagnostico() {
   const head = `<div class="progress"><div class="progress-top"><span>${part}</span><span class="tnum">${idx + 1} de ${TOTAL}</span></div><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div></div>`;
   let body, answered, isLast = idx === TOTAL - 1;
   if (idx < ITEMS.length) {
-    const it = ITEMS[idx];
+    const it = ITEMS_SHOWN[idx];
     const cur = q.items[it.c];
     answered = cur != null;
-    body = `<p class="eyebrow" style="margin-bottom:10px;color:var(--accent)">Pergunta ${idx + 1} de ${TOTAL}</p><p class="q-text">${esc(V(it.t, qv))}</p><p class="q-hint">Com que frequência isso aconteceu nos últimos 30 dias? Marque uma opção e toque em Avançar.</p>
-      <div class="likert" role="radiogroup" aria-label="Frequência, de nunca a sempre">${SCALE_HTML.map((s, k) => `<button type="button" class="lk" role="radio" data-ans="${k + 1}" aria-checked="${cur === k + 1}" aria-pressed="${cur === k + 1}" aria-label="${k + 1}, ${SCALE[k]}"><span class="lk-n">${k + 1}</span><span class="lk-t" lang="pt-BR">${s}</span></button>`).join('')}</div>
-      <div class="likert-ends" aria-hidden="true"><span>menos frequente</span><span>mais frequente</span></div>`;
+    body = `<p class="eyebrow" style="margin-bottom:10px;color:var(--accent)">Pergunta ${idx + 1} de ${TOTAL}</p><p class="q-text">${esc(V(it.t, qv))}</p><p class="q-hint">Pense nas suas últimas 10 conversas com clientes. Em quantas isso aconteceu? Marque uma opção e toque em Avançar.</p>
+      <div class="likert" role="radiogroup" aria-label="Frequência, de nunca a sempre">${SCALE_HTML.map((s, k) => `<button type="button" class="lk" role="radio" data-ans="${k + 1}" aria-checked="${cur === k + 1}" aria-pressed="${cur === k + 1}" aria-label="${k + 1}, ${SCALE[k]}"><span class="lk-n">${k + 1}</span><span class="lk-t" lang="pt-BR">${s}</span><span class="lk-sub">${SCALE_SUB[k]}</span></button>`).join('')}</div>
+      `;
   } else if (idx < ITEMS.length + SJT.length) {
     const sc = SJT[idx - ITEMS.length];
     const cur = q.sjt[sc.id];
@@ -1285,7 +1321,7 @@ async function quizStart() {
 
 async function quizFinish() {
   const q = S.quiz;
-  const missItem = ITEMS.findIndex(i => q.items[i.c] == null);
+  const missItem = ITEMS_SHOWN.findIndex(i => q.items[i.c] == null);
   const missSjt = SJT.findIndex(s => !q.sjt[s.id]);
   if (missItem >= 0 || missSjt >= 0 || (q.historia || '').trim().length < HIST_MIN) {
     q.step = missItem >= 0 ? missItem + 1 : missSjt >= 0 ? ITEMS.length + missSjt + 1 : TOTAL; render(); toast('Falta responder esta pergunta'); return;
@@ -1503,6 +1539,13 @@ function levelMeter(v, color, label) {
   return `<div class="lvl-meter" role="img" aria-label="${label}: ${v} de 100"><div class="lvl-track"><i style="width:${Math.max(2, v)}%;background:${color}"></i><span style="left:40%"></span><span style="left:60%"></span><span style="left:80%"></span></div></div>`;
 }
 
+function confiabHTML(r) {
+  const c = r.confiab; if (!c) return '';
+  return `<div class="card stack" style="gap:10px"><div><h2 class="h-sec" style="margin:0">Índice de confiabilidade · ${c.score} (${c.nivel})</h2><span class="tag" style="display:inline-block;margin-top:8px">Visível só para o facilitador</span></div>
+    ${c.flags.length ? `<ul class="guide">${c.flags.map(f => `<li>${esc(f)}</li>`).join('')}</ul>` : '<p class="muted">Respostas consistentes entre si e com as situações.</p>'}
+    <p class="muted small">Respostas no ponto mais favorável: ${c.maxShare}% · maior sequência de respostas iguais: ${c.longest}.</p></div>`;
+}
+
 function viewResultado() {
   const rec = S.result; const r = rec.resultado; const lvl = levelOf(r.indice); const p = PROFILES[r.perfil];
   const items = rec.respostas?.items; const sjt = rec.respostas?.sjt || {};
@@ -1604,6 +1647,7 @@ function viewResultado() {
       </div>
     </div>
 
+    ${r.confiab && r.confiab.nivel === 'Baixa' ? `<div class="msg" role="note">${esc(V('Algumas respostas ficaram pouco consistentes entre si. O diagnóstico fica mais útil quando reflete a sua prática real com os clientes. Se quiser, refaça com calma, pensando nas suas últimas conversas.', voc))}</div>` : ''}
     ${r.alerts.length ? `<div class="stack"><h2 class="h-sec" style="margin:0">Pontos de atenção</h2>${r.alerts.map(a => `<div class="alert ${a.sev}"><span class="alert-ico" aria-hidden="true">!</span><div><strong>${esc(a.t)}</strong><span class="muted small">${esc(V(a.d, voc))}</span></div></div>`).join('')}</div>` : ''}
 
     <div class="grid-2">
@@ -1624,7 +1668,7 @@ function viewResultado() {
       <div class="acc-list">${situacoes}</div></div>
 
     ${historia}
-    ${isFac ? sinaisHTML(r) : ''}
+    ${isFac ? confiabHTML(r) + sinaisHTML(r) : ''}
 
     <div class="stack"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Prioridades de desenvolvimento</h2><p class="muted small">Abra cada prioridade e avance etapa por etapa: o que está em jogo, o que desenvolver, como implementar e como saber que está funcionando.</p></div><div class="acc-list">${prioridades}</div></div>
 
@@ -1852,9 +1896,9 @@ async function loadFac() {
 }
 
 function csvOf(results) {
-  const head = ['nome', 'data', 'indice', 'nivel', 'perfil', 'aproximacao', 'afastamento', ...DIMS.map(d => d.id + '_' + d.nome), 'assertiva', 'passiva', 'agressiva', 'alertas', 'hesitacoes', 'trocas', 'historia', 'negocio', 'oferta'];
+  const head = ['nome', 'data', 'indice', 'nivel', 'perfil', 'aproximacao', 'afastamento', ...DIMS.map(d => d.id + '_' + d.nome), 'assertiva', 'passiva', 'agressiva', 'alertas', 'hesitacoes', 'trocas', 'historia', 'negocio', 'oferta', 'confiabilidade'];
   const q = v => /[",;\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
-  const rows = results.map(x => { const r = x.resultado; return [x.nome || '', x.created_at.slice(0, 10), r.indice, r.nivel, PROFILES[r.perfil].nome, r.aprox, r.afast, ...DIMS.map(d => r.dims[d.id]), r.postura.assertiva, r.postura.passiva, r.postura.agressiva, r.alerts.map(a => a.t).join(' | '), r.sinais ? r.sinais.hesitacoes.length : '', r.sinais ? r.sinais.trocas.length : '', x.respostas?.historia || '', SEG[x.respostas?.negocio?.segmento]?.nome || '', x.respostas?.negocio?.oferta || ''].map(q).join(','); });
+  const rows = results.map(x => { const r = x.resultado; return [x.nome || '', x.created_at.slice(0, 10), r.indice, r.nivel, PROFILES[r.perfil].nome, r.aprox, r.afast, ...DIMS.map(d => r.dims[d.id]), r.postura.assertiva, r.postura.passiva, r.postura.agressiva, r.alerts.map(a => a.t).join(' | '), r.sinais ? r.sinais.hesitacoes.length : '', r.sinais ? r.sinais.trocas.length : '', x.respostas?.historia || '', SEG[x.respostas?.negocio?.segmento]?.nome || '', x.respostas?.negocio?.oferta || '', r.confiab ? r.confiab.score : ''].map(q).join(','); });
   return [head.map(q).join(','), ...rows].join('\n');
 }
 
@@ -1886,8 +1930,8 @@ function viewFacilitador() {
     </div>
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><h2 class="h-sec" style="margin:0">Mapa da turma</h2><div class="actions"><button class="btn btn-quiet btn-sm" data-act="copiar-csv">Copiar CSV</button>${LIVE ? '<button class="btn btn-quiet btn-sm" data-act="baixar-csv">Baixar CSV</button>' : ''}</div></div>
       <textarea id="csv-fallback" hidden readonly style="width:100%;min-height:120px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px"></textarea>
-      <div class="table-wrap"><table class="heat"><thead><tr><th>Pessoa</th><th class="num">Índice</th><th>Perfil</th><th>Negócio</th>${DIMS.map(d => `<th class="num" title="${d.nome}">${d.nome}</th>`).join('')}<th>Data</th><th>Alertas</th><th>Sinais</th></tr></thead><tbody>
-      ${res.map(x => { const r = x.resultado; return `<tr><td><button class="link-btn" data-fac-open="${esc(x.id)}">${esc(x.nome || 'Sem nome')}</button>${x.exemplo ? ' <span class="tag">exemplo</span>' : ''}</td><td class="num"><b>${r.indice}</b></td><td>${PROFILES[r.perfil].nome}</td><td>${esc((SEG[x.respostas?.negocio?.segmento]?.nome || '—') + (x.respostas?.negocio?.oferta ? ' · ' + x.respostas.negocio.oferta : ''))}</td>${DIMS.map(d => `<td class="cell" style="${heat(r.dims[d.id])}">${r.dims[d.id]}</td>`).join('')}<td>${fmtDate(x.created_at)}</td><td>${r.alerts.map(a => esc(a.t)).join(', ') || '—'}</td><td>${r.sinais ? `${r.sinais.hesitacoes.length} hesitações · ${r.sinais.trocas.length} trocas` : '—'}</td></tr>`; }).join('')}
+      <div class="table-wrap"><table class="heat"><thead><tr><th>Pessoa</th><th class="num">Índice</th><th>Perfil</th><th>Negócio</th>${DIMS.map(d => `<th class="num" title="${d.nome}">${d.nome}</th>`).join('')}<th>Data</th><th>Alertas</th><th>Sinais</th><th>Confiabilidade</th></tr></thead><tbody>
+      ${res.map(x => { const r = x.resultado; return `<tr><td><button class="link-btn" data-fac-open="${esc(x.id)}">${esc(x.nome || 'Sem nome')}</button>${x.exemplo ? ' <span class="tag">exemplo</span>' : ''}</td><td class="num"><b>${r.indice}</b></td><td>${PROFILES[r.perfil].nome}</td><td>${esc((SEG[x.respostas?.negocio?.segmento]?.nome || '—') + (x.respostas?.negocio?.oferta ? ' · ' + x.respostas.negocio.oferta : ''))}</td>${DIMS.map(d => `<td class="cell" style="${heat(r.dims[d.id])}">${r.dims[d.id]}</td>`).join('')}<td>${fmtDate(x.created_at)}</td><td>${r.alerts.map(a => esc(a.t)).join(', ') || '—'}</td><td>${r.sinais ? `${r.sinais.hesitacoes.length} hesitações · ${r.sinais.trocas.length} trocas` : '—'}</td><td>${r.confiab ? `${r.confiab.score} · ${r.confiab.nivel}` : '—'}</td></tr>`; }).join('')}
       </tbody></table></div>
       <p class="small muted" style="margin-top:10px">Cor mais intensa indica pontuação mais alta. Toque no nome para abrir o relatório da pessoa.</p>
     </div>`;
@@ -1930,7 +1974,7 @@ document.addEventListener('click', async (ev) => {
   if (t.dataset.copy) { copyText(t.dataset.copy); return; }
   if (t.dataset.seg) { const q = S.quiz; q.negocio = { ...(q.negocio || {}), segmento: t.dataset.seg, oferta: ($('#qz-oferta')?.value || '').trim() }; saveDraft(); render(); return; }
   if (t.dataset.ans) {
-    const q = S.quiz; const it = ITEMS[q.step - 1]; const v = Number(t.dataset.ans); noteChange(it.c, q.items[it.c], v); q.items[it.c] = v; saveDraft(); S.enter = false; render();
+    const q = S.quiz; const it = ITEMS_SHOWN[q.step - 1]; const v = Number(t.dataset.ans); noteChange(it.c, q.items[it.c], v); q.items[it.c] = v; saveDraft(); S.enter = false; render();
     $('[data-act=qz-next],[data-act=qz-finish]')?.focus({ preventScroll: true });
     return;
   }
