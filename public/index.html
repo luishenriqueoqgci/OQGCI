@@ -244,6 +244,10 @@ p { margin: 0; }
 .path-c { display: grid; gap: 8px; padding-top: 5px; min-width: 0; }
 .path-step.locked .path-c .eyebrow { color: var(--ink-3); opacity: .6; }
 .path-step.cur .path-c { animation: qin .3s ease both; }
+.why { border-left: 2px solid var(--line); padding: 2px 0 2px 12px; display: grid; gap: 4px; }
+.why p { font-size: 15px; }
+.why.ok { border-left-color: var(--c-warm); }
+.why.warn { border-left-color: var(--crit); }
 .impl { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
 .script { border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); border-radius: var(--r-sm); padding: 12px 14px; display: grid; gap: 6px; justify-items: start; }
 .script p { font-family: var(--font-display); font-size: 18px; font-weight: 500; line-height: 1.35; }
@@ -529,6 +533,33 @@ const SJT = [
     ['passiva', 'Vendo assim mesmo, para não perder a venda.'],
     ['assertiva', 'Explico o motivo e indico outro caminho ou outro profissional.'] ] }
 ].map(s => ({ ...s, ops: s.ops.map(([k, t]) => ({ k, t })) }));
+// Embasamento de cada situação: por que a resposta assertiva funciona, o efeito das outras posturas e como soaria no negócio da pessoa.
+const SJT_WHY = {
+  S1: { why: 'Responder o valor logo de início mostra transparência, e a pergunta que vem em seguida devolve a conversa para a necessidade do cliente. Quando o preço chega junto com interesse genuíno, o cliente avalia a intenção antes do valor: as pesquisas sobre percepção social mostram que julgamos primeiro se o outro quer o nosso bem, e só depois a competência dele (Fiske, Cuddy e Glick, 2007).',
+        passiva: 'Mandar a tabela inteira transfere a decisão para o cliente sem nenhuma referência de valor. Ele passa a comparar números, e o preço vira o único critério. Opções demais também alimentam a indecisão (Chernev, Böckenholt e Goodman, 2015).',
+        agressiva: 'Esconder o preço e criar urgência gera desconfiança já na primeira mensagem. Quando o cliente percebe uma intenção de pressionar, a sinceridade percebida cai e ele se protege (Campbell e Kirmani, 2000).',
+        frase: 'O valor é R$ X. É para você? Me conta um pouco do que você procura, que eu te digo se faz sentido.' },
+  S2: { why: 'Perguntar o que pesa mais revela a objeção real, que muitas vezes é o valor de uma vez só ou o receio de o investimento não valer a pena. Ajustar formato, prazo ou quantidade resolve essa objeção e preserva o valor do seu trabalho.',
+        passiva: 'Conceder o desconto na hora mostra ao cliente que o preço era negociável e reduz o valor percebido do que você entrega. A próxima conversa tende a começar com um novo pedido de desconto.',
+        agressiva: 'Uma resposta seca transforma a negociação em disputa. Sob ameaça, o cérebro passa ao modo de defesa e a região que usamos para avaliar e decidir perde força (Arnsten, 2009). O cliente deixa de pensar no valor e passa a pensar em se proteger.',
+        frase: 'O que pesa mais para você agora? Se for o valor de uma vez, consigo dividir em etapas ou ajustar o formato.' },
+  S3: { why: 'Quem decide junto busca o apoio de quem está ao redor: discordar do grupo gera no cérebro um sinal parecido com o de erro e leva a pessoa a se alinhar a ele (Klucharev e colegas, 2009). Oferecer um resumo ou uma conversa com os dois ajuda o cliente a conduzir essa conversa em casa, com os argumentos certos.',
+        passiva: 'Encerrar com "qualquer coisa me chama" deixa a decisão nas mãos de quem não ouviu você. Sem argumentos, a outra pessoa tende a dizer não ou a adiar.',
+        agressiva: 'Questionar a autonomia do cliente ou impor um prazo cria constrangimento. A venda pode até sair, mas a indicação e a recompra vão embora.',
+        frase: 'Que bom que vocês decidem juntos. Quer que eu te mande um resumo para mostrar, ou prefere marcar {primeiro} com os dois?' },
+  S4: { why: 'Grande parte das negociações termina sem decisão, e a principal causa é o medo de escolher errado (Dixon e McKenna, 2022). Um retorno útil, ligado ao caso do cliente, e uma pergunta leve reduzem esse medo e reabrem a conversa sem pressão.',
+        passiva: 'Esperar deixa o cliente sozinho com a dúvida. Na maioria das vezes, o silêncio vira desistência por falta de um próximo passo.',
+        agressiva: 'Cobrar a decisão aumenta o medo de errar e confirma a sensação de pressão. O cliente tende a se afastar de vez.',
+        frase: 'Lembrei do seu caso ao ver isto: [conteúdo útil ligado ao problema dele]. Ficou alguma dúvida que eu possa esclarecer?' },
+  S5: { why: 'Pedir licença antes de trazer uma nova leitura preserva a autonomia do cliente e desperta curiosidade. A curiosidade ativa o circuito de recompensa e melhora a memória do que vem em seguida (Gruber, Gelman e Ranganath, 2014). É o movimento da Virada: o cliente passa a enxergar o próprio problema de outro jeito.',
+        passiva: 'Vender o que o cliente pediu, sabendo que não resolve, leva a um resultado ruim, e o cliente atribui o fracasso a você. Entre os vendedores de melhor desempenho, o perfil mais comum é justamente o que leva ao cliente uma visão nova sobre o problema (Dixon e Adamson, 2011).',
+        agressiva: 'Dizer que o cliente está errado ataca a imagem que ele tem de si. A reação natural é defender a própria opinião, e a conversa vira disputa.',
+        frase: 'Posso te mostrar uma coisa que costuma pesar mais no resultado para quem está na sua situação?' },
+  S6: { why: 'Indicar outro caminho demonstra benevolência, um dos três pilares da confiança, ao lado de competência e integridade (Mayer, Davis e Schoorman, 1995). O cliente lembra de quem o orientou bem: volta quando precisar e indica outras pessoas.',
+        passiva: 'Vender assim mesmo entrega um resultado que não atende ao cliente. A frustração aparece depois e costuma vir junto com avaliações ruins e o fim das indicações.',
+        agressiva: 'Insistir que o seu serviço resolve, quando não resolve, é a forma mais rápida de perder credibilidade. O cliente percebe a intenção, e a confiança dificilmente volta.',
+        frase: 'Pelo que você me contou, eu não sou a melhor opção para isso agora. Quem pode te ajudar melhor é [profissional ou solução indicada], e eu te passo o contato.' }
+};
 // Dimensão a que cada situação mais se relaciona, usada só na leitura dos sinais de resposta.
 const SJT_DIM = { S1: 'D8', S2: 'D8', S3: 'D7', S4: 'D8', S5: 'D4', S6: 'D1' };
 
@@ -1493,10 +1524,18 @@ function viewResultado() {
   }).join('');
 
   const situacoes = SJT.map((s, k) => {
-    const ch = sjt[s.id]; const mine = s.ops.find(o => o.k === ch); const best = s.ops.find(o => o.k === 'assertiva');
+    const ch = sjt[s.id]; const mine = s.ops.find(o => o.k === ch); const best = s.ops.find(o => o.k === 'assertiva'); const W = SJT_WHY[s.id];
+    const fraseLabel = rec.respostas?.negocio?.segmento ? 'Como soaria no seu negócio' : 'Como dizer com as suas palavras';
+    const body = !ch ? '' : ch === 'assertiva'
+      ? `<p class="small"><span class="muted">Sua resposta:</span> ${esc(V(mine.t, voc))}</p>
+         <div class="why ok"><span class="eyebrow">Por que ela funciona</span><p>${esc(V(W.why, voc))}</p></div>`
+      : `<p class="small"><span class="muted">Sua resposta:</span> ${esc(V(mine.t, voc))}</p>
+         <div class="why warn"><span class="eyebrow">O que acontece com essa resposta</span><p>${esc(V(W[ch], voc))}</p></div>
+         <p class="small"><span class="muted">A resposta que sustenta o valor:</span> ${esc(V(best.t, voc))}</p>
+         <div class="why ok"><span class="eyebrow">Por que ela funciona</span><p>${esc(V(W.why, voc))}</p></div>`;
     return `<details class="acc sit-acc" data-acc id="acc-${s.id}" ${S.accOpen[`acc-${s.id}`] ? 'open' : ''}><summary><span class="acc-title"><span class="dim-code">S${k + 1}</span><strong>${esc(V(s.t, voc))}</strong></span>${ch ? `<span class="chip"><i class="swatch" style="background:${POSTURA_COR[ch]}"></i>${POSTURA_NOME[ch]}</span>` : ''}<span class="chev" aria-hidden="true"></span></summary>
-      <div class="acc-body">${mine ? `<p class="small"><span class="muted">Sua resposta:</span> ${esc(V(mine.t, voc))}</p>` : ''}
-      ${ch && ch !== 'assertiva' ? `<p class="small"><span class="muted">A resposta que sustenta o valor:</span> ${esc(V(best.t, voc))}</p>` : `<p class="small muted">${esc(V('Você escolheu a resposta que sustenta o valor do seu trabalho com respeito ao cliente.', voc))}</p>`}</div></details>`;
+      <div class="acc-body">${body}
+        <div class="script"><span class="eyebrow">${fraseLabel}</span><p>“${esc(V(W.frase, voc))}”</p><button type="button" class="link-btn small" data-copy="${esc(V(W.frase, voc))}">Copiar frase</button></div></div></details>`;
   }).join('');
 
   const hasHist = Boolean(rec.respostas?.historia);
@@ -1570,7 +1609,7 @@ function viewResultado() {
     <div class="stack"><div class="acc-headrow"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Leitura das oito dimensões</h2><p class="muted small">Toque em uma dimensão para abrir a leitura completa. As linhas na barra marcam os níveis 40, 60 e 80.</p></div><button class="btn btn-quiet btn-sm no-print" data-act="acc-all" data-target="dim-acc">Abrir todas</button></div>
       <div class="acc-list">${dimCards}</div></div>
 
-    <div class="stack"><div class="acc-headrow"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Sua postura nas situações</h2><p class="muted small">Toque em uma situação para ver a sua resposta.</p></div><button class="btn btn-quiet btn-sm no-print" data-act="acc-all" data-target="sit-acc">Abrir todas</button></div>
+    <div class="stack"><div class="acc-headrow"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Sua postura nas situações</h2><p class="muted small">Toque em uma situação para ver a sua resposta, o efeito dela na decisão do cliente e por que a resposta assertiva funciona.</p></div><button class="btn btn-quiet btn-sm no-print" data-act="acc-all" data-target="sit-acc">Abrir todas</button></div>
       <div class="acc-list">${situacoes}</div></div>
 
     ${historia}
@@ -1691,9 +1730,12 @@ async function buildPDF(rec) {
     need(18); font(10, 'bold', C.ink); const tl = doc.splitTextToSize(pdfText(`${k + 1}. ${V(s.t, voc)}`), CW - 30); doc.text(tl, M, y + 3.6);
     if (ch) { color(ch === 'assertiva' ? C.warm : ch === 'passiva' ? C.cool : C.third, 'fill'); doc.roundedRect(M + CW - 26, y, 26, 5.4, 2.7, 2.7, 'F'); font(8.5, 'bold', [255, 255, 255]); doc.text(pdfText(POSTURA_NOME[ch]), M + CW - 13, y + 3.8, { align: 'center' }); }
     y += tl.length * 4.6 + 1.5;
+    const W = SJT_WHY[s.id];
     if (mine) para(`Sua resposta: ${V(mine.t, voc)}`, 9, 'normal', C.ink2, CW, M, 0.5);
-    if (ch && ch !== 'assertiva') para(`A resposta que sustenta o valor: ${V(best.t, voc)}`, 9, 'normal', C.ink2, CW, M, 0.5);
-    y += 2.5;
+    if (ch && ch !== 'assertiva') { para(`O que acontece com essa resposta: ${V(W[ch], voc)}`, 9, 'normal', C.ink2, CW, M, 0.5); para(`A resposta que sustenta o valor: ${V(best.t, voc)}`, 9, 'bold', C.ink, CW, M, 0.5); }
+    para(`Por que ela funciona: ${V(W.why, voc)}`, 9, 'normal', C.ink, CW, M, 0.5);
+    para(`${rec.respostas?.negocio?.segmento ? 'Como soaria no seu negócio' : 'Como dizer'}: "${V(W.frase, voc)}"`, 9, 'italic', C.warm, CW, M, 0.5);
+    y += 3.5;
   });
 
   if (rec.respostas?.historia) {
