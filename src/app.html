@@ -908,12 +908,12 @@ function viewDiagnostico() {
   if (isItem) {
     const it = ITEMS[idx];
     const cur = q.items[it.c];
-    body = `<p class="q-text">${esc(it.t)}</p><p class="q-hint">Com que frequência isso aconteceu nos últimos 30 dias?</p>
+    body = `<p class="eyebrow" style="margin-bottom:10px;color:var(--accent)">Pergunta ${idx + 1} de ${TOTAL}</p><p class="q-text">${esc(it.t)}</p><p class="q-hint">Com que frequência isso aconteceu nos últimos 30 dias? Marque uma opção e toque em Avançar.</p>
       <div class="opts" role="group" aria-label="Frequência">${SCALE.map((s, k) => `<button class="opt" data-ans="${k + 1}" aria-pressed="${cur === k + 1}"><span class="opt-k">${k + 1}</span><span class="opt-t">${s}</span></button>`).join('')}</div>`;
   } else {
     const sc = SJT[idx - ITEMS.length];
     const cur = q.sjt[sc.id];
-    body = `<div class="scene"><p class="eyebrow" style="margin-bottom:8px">Situação ${idx - ITEMS.length + 1} de ${SJT.length}</p><p class="q-text" style="min-height:0">${esc(sc.t)}</p></div><p class="q-hint">Escolha a resposta mais parecida com o que você faria.</p>
+    body = `<div class="scene"><p class="eyebrow" style="margin-bottom:8px;color:var(--accent)">Pergunta ${idx + 1} de ${TOTAL} · situação ${idx - ITEMS.length + 1} de ${SJT.length}</p><p class="q-text" style="min-height:0">${esc(sc.t)}</p></div><p class="q-hint">Escolha a resposta mais parecida com o que você faria e toque em Avançar.</p>
       <div class="opts" role="group" aria-label="Respostas">${sc.ops.map((o, k) => `<button class="opt" data-sjt="${o.k}" aria-pressed="${cur === o.k}"><span class="opt-k">${'ABC'[k]}</span><span class="opt-t" style="font-weight:500">${esc(o.t)}</span></button>`).join('')}</div>`;
   }
   const answered = isItem ? q.items[ITEMS[idx].c] != null : q.sjt[SJT[idx - ITEMS.length].id] != null;
@@ -952,15 +952,6 @@ async function quizFinish() {
     const rec = await store.saveResult({ turma_id: q.turma?.id, respostas: { items: q.items, sjt: q.sjt }, resultado });
     LS.del(DRAFT_KEY); S.quiz = null; S.busy = false; S.result = rec; go('resultado');
   } catch (e) { S.busy = false; render(); toast(e.message || 'Não foi possível salvar. Tente de novo.'); }
-}
-
-// Mantém a opção marcada visível por um instante e então mostra a próxima pergunta.
-function autoAdvance(q) {
-  const at = q.step;
-  clearTimeout(autoAdvance._t);
-  autoAdvance._t = setTimeout(() => {
-    if (S.route === 'diagnostico' && S.quiz === q && q.step === at && q.step - 1 < TOTAL - 1) { q.step += 1; saveDraft(); S.enter = true; render(); S.enter = false; }
-  }, 650);
 }
 
 /* =============================== RELATÓRIO ================================ */
@@ -1148,12 +1139,12 @@ document.addEventListener('click', async (ev) => {
   if (t.dataset.copy) { copyText(t.dataset.copy); return; }
   if (t.dataset.ans) {
     const q = S.quiz; const it = ITEMS[q.step - 1]; q.items[it.c] = Number(t.dataset.ans); saveDraft(); S.enter = false; render();
-    autoAdvance(q);
+    $('[data-act=qz-next],[data-act=qz-finish]')?.focus({ preventScroll: true });
     return;
   }
   if (t.dataset.sjt) {
     const q = S.quiz; const sc = SJT[q.step - 1 - ITEMS.length]; q.sjt[sc.id] = t.dataset.sjt; saveDraft(); S.enter = false; render();
-    autoAdvance(q);
+    $('[data-act=qz-next],[data-act=qz-finish]')?.focus({ preventScroll: true });
     return;
   }
   if (t.dataset.open) { const r = await store.getResult(t.dataset.open); if (r) { S.result = r; go('resultado'); } return; }
@@ -1165,8 +1156,8 @@ document.addEventListener('click', async (ev) => {
   else if (act === 'sair') { await store.signOut(); S.session = null; S.result = null; S.quiz = null; S.fac = { turmas: null, sel: null, results: null, newCode: null }; go('inicio'); }
   else if (act === 'fac-demo') { S.session = await store.signInFacilitatorDemo(); go('facilitador'); }
   else if (act === 'qz-start') { quizStart(); }
-  else if (act === 'qz-back') { clearTimeout(autoAdvance._t); const q = S.quiz; q.step = Math.max(0, q.step - 1); saveDraft(); render(); }
-  else if (act === 'qz-next') { clearTimeout(autoAdvance._t); const q = S.quiz; q.step = Math.min(TOTAL, q.step + 1); saveDraft(); S.enter = true; render(); S.enter = false; }
+  else if (act === 'qz-back') { const q = S.quiz; q.step = Math.max(0, q.step - 1); saveDraft(); render(); }
+  else if (act === 'qz-next') { const q = S.quiz; q.step = Math.min(TOTAL, q.step + 1); saveDraft(); S.enter = true; render(); S.enter = false; }
   else if (act === 'qz-finish') { quizFinish(); }
   else if (act === 'copiar-resumo') { copyText(resumoTexto(S.result), $('#resumo-fallback')); }
   else if (act === 'imprimir') { window.print(); }
@@ -1186,6 +1177,7 @@ document.addEventListener('keydown', (ev) => {
   const n = idx < ITEMS.length ? 5 : 3;
   const k = idx < ITEMS.length ? Number(ev.key) : ' abc'.indexOf(ev.key.toLowerCase());
   if (k >= 1 && k <= n) { const btn = document.querySelectorAll('.opt')[k - 1]; if (btn) btn.click(); }
+  else if (ev.key === 'Enter' && !ev.target.closest('button')) { const nx = $('[data-act=qz-next]:not([disabled]),[data-act=qz-finish]:not([disabled])'); if (nx) nx.click(); }
 });
 
 document.addEventListener('submit', async (ev) => {
