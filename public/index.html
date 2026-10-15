@@ -162,11 +162,14 @@ p { margin: 0; }
 .q-text { font-family: var(--font-display); font-size: clamp(22px, 4.6vw, 28px); line-height: 1.28; font-weight: 500; min-height: 3.9em; }
 .q-hint { margin-top: 10px; color: var(--ink-3); font-size: 14px; }
 .opts { display: grid; gap: 10px; margin-top: 24px; }
-.opt { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: center; text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 16px; cursor: pointer; transition: border-color .12s ease, background-color .12s ease; }
+.opt { touch-action: manipulation; -webkit-tap-highlight-color: transparent; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: center; text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 16px; cursor: pointer; transition: border-color .12s ease, background-color .12s ease; }
 .opt:hover { border-color: var(--ink-3); }
 .opt[aria-pressed=true] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
 .opt-k { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-family: var(--font-mono); font-size: 13px; background: var(--surface-2); color: var(--ink-2); }
 .opt[aria-pressed=true] .opt-k { background: var(--accent); color: var(--accent-ink); }
+.opt[aria-pressed=true] .opt-t::after { content: "  ✓ marcada"; font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em; color: var(--accent-strong); font-weight: 500; }
+.q-enter { animation: qin .28s ease both; }
+@keyframes qin { from { opacity: .2; transform: translateX(14px); } to { opacity: 1; transform: none; } }
 .opt-t { font-weight: 600; }
 .quiz-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 22px; gap: 12px; }
 .scene { border-left: 2px solid var(--cool); padding-left: 16px; }
@@ -930,9 +933,9 @@ function viewDiagnostico() {
       <div class="opts" role="group" aria-label="Respostas">${sc.ops.map((o, k) => `<button class="opt" data-sjt="${o.k}" aria-pressed="${cur === o.k}"><span class="opt-k">${'ABC'[k]}</span><span class="opt-t" style="font-weight:500">${esc(o.t)}</span></button>`).join('')}</div>`;
   }
   const answered = isItem ? q.items[ITEMS[idx].c] != null : q.sjt[SJT[idx - ITEMS.length].id] != null;
-  return `<main class="quiz wrap">${head}${body}
+  return `<main class="quiz wrap">${head}<div class="${S.enter ? 'q-enter' : ''}">${body}</div>
     <div class="quiz-nav"><button class="btn btn-quiet btn-sm" data-act="qz-back" style="width:auto">← Voltar</button>
-    ${idx === TOTAL - 1 ? `<button class="btn btn-primary btn-sm" data-act="qz-finish" style="width:auto" ${answered && !S.busy ? '' : 'disabled'}>Ver meu resultado</button>` : `<button class="btn btn-quiet btn-sm" data-act="qz-next" style="width:auto" ${answered ? '' : 'disabled'}>Avançar →</button>`}</div>
+    ${idx === TOTAL - 1 ? `<button class="btn btn-primary btn-sm" data-act="qz-finish" style="width:auto" ${answered && !S.busy ? '' : 'disabled'}>Ver meu resultado</button>` : `<button class="btn ${answered ? 'btn-primary' : 'btn-quiet'} btn-sm" data-act="qz-next" style="width:auto" ${answered ? '' : 'disabled'}>Avançar →</button>`}</div>
   </main>`;
 }
 
@@ -965,6 +968,15 @@ async function quizFinish() {
     const rec = await store.saveResult({ turma_id: q.turma?.id, respostas: { items: q.items, sjt: q.sjt }, resultado });
     LS.del(DRAFT_KEY); S.quiz = null; S.busy = false; S.result = rec; go('resultado');
   } catch (e) { S.busy = false; render(); toast(e.message || 'Não foi possível salvar. Tente de novo.'); }
+}
+
+// Mantém a opção marcada visível por um instante e então mostra a próxima pergunta.
+function autoAdvance(q) {
+  const at = q.step;
+  clearTimeout(autoAdvance._t);
+  autoAdvance._t = setTimeout(() => {
+    if (S.route === 'diagnostico' && S.quiz === q && q.step === at && q.step - 1 < TOTAL - 1) { q.step += 1; saveDraft(); S.enter = true; render(); S.enter = false; }
+  }, 650);
 }
 
 /* =============================== RELATÓRIO ================================ */
@@ -1151,13 +1163,13 @@ document.addEventListener('click', async (ev) => {
   if (t.dataset.tab) { S.authTab = t.dataset.tab; S.authMsg = null; render(); return; }
   if (t.dataset.copy) { copyText(t.dataset.copy); return; }
   if (t.dataset.ans) {
-    const q = S.quiz; const it = ITEMS[q.step - 1]; q.items[it.c] = Number(t.dataset.ans); saveDraft(); render();
-    setTimeout(() => { if (S.route === 'diagnostico' && S.quiz === q && q.step - 1 < TOTAL - 1) { q.step += 1; saveDraft(); render(); } }, 220);
+    const q = S.quiz; const it = ITEMS[q.step - 1]; q.items[it.c] = Number(t.dataset.ans); saveDraft(); S.enter = false; render();
+    autoAdvance(q);
     return;
   }
   if (t.dataset.sjt) {
-    const q = S.quiz; const sc = SJT[q.step - 1 - ITEMS.length]; q.sjt[sc.id] = t.dataset.sjt; saveDraft(); render();
-    setTimeout(() => { if (S.route === 'diagnostico' && S.quiz === q && q.step - 1 < TOTAL - 1) { q.step += 1; saveDraft(); render(); } }, 220);
+    const q = S.quiz; const sc = SJT[q.step - 1 - ITEMS.length]; q.sjt[sc.id] = t.dataset.sjt; saveDraft(); S.enter = false; render();
+    autoAdvance(q);
     return;
   }
   if (t.dataset.open) { const r = await store.getResult(t.dataset.open); if (r) { S.result = r; go('resultado'); } return; }
@@ -1169,8 +1181,8 @@ document.addEventListener('click', async (ev) => {
   else if (act === 'sair') { await store.signOut(); S.session = null; S.result = null; S.quiz = null; S.fac = { turmas: null, sel: null, results: null, newCode: null }; go('inicio'); }
   else if (act === 'fac-demo') { S.session = await store.signInFacilitatorDemo(); go('facilitador'); }
   else if (act === 'qz-start') { quizStart(); }
-  else if (act === 'qz-back') { const q = S.quiz; q.step = Math.max(0, q.step - 1); saveDraft(); render(); }
-  else if (act === 'qz-next') { const q = S.quiz; q.step = Math.min(TOTAL, q.step + 1); saveDraft(); render(); }
+  else if (act === 'qz-back') { clearTimeout(autoAdvance._t); const q = S.quiz; q.step = Math.max(0, q.step - 1); saveDraft(); render(); }
+  else if (act === 'qz-next') { clearTimeout(autoAdvance._t); const q = S.quiz; q.step = Math.min(TOTAL, q.step + 1); saveDraft(); S.enter = true; render(); S.enter = false; }
   else if (act === 'qz-finish') { quizFinish(); }
   else if (act === 'copiar-resumo') { copyText(resumoTexto(S.result), $('#resumo-fallback')); }
   else if (act === 'imprimir') { window.print(); }
