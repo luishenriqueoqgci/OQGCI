@@ -136,8 +136,8 @@ p { margin: 0; }
 .dim-row strong, .base-band strong { display: block; font-weight: 700; }
 .base-band { margin-top: 16px; border: 1px solid var(--line); border-radius: var(--r); padding: 20px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), color-mix(in srgb, var(--cool) 8%, var(--surface))); display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; }
 .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.step { display: grid; gap: 14px; align-content: start; }
-.seta { --tip: 30px; min-height: 96px; display: grid; align-content: center; gap: 6px; padding: 16px calc(var(--tip) + 14px) 16px calc(var(--tip) + 18px);
+.step { display: grid; gap: 14px; align-content: start; grid-row: span 2; grid-template-rows: subgrid; }
+.seta { --tip: 30px; min-height: 128px; display: grid; align-content: center; gap: 6px; padding: 16px calc(var(--tip) + 14px) 16px calc(var(--tip) + 18px);
   background: color-mix(in srgb, var(--accent) 16%, var(--surface));
   clip-path: polygon(0 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, 0 100%, var(--tip) 50%); }
 .step:first-child .seta { padding-left: 22px; clip-path: polygon(0 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, 0 100%); }
@@ -373,7 +373,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   .dims-tiles.n4 summary, .dims-tiles.n3 summary { min-height: 0; }
   .steps { gap: 14px; }
   .seta, .step:first-child .seta { --tip: 18px; min-height: 0; padding: 16px 22px calc(var(--tip) + 14px); }
-  .seta { padding-top: calc(var(--tip) + 12px); clip-path: polygon(0 0, 50% var(--tip), 100% 0, 100% calc(100% - var(--tip)), 50% 100%, 0 calc(100% - var(--tip))); }
+  .seta, .step:first-child .seta { padding-top: calc(var(--tip) + 12px); }
+  .seta { clip-path: polygon(0 0, 50% var(--tip), 100% 0, 100% calc(100% - var(--tip)), 50% 100%, 0 calc(100% - var(--tip))); }
   .step:first-child .seta { clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--tip)), 50% 100%, 0 calc(100% - var(--tip))); }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi b[style] { font-size: 18px !important; }
@@ -1388,7 +1389,7 @@ function viewInicio() {
   </div></section>
 
   <section class="section"><div class="wrap">
-    <div class="section-head"><span class="eyebrow">Para quem</span><h2>Feito para quem vende ao cliente final</h2><p class="muted">Serviço, produto ou experiência, com atendimento ou autoatendimento. O diagnóstico se ajusta ao seu tipo de negócio e à forma como os seus clientes compram.</p></div>
+    <div class="section-head"><span class="eyebrow">Para quem</span><h2>Funciona para todo tipo de negócio</h2><p class="muted">Serviço, produto ou experiência, com atendimento ou autoatendimento. O diagnóstico se ajusta ao seu tipo de negócio e à forma como os seus clientes compram.</p></div>
     <div class="who"><span>Empreendedores</span><span>Profissionais de saúde e terapeutas</span><span>Prestadores de serviço</span><span>Lojas e varejo</span><span>Restaurantes e alimentação</span><span>Educação e cursos</span><span>Equipes de venda e atendimento</span><span>Grupos de networking</span></div>
   </div></section>`;
 }
