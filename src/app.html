@@ -110,8 +110,16 @@ p { margin: 0; }
 .dim-code { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); padding-top: 3px; }
 .dim-row strong, .base-band strong { display: block; font-weight: 700; }
 .base-band { margin-top: 16px; border: 1px solid var(--line); border-radius: var(--r); padding: 20px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), color-mix(in srgb, var(--cool) 8%, var(--surface))); display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; }
-.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: s; }
-.step { border-top: 1px solid var(--accent); padding-top: 16px; display: grid; gap: 8px; }
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.step { display: grid; gap: 14px; align-content: start; }
+.seta { --tip: 30px; min-height: 96px; display: grid; align-content: center; gap: 6px; padding: 16px calc(var(--tip) + 14px) 16px calc(var(--tip) + 18px);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  clip-path: polygon(0 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, 0 100%, var(--tip) 50%); }
+.step:first-child .seta { padding-left: 22px; clip-path: polygon(0 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, 0 100%); }
+.step:nth-child(2) .seta { background: color-mix(in srgb, var(--accent) 34%, var(--surface)); }
+.step:nth-child(3) .seta { background: var(--accent); }
+.step:nth-child(3) .seta h3, .step:nth-child(3) .seta .step-n { color: var(--accent-ink); }
+.step > p { padding-inline: 22px 12px; }
 .step-n { font-family: var(--font-mono); font-size: 12px; color: var(--accent); letter-spacing: 0.12em; }
 .step h3 { font-size: 20px; }
 .who { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -334,6 +342,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   .hero .wrap, .report-hero, .grid-2 { grid-template-columns: minmax(0, 1fr); }
   .hero .wrap { padding-block: 48px 44px; gap: 36px; }
   .steps, .grid-3 { grid-template-columns: minmax(0, 1fr); }
+  .steps { gap: 14px; }
+  .seta, .step:first-child .seta { --tip: 18px; min-height: 0; padding: 16px 22px calc(var(--tip) + 14px); }
+  .seta { padding-top: calc(var(--tip) + 12px); clip-path: polygon(0 0, 50% var(--tip), 100% 0, 100% calc(100% - var(--tip)), 50% 100%, 0 calc(100% - var(--tip))); }
+  .step:first-child .seta { clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--tip)), 50% 100%, 0 calc(100% - var(--tip))); }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi b[style] { font-size: 18px !important; }
   .ref-group { grid-template-columns: minmax(0, 1fr); gap: 10px; }
@@ -1337,15 +1349,15 @@ function viewInicio() {
   <section class="section"><div class="wrap">
     <div class="section-head"><span class="eyebrow">Como funciona</span><h2>Do diagnóstico ao desenvolvimento em três passos</h2></div>
     <div class="steps">
-      <div class="step"><span class="step-n">PASSO 1</span><h3>Responda</h3><p class="muted">33 afirmações sobre as suas últimas 10 conversas com clientes, 6 situações do dia a dia, como "quanto custa?" e o cliente que sumiu, e uma pergunta aberta sobre a sua última venda que não fechou.</p></div>
-      <div class="step"><span class="step-n">PASSO 2</span><h3>Receba o diagnóstico completo</h3><p class="muted">Índice OQGCI, perfil, leitura de cada dimensão, a sua postura nas situações e a leitura da sua história de venda.</p></div>
-      <div class="step"><span class="step-n">PASSO 3</span><h3>Desenvolva</h3><p class="muted">As prioridades mostram por onde começar, com passos práticos para cada uma. Refaça o diagnóstico depois e compare a evolução.</p></div>
+      <div class="step"><div class="seta"><span class="step-n">PASSO 1</span><h3>Responda</h3></div><p class="muted">Afirmações sobre a sua prática com clientes, situações do dia a dia, como "quanto custa?" e o cliente que sumiu, e uma pergunta aberta sobre uma venda que não aconteceu.</p></div>
+      <div class="step"><div class="seta"><span class="step-n">PASSO 2</span><h3>Receba o diagnóstico completo</h3></div><p class="muted">Índice OQGCI, perfil, leitura de cada dimensão, a sua postura nas situações e a leitura da sua história de venda.</p></div>
+      <div class="step"><div class="seta"><span class="step-n">PASSO 3</span><h3>Desenvolva</h3></div><p class="muted">As prioridades mostram por onde começar, com passos práticos para cada uma. Refaça o diagnóstico depois e compare a evolução.</p></div>
     </div>
   </div></section>
 
   <section class="section"><div class="wrap">
-    <div class="section-head"><span class="eyebrow">Para quem</span><h2>Feito para quem vende o próprio trabalho</h2><p class="muted">Facilitadores criam turmas com código de acesso e acompanham o resultado do grupo.</p></div>
-    <div class="who"><span>Empreendedores</span><span>Terapeutas</span><span>Prestadores de serviço</span><span>Lojistas</span><span>Equipes de venda</span><span>Grupos de networking</span><span>Facilitadores de workshops</span></div>
+    <div class="section-head"><span class="eyebrow">Para quem</span><h2>Feito para quem vende ao cliente final</h2><p class="muted">Serviço, produto ou experiência, com atendimento ou autoatendimento. O diagnóstico se ajusta ao seu tipo de negócio e à forma como os seus clientes compram.</p></div>
+    <div class="who"><span>Empreendedores</span><span>Profissionais de saúde e terapeutas</span><span>Prestadores de serviço</span><span>Lojas e varejo</span><span>Restaurantes e alimentação</span><span>Educação e cursos</span><span>Equipes de venda e atendimento</span><span>Grupos de networking</span></div>
   </div></section>`;
 }
 
