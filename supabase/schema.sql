@@ -37,14 +37,16 @@ create table if not exists public.turmas (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
   codigo text not null unique,
+  perguntar_nicho boolean not null default true,
   facilitador_id uuid references public.profiles (id) on delete set null default auth.uid(),
   created_at timestamptz not null default now()
 );
 
 -- Busca de turma pelo código, sem expor a lista de turmas aos respondentes
-create or replace function public.turma_por_codigo(p_codigo text)
-returns table (id uuid, nome text) language sql stable security definer set search_path = public as $$
-  select t.id, t.nome from public.turmas t where upper(t.codigo) = upper(trim(p_codigo)) limit 1;
+drop function if exists public.turma_por_codigo(text);
+create function public.turma_por_codigo(p_codigo text)
+returns table (id uuid, nome text, perguntar_nicho boolean) language sql stable security definer set search_path = public as $$
+  select t.id, t.nome, t.perguntar_nicho from public.turmas t where upper(t.codigo) = upper(trim(p_codigo)) limit 1;
 $$;
 
 -- 3. Resultados -----------------------------------------------------------------
