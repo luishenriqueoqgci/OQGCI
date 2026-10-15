@@ -235,6 +235,13 @@ p { margin: 0; }
 .seg { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px 10px; font-weight: 600; font-size: 14px; cursor: pointer; text-align: center; color: var(--ink-2); touch-action: manipulation; }
 .seg:hover { border-color: var(--ink-3); }
 .seg[aria-pressed=true] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--ink); }
+.modo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.modo { display: grid; gap: 4px; text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px; cursor: pointer; color: var(--ink-2); touch-action: manipulation; }
+.modo strong { font-size: 15px; color: var(--ink); }
+.modo span { font-size: 13px; color: var(--ink-3); }
+.modo:hover { border-color: var(--ink-3); }
+.modo[aria-pressed=true] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+@media (max-width: 440px) { .modo-grid { grid-template-columns: minmax(0, 1fr); } }
 .prio-n { width: 28px; height: 28px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 14px; flex: none; align-self: center; }
 .path { list-style: none; margin: 0; padding: 0; display: grid; }
 .path-step { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 14px; position: relative; padding-bottom: 18px; }
@@ -305,7 +312,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .row-btn:hover { border-color: var(--ink-3); }
 .row-meta { color: var(--ink-3); font-size: 13px; }
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 16px; display: grid; gap: 4px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 16px; display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
 .kpi b { font-family: var(--font-display); font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .kpi span { font-size: 13px; color: var(--ink-3); }
 .hbars { display: grid; gap: 10px; }
@@ -342,6 +349,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   .hero .wrap { padding-block: 48px 44px; gap: 36px; }
   .steps, .grid-3 { grid-template-columns: minmax(0, 1fr); }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi b[style] { font-size: 18px !important; }
   .ref-group { grid-template-columns: minmax(0, 1fr); gap: 10px; }
 }
 @media (max-width: 600px) {
@@ -630,7 +638,7 @@ function V(t, voc) {
 }
 function negocioLinha(rec) {
   const n = rec?.respostas?.negocio; if (!n || !n.segmento) return '';
-  return 'Seu negócio: ' + (SEG[n.segmento]?.nome || 'Outro') + (n.oferta ? ' · ' + n.oferta : '');
+  return 'Seu negócio: ' + (SEG[n.segmento]?.nome || 'Outro') + (n.oferta ? ' · ' + n.oferta : '') + (n.modo === 'contato' ? ' · clientes escolhem sozinhos' : '');
 }
 
 // Como implementar cada dimensão: três passos, uma frase pronta e o sinal de que está funcionando.
@@ -667,6 +675,251 @@ const QUESTIONS = [
   ['Quem decide', 'Quem mais participa dessa decisão, e o que importa para cada um?'],
   ['Caminho', 'Qual recomendação clara e qual próximo passo eu vou propor?']
 ];
+
+/* ===================== MODO PONTOS DE CONTATO =====================
+   Para negócios em que a maioria dos clientes compra sozinha (self-service, prateleira, cardápio, site).
+   Mesmos códigos, mesmas dimensões, mesmas inversões e mesmos pares: o cálculo é idêntico ao do modo conversa. */
+const MODOS = [
+  { id: 'conversa', nome: 'Conversando comigo ou com a equipe', sub: 'Atendimento, consulta, orçamento, WhatsApp, visita' },
+  { id: 'contato', nome: 'Escolhendo sozinhos', sub: 'Self-service, prateleira, cardápio, site ou aplicativo' }
+];
+const modoDe = neg => neg?.modo === 'contato' ? 'contato' : 'conversa';
+const PC = {};
+PC.ITEMS = {
+  '1.1': 'Quando um cliente pediu ajuda para escolher, indiquei a opção que mais servia a ele, mesmo sendo a mais barata.',
+  '1.2': 'Deixei em destaque, na exposição e nas sugestões, os itens de maior margem, porque são eles que sustentam o negócio.',
+  '1.3': 'O que estava em destaque no meu negócio era o que eu recomendaria a alguém da minha família.',
+  '1.4': 'Coloquei em primeiro plano a opção mais completa e mais cara, porque o cliente merece o melhor.',
+  '2.1': 'Nos posts e na comunicação do negócio, comecei pelo que o cliente ganha ou resolve, antes de falar de nós.',
+  '2.2': 'Nos posts e na comunicação, destaquei a história, a tradição e os diferenciais do negócio, para o cliente confiar.',
+  '2.3': 'Publiquei um conteúdo útil para o cliente, como uma dica, um bastidor ou uma forma de aproveitar melhor o que vendo.',
+  '2.4': 'Pedi uma avaliação ou uma indicação a clientes satisfeitos, por QR code, mensagem ou pessoalmente.',
+  '3.1': 'Perguntei a clientes o que eles procuravam e se encontraram o que queriam.',
+  '3.2': 'Decidi o que oferecer e o que destacar a partir da minha experiência no negócio, sem precisar consultar os clientes.',
+  '3.3': 'Li as avaliações e as mensagens dos clientes e anotei o que se repete.',
+  '3.4': 'Quando um cliente começou a fazer uma sugestão ou reclamação, expliquei logo como funciona, para resolver rápido.',
+  '4.1': 'Nos pontos de contato (placas, cardápio, prateleira, embalagem, redes), mostrei ao cliente algo que ele ainda não sabia sobre o que está escolhendo.',
+  '4.2': 'Mantive a comunicação só com nome e preço dos produtos, porque o cliente já sabe o que quer.',
+  '4.3': 'Ouvi ou li de um cliente algo como "não sabia disso" ou "nunca tinha pensado nisso".',
+  '4.4': 'Respondi às perguntas dos clientes de forma rápida e objetiva, sem acrescentar informações que eles não pediram.',
+  '5.1': 'A comunicação do negócio ajudou o cliente a perceber o que ele perde com a alternativa: tempo, dinheiro, qualidade ou bem-estar.',
+  '5.2': 'Evitei comparar com as alternativas ou mostrar o que o cliente perde, para não parecer apelativo.',
+  '5.3': 'Mostrei um caso real ou um depoimento de cliente, com o antes e o depois, para mostrar o que estava em jogo.',
+  '5.4': 'Mostrei a conta de forma concreta e sem exagero, como preço por pessoa, tempo economizado ou rendimento.',
+  '6.1': 'Havia uma sugestão clara à vista do cliente, como prato do dia, combo, mais pedido ou sugestão da casa.',
+  '6.2': 'Mantive todas as opções à vista com o mesmo destaque e deixei o cliente escolher com liberdade.',
+  '6.3': 'Deixei claro um próximo passo para o cliente voltar, como encomenda, cartão fidelidade, novidades da semana ou grupo de clientes.',
+  '6.4': 'Ofereci uma forma de reduzir o risco da escolha, como provar antes, porção ou tamanho menor, troca ou garantia.',
+  '7.1': 'Considerei quem acompanha ou influencia a compra (família, colegas, quem paga) na forma de expor e comunicar.',
+  '7.2': 'Comuniquei pensando só em quem entra e paga, porque é essa pessoa quem decide.',
+  '7.3': 'Ofereci um material fácil de compartilhar, como cardápio digital, foto ou link, para o cliente mostrar a quem decide junto.',
+  '7.4': 'Quando um cliente disse que ia combinar um pedido maior com outras pessoas, passei o contato e esperei ele voltar a me procurar.',
+  '8.1': 'Os preços estavam visíveis e claros, sem o cliente precisar perguntar.',
+  '8.2': 'Deixei o preço para o fim da comunicação ou para o caixa, depois de mostrar tudo o que está incluído, para o valor não assustar.',
+  '8.3': 'Quando um cliente pediu desconto, mantive o preço e ofereci outra quantidade, formato ou condição.',
+  '8.4': 'Ofereci desconto ou brinde antes de o cliente pedir, para garantir a venda.',
+  '8.5': 'Retomei o contato com clientes que sumiram, por mensagem ou pelas redes, trazendo algo útil e sem cobrança.'
+};
+PC.DIMS = {
+  D1: { mede: 'Intenção de ajudar o cliente a escolher bem, também no que fica à vista, e honestidade quando o seu negócio não é o mais indicado.',
+        pratica: 'Destacar o que você recomendaria a alguém da sua família.',
+        exercicio: 'Percorra o seu negócio como cliente e pergunte, diante de cada destaque: isto ajuda o cliente a escolher bem, mesmo que ele gaste menos?',
+        indicador: 'Clientes que voltaram ou indicaram depois de uma sugestão honesta.' },
+  D2: { mede: 'A conversa que começa antes de o cliente entrar: fachada, perfil no Google, redes, avaliações e indicação.',
+        pratica: 'Fazer a fachada, o perfil e as redes começarem pelo que o cliente ganha.',
+        exercicio: 'Reescreva a descrição do seu perfil no Google e nas redes e publique um conteúdo útil para o seu cliente.',
+        indicador: 'Avaliações novas e indicações no mês.' },
+  D3: { mede: 'Conhecer o que o cliente procura, perguntando, observando e lendo o que ele diz, antes de decidir o que oferecer e destacar.',
+        pratica: 'Ouvir o cliente antes de mudar a oferta.',
+        exercicio: 'Durante uma semana, pergunte a três clientes por dia o que eles procuravam e anote o que se repete.',
+        indicador: 'Mudanças feitas a partir do que os clientes disseram.' },
+  D4: { mede: 'Mostrar ao cliente, nos pontos de contato, algo que ele ainda não sabia sobre o que está escolhendo.',
+        pratica: 'Ter informações novas à vista: origem, preparo, uso, combinação ou cuidado.',
+        exercicio: 'Escreva três informações que o seu cliente não costuma saber e coloque cada uma num ponto de contato: placa, cardápio, embalagem ou post.',
+        indicador: 'Comentários do tipo "não sabia disso".' },
+  D5: { mede: 'Ajudar o cliente a perceber o que ele perde com a alternativa, com números e casos reais, sem exagero.',
+        pratica: 'Mostrar a conta de forma concreta.',
+        exercicio: 'Monte uma comparação honesta para o seu produto principal (preço por pessoa, tempo economizado ou rendimento) e deixe à vista.',
+        indicador: 'Clientes que citam a vantagem com as próprias palavras.' },
+  D6: { mede: 'Sugestão clara à vista, poucas opções em destaque, risco reduzido e um próximo passo para o cliente voltar.',
+        pratica: 'Deixar uma sugestão clara e um motivo para voltar.',
+        exercicio: 'Escolha um destaque principal por ponto de contato e crie um próximo passo simples: encomenda, fidelidade ou novidades da semana.',
+        indicador: 'Clientes que voltam pelo próximo passo que você criou.' },
+  D7: { mede: 'Considerar quem acompanha, quem paga e quem influencia a escolha, e facilitar a decisão em grupo.',
+        pratica: 'Comunicar o ganho também para quem acompanha o cliente.',
+        exercicio: 'Crie um material fácil de compartilhar (cardápio digital, foto ou link) para pedidos de grupo, família ou empresa.',
+        indicador: 'Pedidos de grupo, família ou empresa no mês.' },
+  D8: { mede: 'Postura assertiva em preço, desconto e retomada, com cuidado no melhor momento e no final da experiência do cliente.',
+        pratica: 'Sustentar o valor do que você vende com respeito.',
+        exercicio: 'Escreva as suas respostas para "achei caro", "faz desconto?" e para o cliente que pediu orçamento e sumiu.',
+        indicador: 'Descontos concedidos sem pedido do cliente (meta: zero).' }
+};
+PC.BANDS = {
+  D1: { alto: 'O cliente percebe que o seu negócio quer que ele escolha bem. É a base que sustenta todo o resto e o que gera recompra e indicação.',
+        medio: 'A intenção de ajudar aparece, mas nem sempre está à vista nos momentos de escolha, como quando uma opção mais simples serviria melhor ao cliente.',
+        baixo: 'Em parte dos pontos de contato, o que o negócio quer vender vem antes do que o cliente precisa. Ele percebe, a confiança cai e as ações de venda perdem efeito.' },
+  D2: { alto: 'O cliente chega com uma imagem clara do que ganha com o seu negócio e, muitas vezes, com a confiança emprestada de quem indicou ou avaliou.',
+        medio: 'A sua presença existe, mas ainda fala mais do negócio do que do ganho do cliente, ou aproveita pouco as avaliações e indicações.',
+        baixo: 'O cliente chega sem referência. A fachada, o perfil e as avaliações poderiam adiantar uma parte da escolha que hoje fica toda para a hora da compra.' },
+  D3: { alto: 'Você sabe o que o cliente procura e usa isso para decidir o que oferecer e destacar. Ele se reconhece no que encontra.',
+        medio: 'Você ouve os clientes, mas de forma irregular. Parte das decisões sobre a oferta ainda vem só da sua percepção.',
+        baixo: 'A oferta e a exposição são decididas sem ouvir o cliente. Quando não se reconhece no que encontra, ele passa a comparar preços.' },
+  D4: { alto: 'Os seus pontos de contato mostram ao cliente algo novo sobre o que ele está escolhendo. Isso diferencia o negócio e torna a experiência memorável.',
+        medio: 'Você tem informação para surpreender o cliente, mas ela aparece pouco nos pontos de contato.',
+        baixo: 'A comunicação mostra nome e preço. Sem uma informação nova, o cliente não encontra um motivo claro para escolher você.' },
+  D5: { alto: 'O cliente enxerga com clareza o que perde com a alternativa, com números e casos reais e sem exagero.',
+        medio: 'A vantagem aparece, mas falta concretude: uma conta simples ou um caso real que o cliente reconheça.',
+        baixo: 'O cliente não chega a perceber o que perde com a alternativa. Sem esse peso, as opções parecem iguais, e o preço decide.' },
+  D6: { alto: 'O cliente encontra uma sugestão clara, escolhe com segurança e sabe como voltar.',
+        medio: 'Há sugestões, mas às vezes com destaques demais ou sem um próximo passo para o cliente voltar.',
+        baixo: 'O cliente encontra muitas opções com o mesmo peso e nenhuma direção. Diante disso, escolhe o de sempre, gasta menos ou não volta.' },
+  D7: { alto: 'Você considera quem acompanha, quem paga e quem influencia, e facilita a escolha em grupo.',
+        medio: 'Você percebe que outras pessoas participam da escolha, mas a comunicação ainda fala só com quem compra.',
+        baixo: 'A comunicação fala com uma pessoa, e a escolha costuma ser feita com outras. Pedidos de grupo, família e empresa ficam pelo caminho.' },
+  D8: { alto: 'Você sustenta o valor do que vende com tranquilidade e respeito, no preço, no desconto e na retomada.',
+        medio: 'Em parte das situações, a firmeza cede lugar ao desconto ou à pressão, principalmente quando o movimento cai.',
+        baixo: 'Preço, desconto e retomada são pontos frágeis. O valor cede, ou a pressão afasta o cliente.' }
+};
+PC.IMPL = {
+  D1: { passos: ['Percorra o seu negócio como {cliente} e retire dos destaques o que você não recomendaria a alguém da sua família.', 'Quando uma opção mais simples servir melhor ao {cliente}, sugira essa opção, por escrito ou pessoalmente.', 'Uma vez por semana, anote um caso em que o {cliente} levou exatamente o que precisava.'],
+        frase: 'Para o que você precisa, esta opção resolve bem e sai mais em conta.',
+        sinal: 'Os {clientes} voltam, indicam e citam a honestidade do negócio nas avaliações.' },
+  D2: { passos: ['Reescreva a descrição do perfil no Google e nas redes começando pelo que o {cliente} ganha.', 'Publique uma vez por semana um conteúdo curto e útil: uma dica, um bastidor ou uma forma de aproveitar melhor {oferta}.', 'Coloque um QR code de avaliação no balcão ou na embalagem e peça a avaliação de forma direta aos {clientes} satisfeitos.'],
+        frase: 'Que bom que você gostou. Se puder deixar uma avaliação, ajuda muito outras pessoas a nos encontrar.',
+        sinal: 'Mais {clientes} chegam dizendo que viram um post, uma avaliação ou que vieram por indicação.' },
+  D3: { passos: ['Pergunte todos os dias a pelo menos três {clientes} o que eles procuravam e se encontraram.', 'Leia as avaliações e as mensagens da semana e anote o que se repete.', 'Antes de mudar a oferta ou a exposição, confirme a ideia com alguns {clientes}.'],
+        frase: 'Encontrou o que procurava hoje? O que faria você vir mais vezes?',
+        sinal: 'As mudanças que você faz partem do que os {clientes} disseram, e eles comentam que o negócio tem a cara deles.' },
+  D4: { passos: ['Liste três coisas que os seus {clientes} não sabem sobre {oferta}: origem, preparo, uso, combinação ou cuidado.', 'Coloque cada uma num ponto de contato: placa, cardápio, prateleira, embalagem, post ou mensagem.', 'Troque a informação em destaque de tempos em tempos e observe o que gera comentário.'],
+        frase: 'Você sabia? [uma informação sobre a origem, o preparo ou o melhor uso do que você vende].',
+        sinal: 'Você ouve ou lê com frequência "não sabia disso".' },
+  D5: { passos: ['Monte uma conta simples e honesta para o seu produto principal: preço por pessoa, tempo economizado ou rendimento.', 'Mostre um caso real, com autorização, de um {cliente} que trocou a alternativa pelo seu negócio.', 'Deixe a comparação à vista, sem exagero e sem falar mal de concorrentes.'],
+        frase: 'Na prática, sai por R$ X por pessoa, pronto em cinco minutos.',
+        sinal: 'Os {clientes} repetem a vantagem com as próprias palavras, como "aqui compensa mais".' },
+  D6: { passos: ['Escolha um destaque principal em cada ponto de contato: prato do dia, combo, mais pedido ou sugestão da casa.', 'Reduza as opções em destaque a duas ou três e organize o restante por categoria.', 'Crie um próximo passo para o {cliente} voltar e uma forma de reduzir o risco da escolha, como provar antes, tamanho menor ou troca.'],
+        frase: 'Primeira vez aqui? O mais pedido é este. Se quiser, prove antes de escolher.',
+        sinal: 'Mais {clientes} escolhem o destaque, e mais voltam pelo próximo passo que você criou.' },
+  D7: { passos: ['Pergunte, sempre que fizer sentido, se a compra é para mais pessoas.', 'Pense no que importa para cada um: quem consome quer qualidade, quem paga quer segurança, quem indica quer acertar na escolha.', 'Tenha um material fácil de compartilhar para pedidos de grupo, família ou empresa: cardápio digital, foto ou link.'],
+        frase: 'É para mais pessoas? Posso te mandar as opções em um link, para você mostrar a quem vai junto.',
+        sinal: 'Aumentam os pedidos de grupo, família e empresa, e quem acompanhou passa a voltar por conta própria.' },
+  D8: { passos: ['Deixe os preços visíveis e claros em todos os pontos de contato.', 'Escreva e treine com a equipe as respostas para "achei caro" e "faz desconto?", mantendo o valor e oferecendo formato, quantidade ou fidelidade.', 'Cuide do final da experiência (caixa, embalagem, despedida) e, quando um {cliente} pedir orçamento e sumir, retome em até três dias com algo útil.'],
+        frase: 'O preço é esse, e para quem vem sempre temos o cartão fidelidade, que sai mais em conta.',
+        sinal: 'Você concede menos descontos sem pedido, e mais {clientes} respondem quando você retoma o contato.' }
+};
+PC.SJT = [
+  { id: 'S1', t: 'Um cliente deixa uma avaliação pública: "Gostei, mas achei caro."', ops: [
+    ['passiva', '"Sentimos muito! Na sua próxima visita, mostre esta mensagem e ganhe 15% de desconto."'],
+    ['assertiva', '"Obrigado por contar! O valor inclui [o que faz diferença]. Se quiser uma opção mais em conta, a [opção] sai por R$ X. Volte para experimentar."'],
+    ['agressiva', '"Os nossos preços estão abaixo da média da região, e qualidade tem custo. Agradecemos a compreensão."'] ] },
+  { id: 'S2', t: 'Um cliente que vem sempre pede desconto na hora de pagar.', ops: [
+    ['agressiva', '"Aqui não trabalhamos com desconto. O preço já é justo para a qualidade."'],
+    ['passiva', 'Dou 10% desta vez, porque ele é um cliente fiel.'],
+    ['assertiva', '"Para quem vem sempre, temos o cartão fidelidade: a cada dez, uma é por nossa conta. Já quer começar hoje?"'] ] },
+  { id: 'S3', t: 'Uma cliente pergunta se você atende um pedido maior, para a família ou para a empresa, e diz que precisa combinar com os outros.', ops: [
+    ['assertiva', '"Atendo, sim. Te mando agora um resumo com opções, fotos e valores para você mostrar. Posso te chamar na quinta para fechar os detalhes?"'],
+    ['passiva', '"Atendo, sim. Combinem com calma e me chamem quando decidirem."'],
+    ['agressiva', '"Atendo, sim. Só aviso que a agenda está quase cheia e preciso da confirmação até amanhã."'] ] },
+  { id: 'S4', t: 'Um cliente pediu um orçamento pelo WhatsApp e não respondeu há cinco dias.', ops: [
+    ['agressiva', '"Oi! O valor do orçamento vale só até hoje. Depois disso, não consigo garantir."'],
+    ['assertiva', 'Envio uma foto ou sugestão útil ligada ao pedido dele e pergunto: "Ficou alguma dúvida que eu possa esclarecer?"'],
+    ['passiva', 'Aguardo o retorno dele, para não parecer insistente.'] ] },
+  { id: 'S5', t: 'Um cliente escolhe algo que, pelo que você percebe, não vai atender ao que ele precisa.', ops: [
+    ['passiva', 'Deixo o cliente levar o que escolheu, porque ele sabe o que quer.'],
+    ['agressiva', '"Isso não vai dar certo para o que você quer. Leve esta outra, que é a certa."'],
+    ['assertiva', '"Posso te dar uma dica? Para esse uso, costuma funcionar melhor esta outra opção." E explico o motivo em uma frase.'] ] },
+  { id: 'S6', t: 'Um cliente procura algo que o seu negócio não oferece com a qualidade de que ele precisa.', ops: [
+    ['assertiva', 'Digo com clareza que esse não é o nosso forte e indico onde ele encontra.'],
+    ['agressiva', 'Mostro o que temos de mais parecido e reforço que vai atender, para não perder a venda.'],
+    ['passiva', 'Vendo a opção mais próxima que temos, explicando que é o que há no momento.'] ] }
+].map(s => ({ ...s, ops: s.ops.map(([k, t]) => ({ k, t })) }));
+PC.SJT_WHY = {
+  S1: { why: 'Responder com transparência sobre o que está incluído no preço, e oferecer uma alternativa, mostra respeito pelo cliente e por quem lê a avaliação. Uma avaliação pública é lida por muitos futuros clientes, que julgam primeiro se o negócio quer o bem deles e só depois a competência (Fiske, Cuddy e Glick, 2007). Uma resposta calma e útil vira propaganda.',
+        passiva: 'Oferecer desconto numa resposta pública ensina a quem lê que reclamar do preço dá desconto, e reduz o valor percebido do que você vende. A próxima avaliação tende a pedir o mesmo.',
+        agressiva: 'Defender o preço com comparações soa como ataque ao cliente, e quem lê se coloca no lugar dele. Quando percebemos intenção de persuadir ou de se defender, a sinceridade percebida cai (Campbell e Kirmani, 2000).',
+        frase: 'Obrigado por contar! O valor inclui [o que faz diferença]. Se quiser uma opção mais em conta, a [opção] sai por R$ X. Volte para experimentar.' },
+  S2: { why: 'Manter o preço e oferecer uma vantagem ligada à frequência reconhece a fidelidade do cliente e preserva o valor do que você vende. A expectativa de uma recompensa futura mobiliza o sistema de dopamina, que motiva a repetição do comportamento (Schultz, Dayan e Montague, 1997): o cliente passa a ter mais um motivo para voltar.',
+        passiva: 'Conceder o desconto na hora mostra que o preço era negociável. O cliente fiel tende a pedir desconto toda vez, e outros clientes que percebem a concessão também.',
+        agressiva: 'Recusar de forma seca coloca um cliente fiel na defensiva. Sob ameaça, o cérebro passa ao modo de defesa e a região que usamos para avaliar perde força (Arnsten, 2009). A relação construída em muitas visitas fica abalada em uma frase.',
+        frase: 'Para quem vem sempre, temos o cartão fidelidade: a cada dez, uma é por nossa conta. Já quer começar hoje?' },
+  S3: { why: 'Quem decide em grupo busca o apoio de quem está ao redor: discordar do grupo gera no cérebro um sinal parecido com o de erro (Klucharev e colegas, 2009). Um resumo pronto para mostrar e um próximo passo combinado ajudam a cliente a conduzir essa conversa com os argumentos certos.',
+        passiva: 'Deixar para quando eles decidirem entrega a escolha a pessoas que não conhecem o seu negócio. Sem material para mostrar, o grupo tende a escolher o que já conhece ou a adiar.',
+        agressiva: 'Impor um prazo antes de o grupo conhecer a proposta gera desconfiança e constrange quem levou a ideia. A cliente tende a evitar o risco e procurar outra opção.',
+        frase: 'Te mando agora um resumo com opções, fotos e valores para você mostrar. Posso te chamar na quinta para fechar os detalhes?' },
+  S4: { why: 'Grande parte das negociações termina sem decisão, e a principal causa é o medo de escolher errado (Dixon e McKenna, 2022). Um retorno útil, ligado ao pedido do cliente, e uma pergunta leve reduzem esse medo e reabrem a conversa sem pressão.',
+        passiva: 'Esperar o retorno, por mais respeitoso que pareça, deixa o cliente sozinho com a dúvida. Na maioria das vezes, o silêncio vira desistência por falta de um próximo passo.',
+        agressiva: 'Cobrar a decisão com prazo aumenta o medo de errar e confirma a sensação de pressão. O cliente tende a se afastar de vez.',
+        frase: 'Lembrei do seu pedido ao ver isto: [foto ou sugestão ligada ao que ele pediu]. Ficou alguma dúvida que eu possa esclarecer?' },
+  S5: { why: 'Pedir licença antes de dar a dica preserva a autonomia do cliente e desperta curiosidade. A curiosidade ativa o circuito de recompensa e melhora a memória do que vem em seguida (Gruber, Gelman e Ranganath, 2014). É o movimento da Virada: o cliente passa a enxergar a própria escolha de outro jeito e lembra de quem o ajudou.',
+        passiva: 'Deixar o cliente levar algo que não atende leva a uma experiência ruim, e ele atribui o resultado ao seu negócio. A frustração costuma aparecer na avaliação e na decisão de não voltar.',
+        agressiva: 'Corrigir a escolha de forma direta ataca a imagem que o cliente tem de si. A reação natural é defender a própria decisão, e a dica se perde.',
+        frase: 'Posso te dar uma dica? Para esse uso, costuma funcionar melhor esta outra opção.' },
+  S6: { why: 'Indicar outro lugar demonstra benevolência, um dos três pilares da confiança, ao lado de competência e integridade (Mayer, Davis e Schoorman, 1995). O cliente lembra de quem o orientou bem: volta para o que você faz melhor e indica outras pessoas.',
+        passiva: 'Vender a opção mais próxima entrega uma experiência abaixo do esperado. A frustração aparece depois, muitas vezes numa avaliação pública.',
+        agressiva: 'Garantir que vai atender, sabendo que não é o caso, é a forma mais rápida de perder credibilidade. O cliente percebe, e a confiança dificilmente volta.',
+        frase: 'Isso não é o nosso forte. Quem faz muito bem é [outro negócio]. O que a gente faz de melhor é [o seu destaque], volte para experimentar.' }
+};
+PC.QUESTIONS = [
+  ['Propósito', 'O que eu deixo à vista ajuda o meu cliente a escolher bem, mesmo que ele gaste menos?'],
+  ['Virada', 'O que o meu cliente ainda não sabe sobre o que está escolhendo?'],
+  ['Quem decide', 'Quem acompanha ou influencia a escolha, e o que importa para cada um?'],
+  ['Caminho', 'Qual sugestão clara e qual próximo passo o meu cliente encontra sozinho?']
+];
+PC.LEVELS = {
+  'Propósito': 'Os seus pontos de contato conduzem o cliente do Espelho ao Caminho com interesse genuíno, de forma consistente.',
+  'Conversa': 'Os seus pontos de contato aplicam os quatro movimentos com consistência parcial.',
+  'Atendimento': 'O negócio atende com cuidado a quem já sabe o que quer. Conduz pouco a escolha.',
+  'Vitrine': 'O cliente decide sozinho, diante de produtos e preços.'
+};
+PC.PROFILES = {
+  insistente: { conversa: 'Empurra a venda com força nos pontos de contato e gera resistência. Vende hoje e perde a recompra.', foco: 'Trabalhe a postura nas situações e o Espelho: a firmeza rende mais quando o cliente se sente ouvido e percebe a intenção de ajudar.' },
+  reativo: { conversa: 'Atende bem a quem já sabe o que quer e espera o cliente decidir sozinho.', foco: 'Comece por Espelho e Caminho: ouvir o que o cliente procura e deixar uma sugestão clara à vista.' },
+  prestativo: { conversa: 'Cuida muito bem do cliente e agrada. Evita mostrar o que ele perde com a alternativa e deixa a escolha sem direção.', foco: 'Trabalhe Virada, Custo e Caminho: ajudar inclui mostrar ao cliente o que ele ainda não sabe e sugerir com clareza.' },
+  especialista: { conversa: 'Domina o próprio produto e comunica com detalhe. O cliente não se reconhece no que encontra.', foco: 'Trabalhe Espelho e Quem decide: o conhecimento rende mais quando parte do que o cliente procura.' },
+  conselheiro: { conversa: 'Os pontos de contato mostram algo novo, deixam a vantagem clara com ética e sugerem com firmeza.', foco: 'Mantenha a consistência e refine as dimensões abaixo de 80. O seu negócio pode servir de referência para outros do grupo.' }
+};
+PC.QUADS = {
+  conduz: 'O cliente enxerga o ganho e encontra ajuda para decidir.',
+  encanta: 'O cliente gosta do que encontra, mas compra menos ou demora a voltar.',
+  pressiona: 'Há firmeza para vender, mas o cliente ainda não enxerga o ganho.',
+  vitrine: 'A comunicação ainda gira em torno do produto.'
+};
+
+// Pacote de textos de cada modo. O modo conversa usa os textos originais.
+const PACKS = {};
+function pack(neg) {
+  const m = modoDe(neg);
+  if (PACKS[m]) return PACKS[m];
+  const c = m === 'contato';
+  const T = Object.fromEntries(ITEMS.map(i => [i.c, c ? PC.ITEMS[i.c] : i.t]));
+  const dim = Object.fromEntries(DIMS.map(d => [d.id, c ? { ...d, ...PC.DIMS[d.id] } : d]));
+  const sjt = c ? PC.SJT : SJT;
+  return (PACKS[m] = {
+    modo: m, T, dim, sjt, sjtOf: id => sjt.find(s => s.id === id),
+    why: c ? PC.SJT_WHY : SJT_WHY, bands: c ? PC.BANDS : BANDS, impl: c ? PC.IMPL : IMPL,
+    questions: c ? PC.QUESTIONS : QUESTIONS,
+    leituraNivel: nome => c ? PC.LEVELS[nome] : LEVELS.find(l => l.nome === nome).leitura,
+    perfil: k => c && PC.PROFILES[k] ? { ...PROFILES[k], ...PC.PROFILES[k] } : PROFILES[k],
+    quad: k => c ? PC.QUADS[k] : QUADS[k].t,
+    ancora: c ? 'Pense nos últimos 10 dias de funcionamento do seu negócio. Em quantos isso aconteceu?' : 'Pense nas suas últimas 10 conversas com clientes. Em quantas isso aconteceu?',
+    ancoraCurta: c ? 'Nas próximas perguntas, pense nos últimos 10 dias de funcionamento do seu negócio e no que o cliente encontrou nos pontos de contato: fachada, perfil e redes, balcão, cardápio ou prateleira, embalagem, caixa e mensagens.' : 'Nas próximas perguntas, pense nas suas últimas 10 conversas com clientes.',
+    hist: c ? {
+      q: 'Conte em poucas linhas uma situação recente em que um cliente foi embora sem comprar, comprou menos do que poderia ou não voltou.',
+      hint: 'O que você percebeu, o que estava à vista para ele e o que aconteceu depois. Escreva como contaria a um colega. Não use nomes de clientes.',
+      ph: 'Ex.: Um casal entrou, olhou o balcão, perguntou o preço do quilo e saiu sem comprar...',
+      guide: [['Espelho', 'você sabia o que esse cliente procurava?'], ['Virada', 'algo à vista mostrou a ele um ganho que ele não esperava?'], ['Custo', 'ficou claro o que ele perderia escolhendo outro lugar?'], ['Caminho', 'havia uma sugestão clara e um próximo passo para ele voltar?']],
+      titulo: 'Sua história'
+    } : {
+      q: 'Conte em poucas linhas como foi a sua última venda que não fechou.',
+      hint: 'O que o cliente disse, o que você respondeu e o que aconteceu depois. Escreva como contaria a um colega. Não use nomes de clientes.',
+      ph: 'Ex.: A cliente pediu o preço pelo WhatsApp, eu mandei a tabela...',
+      guide: [['Espelho', 'você perguntou e aprofundou antes de apresentar o serviço?'], ['Virada', 'o cliente ouviu algo novo sobre o próprio problema?'], ['Custo', 'ficou claro quanto custa deixar como está?'], ['Caminho', 'houve uma recomendação clara e um próximo passo combinado?']],
+      titulo: 'Sua história de venda'
+    },
+    notaBaixa: c ? 'Algumas respostas ficaram pouco consistentes entre si. O diagnóstico fica mais útil quando reflete a prática real do seu negócio. Se quiser, refaça com calma, pensando nos últimos dias de funcionamento.' : 'Algumas respostas ficaram pouco consistentes entre si. O diagnóstico fica mais útil quando reflete a sua prática real com os clientes. Se quiser, refaça com calma, pensando nas suas últimas conversas.',
+    prioFim: c ? 'Você percorreu as quatro etapas. Escolha um dos passos e aplique nos próximos dias, no ponto de contato com mais movimento.' : 'Você percorreu as quatro etapas. Escolha um dos passos e aplique na próxima conversa com um cliente.',
+    perguntasTitulo: c ? 'Quatro perguntas para revisar os seus pontos de contato' : 'Quatro perguntas antes da próxima conversa'
+  });
+}
 
 const REFS = [
   { g: 'OQGCI · aproximação e afastamento', ev: 'Evidência sólida para o circuito de recompensa; a aplicação à venda é leitura do método.', r: [
@@ -838,7 +1091,7 @@ const hashStr = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h 
 /* ===================== ARMAZENAMENTO · DEMONSTRAÇÃO ======================= */
 function seedExamples() {
   const now = Date.now();
-  const mk = (n, means, sjtPattern) => {
+  const mk = (n, means, sjtPattern, negocio) => {
     const items = {};
     const offs = [0.4, -0.4, 0.2, -0.2, 0];
     for (const d of DIMS) {
@@ -851,7 +1104,7 @@ function seedExamples() {
     const sjt = {};
     SJT.forEach((s, k) => { sjt[s.id] = sjtPattern[k]; });
     const resultado = scoreAnswers(items, sjt);
-    return { id: 'ex-' + n, user_id: 'ex-user-' + n, nome: 'Exemplo ' + n, turma_id: 'turma-exemplo', respostas: { items, sjt }, resultado, created_at: new Date(now - n * 86400000 * 0.7).toISOString(), exemplo: true };
+    return { id: 'ex-' + n, user_id: 'ex-user-' + n, nome: 'Exemplo ' + n, turma_id: 'turma-exemplo', respostas: { items, sjt, negocio: negocio || null }, resultado, created_at: new Date(now - n * 86400000 * 0.7).toISOString(), exemplo: true };
   };
   const A = 'assertiva', P = 'passiva', G = 'agressiva';
   const all = v => Object.fromEntries(DIMS.map(d => [d.id, v]));
@@ -863,15 +1116,17 @@ function seedExamples() {
     mk(5, all(2.3), [P, P, A, P, A, A]),
     mk(6, { D1: 3.8, D2: 3.1, D3: 3.6, D4: 3.0, D5: 3.2, D6: 3.5, D7: 2.8, D8: 3.4 }, [A, A, A, P, A, A]),
     mk(7, { D1: 4.4, D2: 4.0, D3: 4.3, D4: 3.9, D5: 3.7, D6: 4.2, D7: 3.9, D8: 4.0 }, [A, A, A, A, P, A]),
-    mk(8, { D1: 4.1, D2: 2.9, D3: 4.0, D4: 3.1, D5: 2.9, D6: 3.0, D7: 3.6, D8: 3.0 }, [P, A, P, A, A, A])
+    mk(8, { D1: 4.1, D2: 2.9, D3: 4.0, D4: 3.1, D5: 2.9, D6: 3.0, D7: 3.6, D8: 3.0 }, [P, A, P, A, A, A]),
+    mk(9, { D1: 4.2, D2: 2.6, D3: 3.0, D4: 2.4, D5: 2.5, D6: 3.3, D7: 2.8, D8: 3.1 }, [P, A, P, P, A, A], { segmento: 'alimentacao', oferta: 'restaurante self-service', modo: 'contato' })
   ];
 }
 
 function DemoStore() {
   const KEY = 'oqgci-demo-v1';
   let db = LS.get(KEY);
-  if (!db || db.v !== 1) {
-    db = { v: 1, users: [], session: null, results: seedExamples(), turmas: [{ id: 'turma-exemplo', nome: 'Exemplo · Workshop de vendas', codigo: 'OQG-DEMO', created_at: new Date().toISOString(), exemplo: true }] };
+  if (db && db.v === 1) { db.results = [...db.results.filter(x => !x.exemplo), ...seedExamples()]; db.v = 2; }
+  if (!db || db.v !== 2) {
+    db = { v: 2, users: [], session: null, results: seedExamples(), turmas: [{ id: 'turma-exemplo', nome: 'Exemplo · Workshop de vendas', codigo: 'OQG-DEMO', created_at: new Date().toISOString(), exemplo: true }] };
   }
   const save = () => LS.set(KEY, db);
   save();
@@ -1241,15 +1496,17 @@ function viewDiagnostico() {
       <p class="muted">Com isso, o diagnóstico usa a linguagem do seu mercado e traz exemplos e frases prontas para o seu tipo de negócio.</p></div>
       <div class="card stack">
         <div class="field"><span class="field-label">Tipo de negócio</span><div class="seg-grid" role="radiogroup" aria-label="Tipo de negócio">${SEGMENTS.map(sg => `<button type="button" class="seg" role="radio" data-seg="${sg.id}" aria-checked="${n.segmento === sg.id}" aria-pressed="${n.segmento === sg.id}">${sg.nome}</button>`).join('')}</div></div>
+        <div class="field"><span class="field-label">Como a maioria dos seus clientes compra de você?</span><div class="modo-grid" role="radiogroup" aria-label="Como a maioria dos seus clientes compra">${MODOS.map(m => `<button type="button" class="modo" role="radio" data-modo="${m.id}" aria-checked="${n.modo === m.id}" aria-pressed="${n.modo === m.id}"><strong>${m.nome}</strong><span>${m.sub}</span></button>`).join('')}</div>
+          ${n.modo ? `<span class="muted small">${esc(pack(n).ancoraCurta)}</span>` : ''}</div>
         <div class="field"><label for="qz-oferta">O que você vende, em poucas palavras <span class="muted">(opcional)</span></label><input id="qz-oferta" type="text" maxlength="80" autocomplete="off" placeholder="Ex.: sessões de psicoterapia para adultos" value="${esc(n.oferta || '')}"></div>
-        <button class="btn ${n.segmento ? 'btn-primary' : 'btn-quiet'}" data-act="qz-negocio" ${n.segmento ? '' : 'disabled'}>Começar o questionário <span aria-hidden="true">→</span></button>
+        <button class="btn ${n.segmento && n.modo ? 'btn-primary' : 'btn-quiet'}" data-act="qz-negocio" ${n.segmento && n.modo ? '' : 'disabled'}>Começar o questionário <span aria-hidden="true">→</span></button>
       </div>
     </div></main>`;
   }
   if (q.step === 0) {
     return `<main class="quiz wrap"><div class="stack-lg">
-      <div class="stack" style="gap:10px"><span class="eyebrow">Antes de começar</span><h1 style="font-size:clamp(28px,5vw,38px)">Pense nas suas últimas 10 conversas com clientes</h1>
-      <p class="muted">São três partes: 33 afirmações sobre o que você fez nessas conversas, 6 situações do dia a dia e uma pergunta aberta sobre a sua última venda que não fechou. Muitas afirmações descrevem práticas comuns e bem-intencionadas. Responda pelo que você faz hoje, sem pensar no que seria o ideal: o diagnóstico é mais útil quando reflete a sua prática real.</p></div>
+      <div class="stack" style="gap:10px"><span class="eyebrow">Antes de começar</span><h1 style="font-size:clamp(28px,5vw,38px)">Responda pela sua prática de hoje</h1>
+      <p class="muted">São três partes: 33 afirmações sobre a sua prática recente com clientes, 6 situações do dia a dia e uma pergunta aberta sobre uma venda que não aconteceu. Muitas afirmações descrevem práticas comuns e bem-intencionadas. Responda pelo que você faz hoje, sem pensar no que seria o ideal: o diagnóstico é mais útil quando reflete a sua prática real.</p></div>
       <div class="card stack">
         <div class="field"><label for="qz-code">Código da turma <span class="muted">(opcional)</span></label><input id="qz-code" type="text" autocomplete="off" placeholder="OQG-XXXX" value="${esc(q.code)}" style="text-transform:uppercase"><span class="muted small">Se você está num workshop ou numa equipe, use o código que o facilitador passou.${store.mode === 'demo' ? ' Na prévia, o código OQG-DEMO entra na turma de exemplo.' : ''}</span></div>
         <div id="qz-msg"></div>
@@ -1260,6 +1517,7 @@ function viewDiagnostico() {
   }
   const idx = q.step - 1;
   const qv = q.negocio ? vocabOf(q.negocio) : null;
+  const pk = pack(q.negocio);
   const pct = Math.round(idx / TOTAL * 100);
   const part = idx < ITEMS.length ? 'PARTE 1 · SUA PRÁTICA' : idx < ITEMS.length + SJT.length ? 'PARTE 2 · SITUAÇÕES' : 'PARTE 3 · SUA HISTÓRIA';
   const head = `<div class="progress"><div class="progress-top"><span>${part}</span><span class="tnum">${idx + 1} de ${TOTAL}</span></div><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div></div>`;
@@ -1268,20 +1526,20 @@ function viewDiagnostico() {
     const it = ITEMS_SHOWN[idx];
     const cur = q.items[it.c];
     answered = cur != null;
-    body = `<p class="eyebrow" style="margin-bottom:10px;color:var(--accent)">Pergunta ${idx + 1} de ${TOTAL}</p><p class="q-text">${esc(V(it.t, qv))}</p><p class="q-hint">Pense nas suas últimas 10 conversas com clientes. Em quantas isso aconteceu? Marque uma opção e toque em Avançar.</p>
+    body = `<p class="eyebrow" style="margin-bottom:10px;color:var(--accent)">Pergunta ${idx + 1} de ${TOTAL}</p><p class="q-text">${esc(V(pk.T[it.c], qv))}</p><p class="q-hint">${pk.ancora} Marque uma opção e toque em Avançar.</p>
       <div class="likert" role="radiogroup" aria-label="Frequência, de nunca a sempre">${SCALE_HTML.map((s, k) => `<button type="button" class="lk" role="radio" data-ans="${k + 1}" aria-checked="${cur === k + 1}" aria-pressed="${cur === k + 1}" aria-label="${k + 1}, ${SCALE[k]}"><span class="lk-n">${k + 1}</span><span class="lk-t" lang="pt-BR">${s}</span><span class="lk-sub">${SCALE_SUB[k]}</span></button>`).join('')}</div>
       `;
   } else if (idx < ITEMS.length + SJT.length) {
-    const sc = SJT[idx - ITEMS.length];
+    const sc = pk.sjt[idx - ITEMS.length];
     const cur = q.sjt[sc.id];
     answered = cur != null;
     body = `<div class="scene"><p class="eyebrow" style="margin-bottom:8px;color:var(--accent)">Pergunta ${idx + 1} de ${TOTAL} · situação ${idx - ITEMS.length + 1} de ${SJT.length}</p><p class="q-text" style="min-height:0">${esc(V(sc.t, qv))}</p></div><p class="q-hint">Escolha a resposta mais parecida com o que você faria e toque em Avançar.</p>
       <div class="opts" role="radiogroup" aria-label="Respostas">${sc.ops.map((o, k) => `<button type="button" class="opt" role="radio" data-sjt="${o.k}" aria-checked="${cur === o.k}" aria-pressed="${cur === o.k}"><span class="opt-k">${'ABC'[k]}</span><span class="opt-t" style="font-weight:500">${esc(V(o.t, qv))}</span></button>`).join('')}</div>`;
   } else {
     answered = (q.historia || '').trim().length >= HIST_MIN;
-    body = `<p class="eyebrow" style="margin-bottom:10px;color:var(--accent)">Pergunta ${TOTAL} de ${TOTAL} · pergunta aberta</p><p class="q-text" style="min-height:0">Conte em poucas linhas como foi a sua última venda que não fechou.</p>
-      <p class="q-hint">O que o cliente disse, o que você respondeu e o que aconteceu depois. Escreva como contaria a um colega. Não use nomes de clientes.</p>
-      <div class="field" style="margin-top:20px"><label for="qz-hist" class="sr-only">Sua história</label><textarea id="qz-hist" rows="8" maxlength="2000" placeholder="Ex.: A cliente pediu o preço pelo WhatsApp, eu mandei a tabela...">${esc(q.historia || '')}</textarea>
+    body = `<p class="eyebrow" style="margin-bottom:10px;color:var(--accent)">Pergunta ${TOTAL} de ${TOTAL} · pergunta aberta</p><p class="q-text" style="min-height:0">${esc(V(pk.hist.q, qv))}</p>
+      <p class="q-hint">${esc(V(pk.hist.hint, qv))}</p>
+      <div class="field" style="margin-top:20px"><label for="qz-hist" class="sr-only">Sua história</label><textarea id="qz-hist" rows="8" maxlength="2000" placeholder="${esc(pk.hist.ph)}">${esc(q.historia || '')}</textarea>
       <span class="muted small" id="qz-hist-n">${(q.historia || '').trim().length < HIST_MIN ? `Escreva pelo menos ${HIST_MIN} caracteres.` : `${(q.historia || '').length} de 2000 caracteres`}</span></div>`;
   }
   return `<main class="quiz wrap">${head}<div class="${S.enter ? 'q-enter' : ''}">${body}</div>
@@ -1370,6 +1628,7 @@ function itemExtremes(dimId, items) {
 
 function resumoTexto(rec) {
   const r = rec.resultado;
+  const pk = pack(rec.respostas?.negocio);
   const p = PROFILES[r.perfil];
   return [
     `Diagnóstico OQGCI · ${fmtDate(rec.created_at)}`,
@@ -1382,13 +1641,14 @@ function resumoTexto(rec) {
     ...DIMS.map(d => `- ${d.nome}: ${r.dims[d.id]}`),
     '',
     'Prioridades de desenvolvimento:',
-    ...r.prioridades.map((k, i) => `${i + 1}. ${DIM[k].nome}: ${DIM[k].pratica}`)
+    ...r.prioridades.map((k, i) => `${i + 1}. ${DIM[k].nome}: ${V(pk.dim[k].pratica, vocabOf(rec.respostas?.negocio))}`)
   ].join('\n');
 }
 
 /* ---------- Leitura da história por IA ---------- */
 function leituraPrompt(rec) {
   const r = rec.resultado;
+  if (modoDe(rec.respostas?.negocio) === 'contato') return leituraPromptContato(rec);
   return `Você é um especialista no método OQGCI de vendas, que combina a lógica do livro The Challenger Sale, adaptada à venda entre pessoas, com achados de neurociência da decisão. A lente do método é o OQGCI ("O Que Eu Ganho Com Isto"): o cliente se aproxima do que lhe faz bem e se afasta do que lhe faz mal.
 
 Os quatro movimentos da conversa, apoiados na linha de base do interesse genuíno em ajudar o cliente:
@@ -1415,6 +1675,37 @@ Responda somente com um objeto JSON neste formato:
  ],
  "quem_decide": "uma frase sobre quem participava da decisão e se foi considerado",
  "postura": "uma frase sobre a postura na conversa: passiva, assertiva ou agressiva, com base no relato",
+ "ponto_chave": "uma frase com o principal ajuste que teria mais chance de mudar o resultado"}`;
+}
+
+function leituraPromptContato(rec) {
+  const r = rec.resultado;
+  return `Você é um especialista no método OQGCI de vendas, que combina a lógica do livro The Challenger Sale, adaptada à venda entre pessoas, com achados de neurociência da decisão. A lente do método é o OQGCI ("O Que Eu Ganho Com Isto"): o cliente se aproxima do que lhe faz bem e se afasta do que lhe faz mal.
+
+Neste negócio, a maioria dos clientes escolhe sozinha (autoatendimento, prateleira, cardápio, site), com pouca ou nenhuma conversa de venda. Os movimentos acontecem pelos pontos de contato: fachada, perfil no Google e redes, avaliações, ambiente, balcão, cardápio ou prateleira, embalagem, caixa e mensagens. Eles se apoiam na linha de base do interesse genuíno em ajudar o cliente a escolher bem:
+1. Espelho: conhecer o que o cliente procura, perguntando, observando e lendo avaliações, antes de decidir o que oferecer e destacar.
+2. Virada: mostrar ao cliente algo que ele ainda não sabia sobre o que está escolhendo.
+3. Custo: ajudar o cliente a perceber o que perde com a alternativa, com números e casos reais, sem exagero.
+4. Caminho: deixar uma sugestão clara à vista, poucas opções em destaque, um risco menor na escolha e um próximo passo para o cliente voltar.
+Também importam: Quem decide (quem acompanha, quem paga, quem influencia a escolha) e Condução (firmeza com respeito em preço, desconto e retomada, sem passividade nem pressão, e cuidado com o final da experiência).
+
+Um empreendedor descreveu uma situação recente em que um cliente foi embora sem comprar, comprou menos do que poderia ou não voltou.${negocioLinha(rec) ? ' ' + negocioLinha(rec).replace('Seu negócio', 'Negócio dele') + '.' : ''} Use a linguagem desse mercado nas sugestões. Pontuações dele no diagnóstico (0 a 100): ${DIMS.map(d => `${d.nome} ${r.dims[d.id]}`).join(', ')}. Perfil: ${PROFILES[r.perfil].nome}.
+
+História, entre as marcas <historia>:
+<historia>
+${rec.respostas.historia}
+</historia>
+
+Analise a história com base apenas no que está escrito. Quando a história não mostrar um movimento, diga que ele não aparece no relato, sem inventar fatos. As sugestões devem ser ações nos pontos de contato, que funcionem mesmo sem uma conversa de venda. Escreva em português do Brasil, em tom direto, respeitoso e profissional, sem tom professoral, falando com a pessoa como "você". Não use construções de contraste como "não é X, é Y" ou "X, e não Y". Não faça avaliações de personalidade ou de saúde. Frases curtas.
+
+Responda somente com um objeto JSON neste formato:
+{"sintese": "duas ou três frases sobre o que a história mostra da experiência de compra do cliente",
+ "movimentos": [
+  {"nome": "Espelho", "status": "presente" | "parcial" | "ausente", "evidencia": "o trecho ou fato do relato que sustenta a avaliação, ou que ele não aparece no relato", "como_fortalecer": "uma ação concreta num ponto de contato"},
+  {"nome": "Virada", ...}, {"nome": "Custo", ...}, {"nome": "Caminho", ...}
+ ],
+ "quem_decide": "uma frase sobre quem participava da escolha e se foi considerado",
+ "postura": "uma frase sobre a postura do negócio no relato: passiva, assertiva ou agressiva",
  "ponto_chave": "uma frase com o principal ajuste que teria mais chance de mudar o resultado"}`;
 }
 
@@ -1467,8 +1758,9 @@ function leituraHTML(rec) {
       <p class="muted small">Leitura gerada por IA a partir do seu relato. Use como ponto de partida para a sua própria reflexão.</p>`;
   }
   if (st === 'loading') return `<p class="muted"><span class="dots" aria-hidden="true"></span> Lendo a sua história com base nos quatro movimentos…</p>`;
+  const voc = vocabOf(rec.respostas?.negocio);
   const guide = `<p class="muted small">Releia a sua história com estas quatro perguntas:</p>
-    <ul class="guide"><li><b>Espelho:</b> você perguntou e aprofundou antes de apresentar o serviço?</li><li><b>Virada:</b> o cliente ouviu algo novo sobre o próprio problema?</li><li><b>Custo:</b> ficou claro quanto custa deixar como está?</li><li><b>Caminho:</b> houve uma recomendação clara e um próximo passo combinado?</li></ul>`;
+    <ul class="guide">${pack(rec.respostas?.negocio).hist.guide.map(([k, t]) => `<li><b>${k}:</b> ${esc(V(t, voc))}</li>`).join('')}</ul>`;
   if (st === 'fail' && S.leitura[rec.id].code !== 'unavailable') return `${guide}<p class="small muted">A leitura automática não foi concluída agora. <button class="link-btn" data-act="ler-historia">Tentar de novo</button></p>`;
   return guide;
 }
@@ -1556,11 +1848,13 @@ function viewResultado() {
   const eixoCor = e => e === 'aprox' ? 'var(--c-warm)' : e === 'afast' ? 'var(--c-cool)' : 'var(--ink-2)';
   const q = quadOf(r);
   const voc = vocabOf(rec.respostas?.negocio);
+  const pk = pack(rec.respostas?.negocio);
+  const pp = pk.perfil(r.perfil);
   const isFac = S.session?.role === 'facilitador';
 
   const dimCards = DIMS.map(d => {
     const v = r.dims[d.id]; const ex = itemExtremes(d.id, items);
-    const quote = (x) => `“${esc(V(x.i.t, voc))}” <span class="muted">· você marcou ${SCALE[x.r - 1].toLowerCase()}</span>`;
+    const quote = (x) => `“${esc(V(pk.T[x.i.c], voc))}” <span class="muted">· você marcou ${SCALE[x.r - 1].toLowerCase()}</span>`;
     const ext = !ex ? '' : ex.uniforme
       ? `<p class="small muted">Suas respostas foram uniformes nesta dimensão.</p>`
       : `<dl class="dl-mini"><dt>Ponto forte nas suas respostas</dt><dd>${quote(ex.best)}</dd><dt>Ponto de atenção</dt><dd>${quote(ex.worst)}</dd></dl>`;
@@ -1571,14 +1865,14 @@ function viewResultado() {
         <span class="acc-score"><b class="tnum">${v}</b><span class="muted small">${levelOf(v).nome}</span></span><span class="chev" aria-hidden="true"></span></summary>
       <div class="acc-body">
         <span class="tag" style="border-style:solid;justify-self:start"><i class="swatch" style="background:${eixoCor(d.eixo)};margin-right:6px"></i>${eixoNome(d.eixo)}</span>
-        <p>${esc(V(BANDS[d.id][bandOf(v)], voc))}</p>
+        <p>${esc(V(pk.bands[d.id][bandOf(v)], voc))}</p>
         ${ext}
         <p class="small muted"><b>Por que importa:</b> ${esc(V(d.mecanismo, voc))}</p>
       </div></details>`;
   }).join('');
 
-  const situacoes = SJT.map((s, k) => {
-    const ch = sjt[s.id]; const mine = s.ops.find(o => o.k === ch); const best = s.ops.find(o => o.k === 'assertiva'); const W = SJT_WHY[s.id];
+  const situacoes = pk.sjt.map((s, k) => {
+    const ch = sjt[s.id]; const mine = s.ops.find(o => o.k === ch); const best = s.ops.find(o => o.k === 'assertiva'); const W = pk.why[s.id];
     const fraseLabel = rec.respostas?.negocio?.segmento ? 'Como soaria no seu negócio' : 'Como dizer com as suas palavras';
     const body = !ch ? '' : ch === 'assertiva'
       ? `<p class="small"><span class="muted">Sua resposta:</span> ${esc(V(mine.t, voc))}</p>
@@ -1593,18 +1887,18 @@ function viewResultado() {
   }).join('');
 
   const hasHist = Boolean(rec.respostas?.historia);
-  const historia = hasHist ? `<div class="card stack" style="gap:14px"><h2 class="h-sec" style="margin:0">Sua história de venda</h2>
+  const historia = hasHist ? `<div class="card stack" style="gap:14px"><h2 class="h-sec" style="margin:0">${pk.hist.titulo}</h2>
       <blockquote class="story">${esc(rec.respostas.historia)}</blockquote>
       <div id="leitura-box" class="stack" style="gap:12px">${leituraHTML(rec)}</div></div>` : '';
 
   const prioridades = r.prioridades.map((k, i) => {
     const key = `${rec.id}-${k}`; const st = S.prioStep[key] || 0; const v = r.dims[k];
     const etapas = [
-      ['O que está em jogo', `<p>${esc(V(BANDS[k][bandOf(v)], voc))}</p>`],
-      ['O que desenvolver', `<p><b>${esc(V(DIM[k].pratica, voc))}</b></p><p class="muted small">${esc(V(DIM[k].mecanismo, voc))}</p>`],
-      ['Como implementar', `<ol class="impl">${IMPL[k].passos.map(x => `<li>${esc(V(x, voc))}</li>`).join('')}</ol>
-        <div class="script"><span class="eyebrow">Frase pronta para usar</span><p>“${esc(V(IMPL[k].frase, voc))}”</p><button type="button" class="link-btn small" data-copy="${esc(V(IMPL[k].frase, voc))}">Copiar frase</button></div>`],
-      ['Como saber que está funcionando', `<p>${esc(V(IMPL[k].sinal, voc))}</p>`]
+      ['O que está em jogo', `<p>${esc(V(pk.bands[k][bandOf(v)], voc))}</p>`],
+      ['O que desenvolver', `<p><b>${esc(V(pk.dim[k].pratica, voc))}</b></p><p class="muted small">${esc(V(DIM[k].mecanismo, voc))}</p>`],
+      ['Como implementar', `<ol class="impl">${pk.impl[k].passos.map(x => `<li>${esc(V(x, voc))}</li>`).join('')}</ol>
+        <div class="script"><span class="eyebrow">Frase pronta para usar</span><p>“${esc(V(pk.impl[k].frase, voc))}”</p><button type="button" class="link-btn small" data-copy="${esc(V(pk.impl[k].frase, voc))}">Copiar frase</button></div>`],
+      ['Como saber que está funcionando', `<p>${esc(V(pk.impl[k].sinal, voc))}</p>`]
     ];
     const id = `acc-p-${k}`;
     return `<details class="acc prio-acc" data-acc id="${id}" ${S.accOpen[id] ? 'open' : ''}>
@@ -1615,7 +1909,7 @@ function viewResultado() {
         <ol class="path">${etapas.map(([t, b], j) => j <= st
           ? `<li class="path-step ${j === st ? 'cur' : 'done'}"><span class="path-n">${j < st ? '✓' : j + 1}</span><div class="path-c"><span class="eyebrow">${t}</span>${b}</div></li>`
           : `<li class="path-step locked"><span class="path-n">${j + 1}</span><div class="path-c"><span class="eyebrow">${t}</span></div></li>`).join('')}</ol>
-        <div class="actions">${st < 3 ? `<button type="button" class="btn btn-primary btn-sm" data-act="prio-next" data-key="${key}" data-id="${id}" style="width:auto">Continuar <span aria-hidden="true">→</span></button>` : `<span class="small muted">${esc(V('Você percorreu as quatro etapas. Escolha um dos passos e aplique na próxima conversa com um cliente.', voc))}</span>`}${st > 0 ? `<button type="button" class="btn btn-quiet btn-sm" data-act="prio-reset" data-key="${key}" data-id="${id}" style="width:auto">Recomeçar</button>` : ''}</div>
+        <div class="actions">${st < 3 ? `<button type="button" class="btn btn-primary btn-sm" data-act="prio-next" data-key="${key}" data-id="${id}" style="width:auto">Continuar <span aria-hidden="true">→</span></button>` : `<span class="small muted">${esc(V(pk.prioFim, voc))}</span>`}${st > 0 ? `<button type="button" class="btn btn-quiet btn-sm" data-act="prio-reset" data-key="${key}" data-id="${id}" style="width:auto">Recomeçar</button>` : ''}</div>
       </div></details>`;
   }).join('');
 
@@ -1633,13 +1927,13 @@ function viewResultado() {
         <span class="eyebrow">Índice OQGCI</span>
         <div class="gauge-wrap">${gauge(r.indice)}</div>
         <div class="level-steps" aria-hidden="true">${LEVELS.slice().reverse().map(l => `<span class="${l.nome === lvl.nome ? 'on' : ''}">${l.n} · ${l.nome}</span>`).join('')}</div>
-        <p class="muted">${esc(V(lvl.leitura, voc))}</p>
+        <p class="muted">${esc(V(pk.leituraNivel(lvl.nome), voc))}</p>
       </div>
       <div class="card profile-card stack">
         <span class="eyebrow">Seu perfil</span>
         <h2>${p.nome}</h2>
-        <p>${esc(V(p.conversa, voc))}</p>
-        <p class="muted">${esc(V(p.foco, voc))}</p>
+        <p>${esc(V(pp.conversa, voc))}</p>
+        <p class="muted">${esc(V(pp.foco, voc))}</p>
         <div><p class="small muted" style="margin-bottom:8px">Postura nas seis situações</p>
           <div class="stackbar" role="img" aria-label="Postura: ${r.postura.assertiva} assertiva, ${r.postura.passiva} passiva, ${r.postura.agressiva} agressiva">${seg('assertiva', POSTURA_COR.assertiva)}${seg('passiva', POSTURA_COR.passiva)}${seg('agressiva', POSTURA_COR.agressiva)}</div>
           <div class="legend">${['assertiva', 'passiva', 'agressiva'].map(k => `<span><i class="swatch" style="background:${POSTURA_COR[k]}"></i>${POSTURA_NOME[k]} <b class="tnum">${r.postura[k]}</b></span>`).join('')}</div>
@@ -1647,19 +1941,19 @@ function viewResultado() {
       </div>
     </div>
 
-    ${r.confiab && r.confiab.nivel === 'Baixa' ? `<div class="msg" role="note">${esc(V('Algumas respostas ficaram pouco consistentes entre si. O diagnóstico fica mais útil quando reflete a sua prática real com os clientes. Se quiser, refaça com calma, pensando nas suas últimas conversas.', voc))}</div>` : ''}
+    ${r.confiab && r.confiab.nivel === 'Baixa' ? `<div class="msg" role="note">${esc(V(pk.notaBaixa, voc))}</div>` : ''}
     ${r.alerts.length ? `<div class="stack"><h2 class="h-sec" style="margin:0">Pontos de atenção</h2>${r.alerts.map(a => `<div class="alert ${a.sev}"><span class="alert-ico" aria-hidden="true">!</span><div><strong>${esc(a.t)}</strong><span class="muted small">${esc(V(a.d, voc))}</span></div></div>`).join('')}</div>` : ''}
 
     <div class="grid-2">
       <div class="card"><h2 class="h-sec">Mapa OQGCI</h2><div class="map-wrap">${oqgciMap(r)}</div>
         <div class="stack" style="gap:10px;margin-top:6px">${meter('Aproximação · o cliente percebe o ganho', r.aprox, 'var(--c-warm)')}${meter('Afastamento · o cliente se livra do que faz mal', r.afast, 'var(--c-cool)')}</div>
-        <p class="small" style="margin-top:12px"><b>${QUADS[q].nome}.</b> <span class="muted">${esc(V(QUADS[q].t, voc))}</span></p></div>
+        <p class="small" style="margin-top:12px"><b>${QUADS[q].nome}.</b> <span class="muted">${esc(V(pk.quad(q), voc))}</span></p></div>
       <div class="card"><h2 class="h-sec">As oito dimensões</h2><div class="radar-wrap">${radar(r.dims)}</div>
         <div class="legend"><span><i class="swatch" style="background:var(--c-warm)"></i>Aproximação</span><span><i class="swatch" style="background:var(--cool)"></i>Afastamento</span><span><i class="swatch" style="background:var(--ink-2)"></i>Linha de base</span></div></div>
     </div>
 
     <div class="stack"><h2 class="h-sec" style="margin:0">Suas forças</h2>
-      <div class="grid-3">${r.forcas.map(k => `<div class="card prio"><div class="prio-head"><strong>${DIM[k].nome}</strong><b class="tnum">${r.dims[k]}</b></div>${levelMeter(r.dims[k], eixoCor(DIM[k].eixo), DIM[k].nome)}<p class="muted small">${esc(V(BANDS[k][bandOf(r.dims[k])], voc))}</p></div>`).join('')}</div></div>
+      <div class="grid-3">${r.forcas.map(k => `<div class="card prio"><div class="prio-head"><strong>${DIM[k].nome}</strong><b class="tnum">${r.dims[k]}</b></div>${levelMeter(r.dims[k], eixoCor(DIM[k].eixo), DIM[k].nome)}<p class="muted small">${esc(V(pk.bands[k][bandOf(r.dims[k])], voc))}</p></div>`).join('')}</div></div>
 
     <div class="stack"><div class="acc-headrow"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Leitura das oito dimensões</h2><p class="muted small">Toque em uma dimensão para abrir a leitura completa. As linhas na barra marcam os níveis 40, 60 e 80.</p></div><button class="btn btn-quiet btn-sm no-print" data-act="acc-all" data-target="dim-acc">Abrir todas</button></div>
       <div class="acc-list">${dimCards}</div></div>
@@ -1673,8 +1967,8 @@ function viewResultado() {
     <div class="stack"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Prioridades de desenvolvimento</h2><p class="muted small">Abra cada prioridade e avance etapa por etapa: o que está em jogo, o que desenvolver, como implementar e como saber que está funcionando.</p></div><div class="acc-list">${prioridades}</div></div>
 
 
-    <div class="stack"><h2 class="h-sec" style="margin:0">Quatro perguntas antes da próxima conversa</h2>
-      <div class="questions">${QUESTIONS.map(([k, t]) => `<div class="question"><span class="eyebrow">${k}</span><strong style="font-family:var(--font-display);font-size:19px;font-weight:600">${esc(t)}</strong></div>`).join('')}</div></div>
+    <div class="stack"><h2 class="h-sec" style="margin:0">${pk.perguntasTitulo}</h2>
+      <div class="questions">${pk.questions.map(([k, t]) => `<div class="question"><span class="eyebrow">${k}</span><strong style="font-family:var(--font-display);font-size:19px;font-weight:600">${esc(V(t, voc))}</strong></div>`).join('')}</div></div>
 
     <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o seu diagnóstico</h2><p class="muted small">O relatório em PDF traz todas as leituras, abertas, para guardar ou enviar.${LIVE ? ' No celular, Compartilhar envia o PDF por WhatsApp ou e-mail.' : ''}</p><div class="actions">${exportBtns}</div></div>
 
@@ -1708,7 +2002,8 @@ async function buildPDF(rec) {
   const { jsPDF } = await loadJsPDF();
   const logo = await logoDataURL();
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const r = rec.resultado; const p = PROFILES[r.perfil]; const lvl = levelOf(r.indice); const voc = vocabOf(rec.respostas?.negocio);
+  const r = rec.resultado; const lvl = levelOf(r.indice); const voc = vocabOf(rec.respostas?.negocio);
+  const pk = pack(rec.respostas?.negocio); const p = pk.perfil(r.perfil);
   const W = 210, M = 16, CW = W - 2 * M, BOTTOM = 280;
   const C = { ink: [27, 26, 34], ink2: [88, 84, 100], ink3: [130, 126, 144], line: [222, 219, 228], warm: [194, 131, 30], cool: [74, 139, 220], third: [194, 85, 159], dark: [15, 14, 20], soft: [248, 245, 240], good: [47, 143, 98], warn: [190, 135, 20], crit: [196, 72, 86] };
   let y = 0;
@@ -1748,7 +2043,7 @@ async function buildPDF(rec) {
   font(16, 'bold', C.ink); doc.text(pdfText(p.nome), M + 92, y + 9);
   font(9.5, 'normal', C.ink2); const pl = doc.splitTextToSize(pdfText(V(p.conversa + ' ' + p.foco, voc)), CW - 92); doc.text(pl.slice(0, 7), M + 92, y + 15);
   y += 36;
-  font(9.5, 'normal', C.ink2); const ll = doc.splitTextToSize(pdfText(lvl.leitura), 76); doc.text(ll, M, y); y += ll.length * 4.4 + 6;
+  font(9.5, 'normal', C.ink2); const ll = doc.splitTextToSize(pdfText(V(pk.leituraNivel(lvl.nome), voc)), 76); doc.text(ll, M, y); y += ll.length * 4.4 + 6;
 
   // Eixos OQGCI
   h2('Mapa OQGCI');
@@ -1757,7 +2052,7 @@ async function buildPDF(rec) {
     font(9.5, 'normal', C.ink); doc.text(pdfText(t), M, y + 3.5); font(9.5, 'bold', C.ink); doc.text(String(v), M + CW, y + 3.5, { align: 'right' });
     bar(M, y + 5.5, CW, 3, v, c); y += 12;
   });
-  para(`${QUADS[q].nome}. ${QUADS[q].t}`, 10, 'normal', C.ink);
+  para(`${QUADS[q].nome}. ${V(pk.quad(q), voc)}`, 10, 'normal', C.ink);
   font(9, 'normal', C.ink3); doc.text(pdfText(`Postura nas seis situações: ${r.postura.assertiva} assertiva, ${r.postura.passiva} passiva, ${r.postura.agressiva} agressiva.`), M, y + 3); y += 8;
 
   if (r.alerts.length) {
@@ -1781,23 +2076,23 @@ async function buildPDF(rec) {
   DIMS.forEach(d => {
     const v = r.dims[d.id]; need(30);
     font(11, 'bold', C.ink); doc.text(pdfText(`${d.nome}`), M, y + 4); font(10, 'bold', eixoRGB(d.eixo)); doc.text(pdfText(`${v} · ${levelOf(v).nome}`), M + CW, y + 4, { align: 'right' }); y += 7;
-    para(V(BANDS[d.id][bandOf(v)], voc), 9.5, 'normal', C.ink, CW, M, 1);
+    para(V(pk.bands[d.id][bandOf(v)], voc), 9.5, 'normal', C.ink, CW, M, 1);
     const ex = itemExtremes(d.id, items);
     if (ex && !ex.uniforme) {
-      para(`Ponto forte: "${V(ex.best.i.t, voc)}" (você marcou ${SCALE[ex.best.r - 1].toLowerCase()})`, 9, 'normal', C.ink2, CW, M, 0.5);
-      para(`Ponto de atenção: "${V(ex.worst.i.t, voc)}" (você marcou ${SCALE[ex.worst.r - 1].toLowerCase()})`, 9, 'normal', C.ink2, CW, M, 0.5);
+      para(`Ponto forte: "${V(pk.T[ex.best.i.c], voc)}" (você marcou ${SCALE[ex.best.r - 1].toLowerCase()})`, 9, 'normal', C.ink2, CW, M, 0.5);
+      para(`Ponto de atenção: "${V(pk.T[ex.worst.i.c], voc)}" (você marcou ${SCALE[ex.worst.r - 1].toLowerCase()})`, 9, 'normal', C.ink2, CW, M, 0.5);
     }
     para(`Por que importa: ${V(d.mecanismo, voc)}`, 8.5, 'italic', C.ink3, CW, M, 4);
   });
 
   h2('Sua postura nas situações');
   const sjt = rec.respostas?.sjt || {};
-  SJT.forEach((s, k) => {
+  pk.sjt.forEach((s, k) => {
     const ch = sjt[s.id]; const mine = s.ops.find(o => o.k === ch); const best = s.ops.find(o => o.k === 'assertiva');
     need(18); font(10, 'bold', C.ink); const tl = doc.splitTextToSize(pdfText(`${k + 1}. ${V(s.t, voc)}`), CW - 30); doc.text(tl, M, y + 3.6);
     if (ch) { color(ch === 'assertiva' ? C.warm : ch === 'passiva' ? C.cool : C.third, 'fill'); doc.roundedRect(M + CW - 26, y, 26, 5.4, 2.7, 2.7, 'F'); font(8.5, 'bold', [255, 255, 255]); doc.text(pdfText(POSTURA_NOME[ch]), M + CW - 13, y + 3.8, { align: 'center' }); }
     y += tl.length * 4.6 + 1.5;
-    const W = SJT_WHY[s.id];
+    const W = pk.why[s.id];
     if (mine) para(`Sua resposta: ${V(mine.t, voc)}`, 9, 'normal', C.ink2, CW, M, 0.5);
     if (ch && ch !== 'assertiva') { para(`O que acontece com essa resposta: ${V(W[ch], voc)}`, 9, 'normal', C.ink2, CW, M, 0.5); para(`A resposta que sustenta o valor: ${V(best.t, voc)}`, 9, 'bold', C.ink, CW, M, 0.5); }
     para(`Por que ela funciona: ${V(W.why, voc)}`, 9, 'normal', C.ink, CW, M, 0.5);
@@ -1806,7 +2101,7 @@ async function buildPDF(rec) {
   });
 
   if (rec.respostas?.historia) {
-    h2('Sua história de venda');
+    h2(pk.hist.titulo);
     color(C.soft, 'fill'); const hl = doc.splitTextToSize(pdfText(rec.respostas.historia), CW - 8); const hh = hl.length * 4.4 + 6;
     need(Math.min(hh, 120)); doc.rect(M, y, CW, Math.min(hh, BOTTOM - y), 'F'); color(C.warm, 'fill'); doc.rect(M, y, 1, Math.min(hh, BOTTOM - y), 'F');
     y += 3; para(rec.respostas.historia, 9.5, 'italic', C.ink, CW - 8, M + 5, 3);
@@ -1823,24 +2118,26 @@ async function buildPDF(rec) {
       if (L.ponto_chave) para(`Ponto-chave: ${L.ponto_chave}`, 10, 'bold', C.warm, CW, M, 2);
       para('Leitura gerada por IA a partir do relato.', 8, 'italic', C.ink3, CW, M, 2);
     } else {
-      para('Releia a sua história com as quatro perguntas: houve Espelho (você perguntou antes de apresentar)? Virada (o cliente ouviu algo novo)? Custo (ficou claro quanto custa deixar como está)? Caminho (recomendação clara e próximo passo)?', 9.5, 'normal', C.ink2);
+      para('Releia a sua história com estas quatro perguntas:', 9.5, 'normal', C.ink2, CW, M, 0.5);
+      pk.hist.guide.forEach(([k2, t2]) => para(`${k2}: ${V(t2, voc)}`, 9.5, 'normal', C.ink2, CW - 4, M + 4, 0.5));
+      y += 2;
     }
   }
 
   h2('Prioridades de desenvolvimento');
   r.prioridades.forEach((k, i) => {
     need(30); font(11, 'bold', C.ink); doc.text(pdfText(`${i + 1}. ${DIM[k].nome}`), M, y + 4); font(10, 'bold', C.warm); doc.text(String(r.dims[k]), M + CW, y + 4, { align: 'right' }); y += 7;
-    para('O que está em jogo: ' + V(BANDS[k][bandOf(r.dims[k])], voc), 9.5, 'normal', C.ink2, CW, M, 1);
-    para(`O que desenvolver: ${V(DIM[k].pratica, voc)}`, 9.5, 'bold', C.ink, CW, M, 1);
+    para('O que está em jogo: ' + V(pk.bands[k][bandOf(r.dims[k])], voc), 9.5, 'normal', C.ink2, CW, M, 1);
+    para(`O que desenvolver: ${V(pk.dim[k].pratica, voc)}`, 9.5, 'bold', C.ink, CW, M, 1);
     para('Como implementar:', 9.5, 'bold', C.ink, CW, M, 0.5);
-    IMPL[k].passos.forEach((x, n) => para(`${n + 1}. ${V(x, voc)}`, 9.5, 'normal', C.ink, CW - 4, M + 4, 0.5));
-    para(`Frase pronta: "${V(IMPL[k].frase, voc)}"`, 9.5, 'italic', C.warm, CW, M, 1);
-    para(`Como saber que está funcionando: ${V(IMPL[k].sinal, voc)}`, 9.5, 'normal', C.ink2, CW, M, 5);
+    pk.impl[k].passos.forEach((x, n) => para(`${n + 1}. ${V(x, voc)}`, 9.5, 'normal', C.ink, CW - 4, M + 4, 0.5));
+    para(`Frase pronta: "${V(pk.impl[k].frase, voc)}"`, 9.5, 'italic', C.warm, CW, M, 1);
+    para(`Como saber que está funcionando: ${V(pk.impl[k].sinal, voc)}`, 9.5, 'normal', C.ink2, CW, M, 5);
   });
 
 
-  h2('Quatro perguntas antes da próxima conversa');
-  QUESTIONS.forEach(([k, t]) => para(`${k}: ${t}`, 10, 'normal', C.ink, CW, M, 1.5));
+  h2(pk.perguntasTitulo);
+  pk.questions.forEach(([k, t]) => para(`${k}: ${V(t, voc)}`, 10, 'normal', C.ink, CW, M, 1.5));
   para('O instrumento está em fase de validação. Use o resultado como ferramenta de desenvolvimento.', 8, 'italic', C.ink3, CW, M, 0);
   footer();
   return doc.output('blob');
@@ -1896,14 +2193,19 @@ async function loadFac() {
 }
 
 function csvOf(results) {
-  const head = ['nome', 'data', 'indice', 'nivel', 'perfil', 'aproximacao', 'afastamento', ...DIMS.map(d => d.id + '_' + d.nome), 'assertiva', 'passiva', 'agressiva', 'alertas', 'hesitacoes', 'trocas', 'historia', 'negocio', 'oferta', 'confiabilidade'];
+  const head = ['nome', 'data', 'indice', 'nivel', 'perfil', 'aproximacao', 'afastamento', ...DIMS.map(d => d.id + '_' + d.nome), 'assertiva', 'passiva', 'agressiva', 'alertas', 'hesitacoes', 'trocas', 'historia', 'negocio', 'oferta', 'modo', 'confiabilidade'];
   const q = v => /[",;\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
-  const rows = results.map(x => { const r = x.resultado; return [x.nome || '', x.created_at.slice(0, 10), r.indice, r.nivel, PROFILES[r.perfil].nome, r.aprox, r.afast, ...DIMS.map(d => r.dims[d.id]), r.postura.assertiva, r.postura.passiva, r.postura.agressiva, r.alerts.map(a => a.t).join(' | '), r.sinais ? r.sinais.hesitacoes.length : '', r.sinais ? r.sinais.trocas.length : '', x.respostas?.historia || '', SEG[x.respostas?.negocio?.segmento]?.nome || '', x.respostas?.negocio?.oferta || '', r.confiab ? r.confiab.score : ''].map(q).join(','); });
+  const rows = results.map(x => { const r = x.resultado; return [x.nome || '', x.created_at.slice(0, 10), r.indice, r.nivel, PROFILES[r.perfil].nome, r.aprox, r.afast, ...DIMS.map(d => r.dims[d.id]), r.postura.assertiva, r.postura.passiva, r.postura.agressiva, r.alerts.map(a => a.t).join(' | '), r.sinais ? r.sinais.hesitacoes.length : '', r.sinais ? r.sinais.trocas.length : '', x.respostas?.historia || '', SEG[x.respostas?.negocio?.segmento]?.nome || '', x.respostas?.negocio?.oferta || '', x.respostas?.negocio ? (modoDe(x.respostas.negocio) === 'contato' ? 'pontos de contato' : 'conversa') : '', r.confiab ? r.confiab.score : ''].map(q).join(','); });
   return [head.map(q).join(','), ...rows].join('\n');
 }
 
 function viewFacilitador() {
-  const F = S.fac; const res = F.results || []; const turmas = F.turmas || [];
+  const F = S.fac; const resAll = F.results || []; const turmas = F.turmas || [];
+  const nModo = m => resAll.filter(x => modoDe(x.respostas?.negocio) === m).length;
+  const temContato = nModo('contato') > 0;
+  const modoSel = temContato ? (F.modo || 'todos') : 'todos';
+  const res = modoSel === 'todos' ? resAll : resAll.filter(x => modoDe(x.respostas?.negocio) === modoSel);
+  const modoChips = temContato ? `<div class="stack" style="gap:8px"><span class="small muted">Como os clientes compram</span><div class="turma-chips">${[['todos', 'Todos', resAll.length], ['conversa', 'Conversando', nModo('conversa')], ['contato', 'Escolhendo sozinhos', nModo('contato')]].map(([k, t, c]) => `<button data-fac-modo="${k}" aria-pressed="${modoSel === k}">${t} · ${c}</button>`).join('')}</div><span class="small muted">As médias abaixo consideram só o grupo selecionado. Os dois modos usam as mesmas oito dimensões e a mesma escala.</span></div>` : '';
   const selT = turmas.find(t => t.id === F.sel);
   const n = res.length;
   const mean = k => n ? Math.round(avg(res.map(x => x.resultado.dims[k]))) : 0;
@@ -1931,7 +2233,7 @@ function viewFacilitador() {
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><h2 class="h-sec" style="margin:0">Mapa da turma</h2><div class="actions"><button class="btn btn-quiet btn-sm" data-act="copiar-csv">Copiar CSV</button>${LIVE ? '<button class="btn btn-quiet btn-sm" data-act="baixar-csv">Baixar CSV</button>' : ''}</div></div>
       <textarea id="csv-fallback" hidden readonly style="width:100%;min-height:120px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px"></textarea>
       <div class="table-wrap"><table class="heat"><thead><tr><th>Pessoa</th><th class="num">Índice</th><th>Perfil</th><th>Negócio</th>${DIMS.map(d => `<th class="num" title="${d.nome}">${d.nome}</th>`).join('')}<th>Data</th><th>Alertas</th><th>Sinais</th><th>Confiabilidade</th></tr></thead><tbody>
-      ${res.map(x => { const r = x.resultado; return `<tr><td><button class="link-btn" data-fac-open="${esc(x.id)}">${esc(x.nome || 'Sem nome')}</button>${x.exemplo ? ' <span class="tag">exemplo</span>' : ''}</td><td class="num"><b>${r.indice}</b></td><td>${PROFILES[r.perfil].nome}</td><td>${esc((SEG[x.respostas?.negocio?.segmento]?.nome || '—') + (x.respostas?.negocio?.oferta ? ' · ' + x.respostas.negocio.oferta : ''))}</td>${DIMS.map(d => `<td class="cell" style="${heat(r.dims[d.id])}">${r.dims[d.id]}</td>`).join('')}<td>${fmtDate(x.created_at)}</td><td>${r.alerts.map(a => esc(a.t)).join(', ') || '—'}</td><td>${r.sinais ? `${r.sinais.hesitacoes.length} hesitações · ${r.sinais.trocas.length} trocas` : '—'}</td><td>${r.confiab ? `${r.confiab.score} · ${r.confiab.nivel}` : '—'}</td></tr>`; }).join('')}
+      ${res.map(x => { const r = x.resultado; return `<tr><td><button class="link-btn" data-fac-open="${esc(x.id)}">${esc(x.nome || 'Sem nome')}</button>${x.exemplo ? ' <span class="tag">exemplo</span>' : ''}</td><td class="num"><b>${r.indice}</b></td><td>${PROFILES[r.perfil].nome}</td><td>${esc((SEG[x.respostas?.negocio?.segmento]?.nome || '—') + (x.respostas?.negocio?.oferta ? ' · ' + x.respostas.negocio.oferta : '') + (modoDe(x.respostas?.negocio) === 'contato' ? ' · escolhem sozinhos' : ''))}</td>${DIMS.map(d => `<td class="cell" style="${heat(r.dims[d.id])}">${r.dims[d.id]}</td>`).join('')}<td>${fmtDate(x.created_at)}</td><td>${r.alerts.map(a => esc(a.t)).join(', ') || '—'}</td><td>${r.sinais ? `${r.sinais.hesitacoes.length} hesitações · ${r.sinais.trocas.length} trocas` : '—'}</td><td>${r.confiab ? `${r.confiab.score} · ${r.confiab.nivel}` : '—'}</td></tr>`; }).join('')}
       </tbody></table></div>
       <p class="small muted" style="margin-top:10px">Cor mais intensa indica pontuação mais alta. Toque no nome para abrir o relatório da pessoa.</p>
     </div>`;
@@ -1943,7 +2245,7 @@ function viewFacilitador() {
       ${F.newCode ? `<div class="msg msg-ok" role="status">Turma criada. Código de acesso: <span class="code-box">${esc(F.newCode)}</span> <button type="button" class="link-btn" data-copy="${esc(F.newCode)}">Copiar</button></div>` : ''}
     </div>
     <div class="stack" style="gap:10px"><span class="small muted">Turma selecionada${selT ? ` · código <b class="tnum" style="color:var(--ink)">${esc(selT.codigo)}</b> <button type="button" class="link-btn small" data-copy="${esc(selT.codigo)}">copiar</button> · tipo de negócio: <b style="color:var(--ink)">${selT.perguntar_nicho === false ? 'não pergunta' : 'pergunta'}</b> <button type="button" class="link-btn small" data-act="turma-nicho">alterar</button>` : ''}</span><div class="turma-chips">${chips}</div></div>
-    ${F.results === null ? '<p class="muted">Carregando…</p>' : body}
+    ${F.results === null ? '<p class="muted">Carregando…</p>' : modoChips + body}
   </div></main>`;
 }
 
@@ -1967,12 +2269,13 @@ function render() {
 
 /* ================================ EVENTOS ================================= */
 document.addEventListener('click', async (ev) => {
-  const t = ev.target.closest('[data-go],[data-act],[data-tab],[data-ans],[data-sjt],[data-open],[data-fac-open],[data-turma],[data-copy],[data-seg]');
+  const t = ev.target.closest('[data-go],[data-act],[data-tab],[data-ans],[data-sjt],[data-open],[data-fac-open],[data-turma],[data-copy],[data-seg],[data-modo],[data-fac-modo]');
   if (!t) return;
   if (t.dataset.go) { if (t.dataset.go === 'diagnostico' && !S.quiz) startQuiz(); go(t.dataset.go); return; }
   if (t.dataset.tab) { S.authTab = t.dataset.tab; S.authMsg = null; render(); return; }
   if (t.dataset.copy) { copyText(t.dataset.copy); return; }
   if (t.dataset.seg) { const q = S.quiz; q.negocio = { ...(q.negocio || {}), segmento: t.dataset.seg, oferta: ($('#qz-oferta')?.value || '').trim() }; saveDraft(); render(); return; }
+  if (t.dataset.modo) { const q = S.quiz; q.negocio = { ...(q.negocio || {}), modo: t.dataset.modo, oferta: ($('#qz-oferta')?.value || '').trim() }; saveDraft(); render(); return; }
   if (t.dataset.ans) {
     const q = S.quiz; const it = ITEMS_SHOWN[q.step - 1]; const v = Number(t.dataset.ans); noteChange(it.c, q.items[it.c], v); q.items[it.c] = v; saveDraft(); S.enter = false; render();
     $('[data-act=qz-next],[data-act=qz-finish]')?.focus({ preventScroll: true });
@@ -1985,6 +2288,7 @@ document.addEventListener('click', async (ev) => {
   }
   if (t.dataset.open) { const r = await store.getResult(t.dataset.open); if (r) { S.result = r; go('resultado'); } return; }
   if (t.dataset.facOpen) { const r = (S.fac.results || []).find(x => x.id === t.dataset.facOpen); if (r) { S.result = r; go('resultado'); } return; }
+  if (t.dataset.facModo) { S.fac.modo = t.dataset.facModo; render(); return; }
   if (t.dataset.turma) { S.fac.sel = t.dataset.turma; S.fac.results = null; S.fac.newCode = null; render(); try { S.fac.results = await store.turmaResults(S.fac.sel); } catch (e) { S.fac.results = []; toast(e.message); } render(); return; }
   const act = t.dataset.act;
   if (act === 'criar') { S.authTab = 'criar'; S.authMsg = null; go('entrar'); }
@@ -2004,6 +2308,7 @@ document.addEventListener('click', async (ev) => {
   else if (act === 'qz-negocio') {
     const q = S.quiz; q.negocio = { ...(q.negocio || {}), oferta: ($('#qz-oferta')?.value || '').trim() };
     if (!q.negocio.segmento) { toast('Escolha o tipo de negócio'); return; }
+    if (!q.negocio.modo) { toast('Escolha como os seus clientes compram'); return; }
     q.phase = null; q.step = 1; saveDraft(); render();
   }
   else if (act === 'turma-nicho') {
