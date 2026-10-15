@@ -1506,7 +1506,7 @@ function viewDiagnostico() {
   if (q.step === 0) {
     return `<main class="quiz wrap"><div class="stack-lg">
       <div class="stack" style="gap:10px"><span class="eyebrow">Antes de começar</span><h1 style="font-size:clamp(28px,5vw,38px)">Responda pela sua prática de hoje</h1>
-      <p class="muted">São três partes: 33 afirmações sobre a sua prática recente com clientes, 6 situações do dia a dia e uma pergunta aberta sobre uma venda que não aconteceu. Muitas afirmações descrevem práticas comuns e bem-intencionadas. Responda pelo que você faz hoje, sem pensar no que seria o ideal: o diagnóstico é mais útil quando reflete a sua prática real.</p></div>
+      <p class="muted">Muitas afirmações descrevem práticas comuns e bem-intencionadas. Responda pelo que você faz hoje, sem pensar no que seria o ideal: o diagnóstico é mais útil quando reflete a sua prática real.</p></div>
       <div class="card stack">
         <div class="field"><label for="qz-code">Código da turma <span class="muted">(opcional)</span></label><input id="qz-code" type="text" autocomplete="off" placeholder="OQG-XXXX" value="${esc(q.code)}" style="text-transform:uppercase"><span class="muted small">Se você está num workshop ou numa equipe, use o código que o facilitador passou.${store.mode === 'demo' ? ' Na prévia, o código OQG-DEMO entra na turma de exemplo.' : ''}</span></div>
         <div id="qz-msg"></div>
