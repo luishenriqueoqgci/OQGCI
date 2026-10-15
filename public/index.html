@@ -173,6 +173,37 @@ p { margin: 0; }
 .opt-t { font-weight: 600; }
 .quiz-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 22px; gap: 12px; }
 .scene { border-left: 2px solid var(--cool); padding-left: 16px; }
+.likert { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 24px; }
+.lk { display: grid; justify-items: center; align-content: start; gap: 10px; padding: 16px 6px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer; text-align: center; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: border-color .12s ease, background-color .12s ease; min-width: 0; }
+.lk:hover { border-color: var(--ink-3); }
+.lk-n { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-family: var(--font-mono); font-size: 15px; background: var(--surface-2); color: var(--ink-2); }
+.lk-t { font-size: 13px; font-weight: 600; line-height: 1.25; color: var(--ink-2); overflow-wrap: break-word; hyphens: manual; max-width: 100%; }
+.lk[aria-pressed=true] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+.lk[aria-pressed=true] .lk-n { background: var(--accent); color: var(--accent-ink); }
+.lk[aria-pressed=true] .lk-t { color: var(--ink); }
+.likert-ends { display: flex; justify-content: space-between; margin-top: 8px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.field textarea { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 13px 14px; font-size: 16px; line-height: 1.5; resize: vertical; min-height: 160px; }
+.field textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.dim-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.dim-card { display: grid; gap: 12px; align-content: start; }
+.dim-card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dl-mini { margin: 0; display: grid; gap: 6px; font-size: 14px; }
+.dl-mini dt { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
+.dl-mini dd { margin: 0 0 6px; }
+.sit-list { display: grid; }
+.sit { display: grid; gap: 6px; padding-block: 14px; border-top: 1px solid var(--line); }
+.sit:first-child { border-top: 0; padding-top: 4px; }
+.sit-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.story { margin: 0; padding: 14px 16px; border-left: 2px solid var(--accent); background: var(--bg); border-radius: 0 var(--r-sm) var(--r-sm) 0; color: var(--ink); white-space: pre-wrap; font-size: 15px; }
+.mov-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.mov { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px; background: var(--bg); display: grid; gap: 6px; align-content: start; }
+.mov-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.key-point { border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); border-radius: var(--r-sm); padding: 14px 16px; display: grid; gap: 6px; }
+.guide { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15px; }
+.cta-card { display: grid; gap: 10px; background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 12%, var(--surface)), var(--surface) 60%); }
+.dots { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin-right: 8px; vertical-align: middle; animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
 
 /* Relatório */
 .report-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: stretch; }
@@ -258,7 +289,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   .ref-group { grid-template-columns: minmax(0, 1fr); gap: 10px; }
 }
 @media (max-width: 600px) {
-  .axis-grid, .questions { grid-template-columns: minmax(0, 1fr); }
+  .axis-grid, .questions, .dim-grid, .mov-list { grid-template-columns: minmax(0, 1fr); }
+  .likert { gap: 5px; }
+  .lk { padding: 12px 2px 10px; gap: 8px; }
+  .lk-n { width: 30px; height: 30px; font-size: 14px; }
+  .lk-t { font-size: 11px; }
   .hbar { grid-template-columns: 96px minmax(0, 1fr) 36px; }
   .week { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .btn { width: 100%; }
@@ -292,6 +327,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 /* ============================== CONFIGURAÇÃO ============================== */
 const CONFIG = window.OQGCI_CONFIG || {};
 const LIVE = Boolean(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey);
+const CTA = Object.assign({
+  titulo: 'Treinamento Venda com Propósito',
+  texto: 'As suas prioridades mostram onde o treinamento faz mais diferença. Fale com o facilitador que aplicou o seu diagnóstico para conhecer o programa completo.',
+  link: '', botao: 'Conhecer o treinamento'
+}, CONFIG.cta || {});
 const SUPABASE_ESM = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 
 /* ================================ MÉTODO ================================== */
@@ -348,6 +388,34 @@ const DIMS = [
     indicador: 'Descontos concedidos sem pedido do cliente (meta: zero).' }
 ];
 const DIM = Object.fromEntries(DIMS.map(d => [d.id, d]));
+
+// Leitura por faixa: alto (75 ou mais), médio (50 a 74), baixo (abaixo de 50).
+const BANDS = {
+  D1: { alto: 'O cliente percebe a sua intenção de ajudar. É a base que sustenta todo o resto e o que gera indicação.',
+        medio: 'A intenção de ajudar aparece, mas nem sempre fica clara para o cliente nos momentos de decisão, como quando outra opção serviria melhor a ele.',
+        baixo: 'Em parte das conversas, a venda vem antes do interesse do cliente. Ele percebe, a sinceridade percebida cai e as técnicas perdem efeito.' },
+  D2: { alto: 'O cliente chega até você com uma imagem clara do problema que você resolve e, muitas vezes, com a confiança emprestada de quem indicou.',
+        medio: 'A sua presença existe, mas ainda fala mais de você do que do problema do cliente, ou aproveita pouco as indicações e avaliações.',
+        baixo: 'O cliente chega sem referência do seu trabalho. A primeira conversa precisa fazer sozinha o trabalho que a bio, o conteúdo e as indicações poderiam adiantar.' },
+  D3: { alto: 'Você pergunta e escuta antes de apresentar. O cliente se sente compreendido, e isso abre espaço para o resto da conversa.',
+        medio: 'Você pergunta, mas às vezes passa cedo para a solução. O cliente ainda está contando o problema quando o serviço aparece.',
+        baixo: 'O serviço entra na conversa antes do problema do cliente. Sem se sentir ouvido, ele passa a comparar preços.' },
+  D4: { alto: 'Você leva ao cliente leituras novas sobre o problema dele. Isso diferencia o seu trabalho e torna a conversa memorável.',
+        medio: 'Você tem conhecimento para oferecer leituras novas, mas elas aparecem de forma irregular ou pouco preparada.',
+        baixo: 'A conversa confirma o que o cliente já pensava. Sem uma leitura nova, ele não encontra um motivo claro para escolher você.' },
+  D5: { alto: 'Você ajuda o cliente a enxergar o custo de deixar como está, com números e histórias reais e sem exagero.',
+        medio: 'O custo de ficar parado aparece na conversa, mas falta concretude: os números do próprio cliente ou um caso parecido com o dele.',
+        baixo: 'O cliente não chega a medir quanto o problema já custa. Sem esse peso, adiar parece a opção mais segura.' },
+  D6: { alto: 'Você recomenda com clareza, simplifica a escolha e reduz o risco. O cliente sai da conversa sabendo qual é o próximo passo.',
+        medio: 'A recomendação existe, mas às vezes vem com opções demais ou sem um próximo passo combinado.',
+        baixo: 'O cliente sai da conversa com opções e sem direção. É aqui que muitas vendas terminam sem decisão, por medo de errar.' },
+  D7: { alto: 'Você considera quem usa, quem paga e quem influencia, e ajuda o cliente a levar a conversa para casa.',
+        medio: 'Você percebe que outras pessoas participam da decisão, mas nem sempre prepara o cliente para essa conversa.',
+        baixo: 'A conversa acontece com uma pessoa, e a decisão costuma acontecer com outras. O "vou ver com meu marido" vira o fim da venda.' },
+  D8: { alto: 'Você sustenta o valor do seu trabalho com tranquilidade e respeito, no preço, no desconto e na retomada.',
+        medio: 'Em parte das situações, a firmeza cede lugar à concessão ou à pressão, principalmente no preço e no desconto.',
+        baixo: 'Preço, desconto e retomada são pontos frágeis. O valor do trabalho cede, ou a pressão afasta o cliente.' }
+};
 
 const ITEMS = [
   ['1.1','D1','Quando percebo que meu serviço não é o mais indicado para alguém, digo isso ao cliente com clareza.',0],
@@ -412,6 +480,8 @@ const SJT = [
     ['passiva', 'Vendo assim mesmo, para não perder a venda.'],
     ['assertiva', 'Explico o motivo e indico outro caminho ou outro profissional.'] ] }
 ].map(s => ({ ...s, ops: s.ops.map(([k, t]) => ({ k, t })) }));
+// Dimensão a que cada situação mais se relaciona, usada só na leitura dos sinais de resposta.
+const SJT_DIM = { S1: 'D8', S2: 'D8', S3: 'D7', S4: 'D8', S5: 'D4', S6: 'D1' };
 
 const LEVELS = [
   { min: 80, n: 4, nome: 'Propósito', leitura: 'Você conduz do Espelho ao Caminho com interesse genuíno, de forma consistente.' },
@@ -485,7 +555,26 @@ const REFS = [
 const avg = a => a.reduce((s, x) => s + x, 0) / a.length;
 const r0 = v => Math.round(v);
 
-function scoreAnswers(items, sjt) {
+function median(arr) { const a = [...arr].sort((x, y) => x - y); const m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; }
+// Sinais de resposta: cada pergunta é comparada com o ritmo da própria pessoa. Pausas acima de 2 minutos ficam de fora.
+function analyzeSignals(meta) {
+  if (!meta) return null;
+  const itemMs = ITEMS.map(i => meta[i.c]?.ms).filter(v => v > 0);
+  if (itemMs.length < 10) return null;
+  const mI = median(itemMs);
+  const sjtMs = SJT.map(s => meta[s.id]?.ms).filter(v => v > 0);
+  const mS = sjtMs.length ? median(sjtMs) : 0;
+  const hes = [], chg = [];
+  ITEMS.forEach(i => { const m = meta[i.c]; if (!m) return; if (m.ms >= Math.max(2 * mI, 8000)) hes.push(i.c); if (m.changes > 0) chg.push(i.c); });
+  SJT.forEach(s => { const m = meta[s.id]; if (!m) return; if (mS && m.ms >= Math.max(2 * mS, 15000)) hes.push(s.id); if (m.changes > 0) chg.push(s.id); });
+  const dimOf = k => (ITEMS.find(i => i.c === k) || {}).d || SJT_DIM[k];
+  const porDim = {};
+  [...hes, ...chg].forEach(k => { const d = dimOf(k); if (d) porDim[d] = (porDim[d] || 0) + 1; });
+  const interrupcoes = Object.values(meta).reduce((t, m) => t + (m.long || 0), 0);
+  return { medianaSeg: Math.round(mI / 100) / 10, hesitacoes: hes, trocas: chg, porDim, interrupcoes, rapido: mI < 2500 };
+}
+
+function scoreAnswers(items, sjt, meta) {
   const dims = {};
   let d8Items = 0;
   for (const d of DIMS) {
@@ -532,7 +621,8 @@ function scoreAnswers(items, sjt) {
     dims: round,
     indice: r0(indice), aprox: r0(aprox), afast: r0(afast),
     nivel: levelOf(r0(indice)).nome,
-    postura, perfil, alerts, prioridades, forcas
+    postura, perfil, alerts, prioridades, forcas,
+    sinais: analyzeSignals(meta)
   };
 }
 
@@ -630,6 +720,7 @@ function DemoStore() {
     },
     async myResults() { return db.results.filter(r => r.user_id === db.session).sort((a, b) => b.created_at.localeCompare(a.created_at)); },
     async getResult(id) { return db.results.find(r => r.id === id) || null; },
+    async updateLeitura(id, leitura) { const r = db.results.find(x => x.id === id); if (r) { r.resultado.leitura = leitura; save(); } },
     async listTurmas() { return db.turmas.slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')); },
     async createTurma(nome) { const t = { id: uid(), nome: nome.trim(), codigo: genCode(), created_at: new Date().toISOString() }; db.turmas.push(t); save(); return t; },
     async turmaResults(turmaId) {
@@ -683,6 +774,7 @@ function LiveStore() {
       if (error) throw errPt(error);
       return {};
     },
+    async accessToken() { const { data: { session } } = await sb.auth.getSession(); return session?.access_token || ''; },
     async updatePassword(senha) { const { error } = await sb.auth.updateUser({ password: senha }); if (error) throw errPt(error); },
     async signOut() { await sb.auth.signOut(); profileCache = null; },
     async findTurma(codigo) { const { data, error } = await sb.rpc('turma_por_codigo', { p_codigo: codigo.trim() }); if (error) throw errPt(error); return (data && data[0]) || null; },
@@ -730,7 +822,10 @@ const S = {
   myResults: null,
   fac: { turmas: null, sel: null, results: null, newCode: null },
   installEvt: null,
-  installHidden: false
+  installHidden: false,
+  leitura: {},
+  qv: null,
+  enter: false
 };
 const ROUTES = ['inicio', 'referencias', 'entrar', 'painel', 'diagnostico', 'resultado', 'facilitador', 'nova-senha'];
 const PRIVATE = ['painel', 'diagnostico', 'resultado', 'facilitador'];
@@ -775,7 +870,7 @@ function viewInicio() {
     <div>
       <span class="pill"><span class="demo-dot" aria-hidden="true"></span><span class="eyebrow">Neurociência aplicada à venda</span></span>
       <h1>Todo cliente decide com uma pergunta: <span class="gold">o que eu ganho com isto?</span></h1>
-      <p class="lead">Em cerca de 15 minutos, o Diagnóstico OQGCI mostra como você conduz a conversa de venda, qual é o seu perfil e o que praticar nos próximos 30 dias.</p>
+      <p class="lead">Em cerca de 15 minutos, o Diagnóstico OQGCI mostra como você conduz a conversa de venda, qual é o seu perfil e onde estão as suas maiores oportunidades de desenvolvimento.</p>
       <div class="cta-row">
         <button class="btn btn-primary" data-go="${S.session ? 'diagnostico' : 'entrar'}">${S.session ? 'Iniciar diagnóstico' : 'Entrar no diagnóstico'} <span aria-hidden="true">→</span></button>
         ${S.session ? '' : '<button class="btn btn-ghost" data-act="criar">Criar conta gratuita</button>'}
@@ -804,11 +899,11 @@ function viewInicio() {
   </div></section>
 
   <section class="section"><div class="wrap">
-    <div class="section-head"><span class="eyebrow">Como funciona</span><h2>Do diagnóstico à prática em três passos</h2></div>
+    <div class="section-head"><span class="eyebrow">Como funciona</span><h2>Do diagnóstico ao desenvolvimento em três passos</h2></div>
     <div class="steps">
-      <div class="step"><span class="step-n">PASSO 1</span><h3>Responda</h3><p class="muted">33 afirmações sobre as suas conversas dos últimos 30 dias e 6 situações do dia a dia, como "quanto custa?" e o cliente que sumiu.</p></div>
-      <div class="step"><span class="step-n">PASSO 2</span><h3>Receba o relatório</h3><p class="muted">Índice OQGCI, nível de maturidade, perfil, postura na conversa, forças e as três prioridades.</p></div>
-      <div class="step"><span class="step-n">PASSO 3</span><h3>Pratique por 30 dias</h3><p class="muted">Uma prioridade por semana, com exercício e indicador. Depois de 60 a 90 dias, refaça o diagnóstico e compare.</p></div>
+      <div class="step"><span class="step-n">PASSO 1</span><h3>Responda</h3><p class="muted">33 afirmações sobre as suas conversas dos últimos 30 dias, 6 situações do dia a dia, como "quanto custa?" e o cliente que sumiu, e uma pergunta aberta sobre a sua última venda que não fechou.</p></div>
+      <div class="step"><span class="step-n">PASSO 2</span><h3>Receba o diagnóstico completo</h3><p class="muted">Índice OQGCI, perfil, leitura de cada dimensão, a sua postura nas situações e a leitura da sua história de venda.</p></div>
+      <div class="step"><span class="step-n">PASSO 3</span><h3>Desenvolva</h3><p class="muted">As prioridades mostram onde o treinamento Venda com Propósito faz mais diferença. Refaça o diagnóstico depois e compare a evolução.</p></div>
     </div>
   </div></section>
 
@@ -850,7 +945,7 @@ function viewEntrar() {
       <div class="field"><label for="cr-nome">Nome</label><input id="cr-nome" type="text" autocomplete="name" required></div>
       <div class="field"><label for="cr-email">E-mail</label><input id="cr-email" type="email" autocomplete="email" required></div>
       <div class="field"><label for="cr-senha">Senha</label><input id="cr-senha" type="password" autocomplete="new-password" minlength="6" required><span class="muted small">Pelo menos 6 caracteres.</span></div>
-      <label class="check" for="cr-lgpd"><input id="cr-lgpd" type="checkbox" required><span>Autorizo o uso das minhas respostas para gerar o meu relatório e, de forma agregada e sem identificação, para a validação do método, conforme a LGPD. Posso pedir a exclusão dos meus dados a qualquer momento.</span></label>
+      <label class="check" for="cr-lgpd"><input id="cr-lgpd" type="checkbox" required><span>Autorizo o uso das minhas respostas, incluindo o tempo de resposta e as trocas de resposta registradas durante o questionário, para gerar o meu diagnóstico e, de forma agregada e sem identificação, para a validação do método, conforme a LGPD. Posso pedir a exclusão dos meus dados a qualquer momento.</span></label>
       ${m}
       <button class="btn btn-primary" type="submit" ${S.busy ? 'disabled' : ''}>Criar conta <span aria-hidden="true">→</span></button>
     </form>` : `
@@ -895,19 +990,59 @@ function viewPainel() {
 }
 
 /* ============================== QUESTIONÁRIO ============================== */
+const HIST_MIN = 20;
 function startQuiz() {
   const d = LS.get(DRAFT_KEY);
-  S.quiz = d && d.v === 1 && (!d.uid || d.uid === S.session?.id) ? d : { v: 1, uid: S.session?.id, step: 0, items: {}, sjt: {}, turma: null, code: '' };
+  S.quiz = d && d.v === 2 && (!d.uid || d.uid === S.session?.id) ? d : { v: 2, uid: S.session?.id, step: 0, items: {}, sjt: {}, historia: '', meta: {}, turma: null, code: '' };
+  if (!S.quiz.meta) S.quiz.meta = {};
 }
-const TOTAL = ITEMS.length + SJT.length;
+const TOTAL = ITEMS.length + SJT.length + 1;
 function saveDraft() { LS.set(DRAFT_KEY, S.quiz); }
+function keyOfStep(step) {
+  const idx = step - 1;
+  if (idx < 0) return null;
+  if (idx < ITEMS.length) return ITEMS[idx].c;
+  if (idx < ITEMS.length + SJT.length) return SJT[idx - ITEMS.length].id;
+  return 'historia';
+}
+
+// Registro do tempo de cada pergunta na tela (descontando a aba em segundo plano) e das trocas de resposta.
+function closeVisit() {
+  const v = S.qv; if (!v) return;
+  const el = performance.now() - v.t0 - v.hidden - (v.hiddenAt ? performance.now() - v.hiddenAt : 0);
+  const key = keyOfStep(v.step);
+  if (key && v.quiz && v.quiz.meta) {
+    const m = v.quiz.meta[key] || (v.quiz.meta[key] = { ms: 0, visits: 0, changes: 0, long: 0 });
+    m.visits += 1;
+    if (el > 120000) m.long += 1; else m.ms += Math.round(el);
+  }
+  S.qv = null;
+}
+function trackVisit() {
+  const q = S.quiz;
+  const cur = (S.route === 'diagnostico' && q && q.step > 0) ? q.step : null;
+  if (S.qv && (S.qv.step !== cur || S.qv.quiz !== q)) { closeVisit(); if (q) saveDraft(); }
+  if (cur && !S.qv) S.qv = { step: cur, t0: performance.now(), hidden: 0, hiddenAt: null, quiz: q };
+}
+document.addEventListener('visibilitychange', () => {
+  const v = S.qv; if (!v) return;
+  if (document.hidden) v.hiddenAt = performance.now();
+  else if (v.hiddenAt) { v.hidden += performance.now() - v.hiddenAt; v.hiddenAt = null; }
+});
+function noteChange(key, prev, next) {
+  if (prev == null || prev === next) return;
+  const m = S.quiz.meta[key] || (S.quiz.meta[key] = { ms: 0, visits: 0, changes: 0, long: 0 });
+  m.changes += 1;
+}
+
+const SCALE_HTML = ['Nunca', 'Raramente', 'Às vezes', 'Frequen&shy;temente', 'Sempre'];
 
 function viewDiagnostico() {
   const q = S.quiz;
   if (q.step === 0) {
     return `<main class="quiz wrap"><div class="stack-lg">
       <div class="stack" style="gap:10px"><span class="eyebrow">Antes de começar</span><h1 style="font-size:clamp(28px,5vw,38px)">Pense nas suas conversas com clientes nos últimos 30 dias</h1>
-      <p class="muted">São duas partes: 33 afirmações sobre o que você costuma fazer e 6 situações do dia a dia. Responda pelo que você realmente faz. O resultado é mais útil quando reflete a sua prática atual.</p></div>
+      <p class="muted">São três partes: 33 afirmações sobre o que você costuma fazer, 6 situações do dia a dia e uma pergunta aberta sobre a sua última venda que não fechou. Responda pelo que você realmente faz. O resultado é mais útil quando reflete a sua prática atual.</p></div>
       <div class="card stack">
         <div class="field"><label for="qz-code">Código da turma <span class="muted">(opcional)</span></label><input id="qz-code" type="text" autocomplete="off" placeholder="OQG-XXXX" value="${esc(q.code)}" style="text-transform:uppercase"><span class="muted small">Se você está num workshop ou numa equipe, use o código que o facilitador passou.${store.mode === 'demo' ? ' Na prévia, o código OQG-DEMO entra na turma de exemplo.' : ''}</span></div>
         <div id="qz-msg"></div>
@@ -918,26 +1053,45 @@ function viewDiagnostico() {
   }
   const idx = q.step - 1;
   const pct = Math.round(idx / TOTAL * 100);
-  const isItem = idx < ITEMS.length;
-  const head = `<div class="progress"><div class="progress-top"><span>${isItem ? 'PARTE 1 · SUA PRÁTICA' : 'PARTE 2 · SITUAÇÕES'}</span><span class="tnum">${idx + 1} de ${TOTAL}</span></div><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div></div>`;
-  let body;
-  if (isItem) {
+  const part = idx < ITEMS.length ? 'PARTE 1 · SUA PRÁTICA' : idx < ITEMS.length + SJT.length ? 'PARTE 2 · SITUAÇÕES' : 'PARTE 3 · SUA HISTÓRIA';
+  const head = `<div class="progress"><div class="progress-top"><span>${part}</span><span class="tnum">${idx + 1} de ${TOTAL}</span></div><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div></div>`;
+  let body, answered, isLast = idx === TOTAL - 1;
+  if (idx < ITEMS.length) {
     const it = ITEMS[idx];
     const cur = q.items[it.c];
+    answered = cur != null;
     body = `<p class="eyebrow" style="margin-bottom:10px;color:var(--accent)">Pergunta ${idx + 1} de ${TOTAL}</p><p class="q-text">${esc(it.t)}</p><p class="q-hint">Com que frequência isso aconteceu nos últimos 30 dias? Marque uma opção e toque em Avançar.</p>
-      <div class="opts" role="group" aria-label="Frequência">${SCALE.map((s, k) => `<button class="opt" data-ans="${k + 1}" aria-pressed="${cur === k + 1}"><span class="opt-k">${k + 1}</span><span class="opt-t">${s}</span></button>`).join('')}</div>`;
-  } else {
+      <div class="likert" role="radiogroup" aria-label="Frequência, de nunca a sempre">${SCALE_HTML.map((s, k) => `<button type="button" class="lk" role="radio" data-ans="${k + 1}" aria-checked="${cur === k + 1}" aria-pressed="${cur === k + 1}" aria-label="${k + 1}, ${SCALE[k]}"><span class="lk-n">${k + 1}</span><span class="lk-t" lang="pt-BR">${s}</span></button>`).join('')}</div>
+      <div class="likert-ends" aria-hidden="true"><span>menos frequente</span><span>mais frequente</span></div>`;
+  } else if (idx < ITEMS.length + SJT.length) {
     const sc = SJT[idx - ITEMS.length];
     const cur = q.sjt[sc.id];
+    answered = cur != null;
     body = `<div class="scene"><p class="eyebrow" style="margin-bottom:8px;color:var(--accent)">Pergunta ${idx + 1} de ${TOTAL} · situação ${idx - ITEMS.length + 1} de ${SJT.length}</p><p class="q-text" style="min-height:0">${esc(sc.t)}</p></div><p class="q-hint">Escolha a resposta mais parecida com o que você faria e toque em Avançar.</p>
-      <div class="opts" role="group" aria-label="Respostas">${sc.ops.map((o, k) => `<button class="opt" data-sjt="${o.k}" aria-pressed="${cur === o.k}"><span class="opt-k">${'ABC'[k]}</span><span class="opt-t" style="font-weight:500">${esc(o.t)}</span></button>`).join('')}</div>`;
+      <div class="opts" role="radiogroup" aria-label="Respostas">${sc.ops.map((o, k) => `<button type="button" class="opt" role="radio" data-sjt="${o.k}" aria-checked="${cur === o.k}" aria-pressed="${cur === o.k}"><span class="opt-k">${'ABC'[k]}</span><span class="opt-t" style="font-weight:500">${esc(o.t)}</span></button>`).join('')}</div>`;
+  } else {
+    answered = (q.historia || '').trim().length >= HIST_MIN;
+    body = `<p class="eyebrow" style="margin-bottom:10px;color:var(--accent)">Pergunta ${TOTAL} de ${TOTAL} · pergunta aberta</p><p class="q-text" style="min-height:0">Conte em poucas linhas como foi a sua última venda que não fechou.</p>
+      <p class="q-hint">O que o cliente disse, o que você respondeu e o que aconteceu depois. Escreva como contaria a um colega. Não use nomes de clientes.</p>
+      <div class="field" style="margin-top:20px"><label for="qz-hist" class="sr-only">Sua história</label><textarea id="qz-hist" rows="8" maxlength="2000" placeholder="Ex.: A cliente pediu o preço pelo WhatsApp, eu mandei a tabela...">${esc(q.historia || '')}</textarea>
+      <span class="muted small" id="qz-hist-n">${(q.historia || '').trim().length < HIST_MIN ? `Escreva pelo menos ${HIST_MIN} caracteres.` : `${(q.historia || '').length} de 2000 caracteres`}</span></div>`;
   }
-  const answered = isItem ? q.items[ITEMS[idx].c] != null : q.sjt[SJT[idx - ITEMS.length].id] != null;
   return `<main class="quiz wrap">${head}<div class="${S.enter ? 'q-enter' : ''}">${body}</div>
-    <div class="quiz-nav"><button class="btn btn-quiet btn-sm" data-act="qz-back" style="width:auto">← Voltar</button>
-    ${idx === TOTAL - 1 ? `<button class="btn btn-primary btn-sm" data-act="qz-finish" style="width:auto" ${answered && !S.busy ? '' : 'disabled'}>Ver meu resultado</button>` : `<button class="btn ${answered ? 'btn-primary' : 'btn-quiet'} btn-sm" data-act="qz-next" style="width:auto" ${answered ? '' : 'disabled'}>Avançar →</button>`}</div>
+    <div class="quiz-nav"><button type="button" class="btn btn-quiet btn-sm" data-act="qz-back" style="width:auto">← Voltar</button>
+    ${isLast ? `<button type="button" class="btn ${answered ? 'btn-primary' : 'btn-quiet'} btn-sm" data-act="qz-finish" style="width:auto" ${answered && !S.busy ? '' : 'disabled'}>Ver meu diagnóstico</button>` : `<button type="button" class="btn ${answered ? 'btn-primary' : 'btn-quiet'} btn-sm" data-act="qz-next" style="width:auto" ${answered ? '' : 'disabled'}>Avançar →</button>`}</div>
   </main>`;
 }
+
+document.addEventListener('input', (ev) => {
+  if (ev.target.id !== 'qz-hist' || !S.quiz) return;
+  S.quiz.historia = ev.target.value;
+  const n = S.quiz.historia.trim().length;
+  const ok = n >= HIST_MIN;
+  const btn = $('[data-act=qz-finish]');
+  if (btn) { btn.disabled = !ok || S.busy; btn.classList.toggle('btn-primary', ok); btn.classList.toggle('btn-quiet', !ok); }
+  const c = $('#qz-hist-n'); if (c) c.textContent = ok ? `${S.quiz.historia.length} de 2000 caracteres` : `Escreva pelo menos ${HIST_MIN} caracteres.`;
+  clearTimeout(saveDraft._t); saveDraft._t = setTimeout(saveDraft, 400);
+});
 
 async function quizStart() {
   const q = S.quiz;
@@ -958,14 +1112,16 @@ async function quizStart() {
 
 async function quizFinish() {
   const q = S.quiz;
-  if (Object.keys(q.items).length < ITEMS.length || Object.keys(q.sjt).length < SJT.length) {
-    const miss = ITEMS.findIndex(i => q.items[i.c] == null);
-    q.step = miss >= 0 ? miss + 1 : ITEMS.length + SJT.findIndex(s => !q.sjt[s.id]) + 1; render(); toast('Falta responder esta pergunta'); return;
+  const missItem = ITEMS.findIndex(i => q.items[i.c] == null);
+  const missSjt = SJT.findIndex(s => !q.sjt[s.id]);
+  if (missItem >= 0 || missSjt >= 0 || (q.historia || '').trim().length < HIST_MIN) {
+    q.step = missItem >= 0 ? missItem + 1 : missSjt >= 0 ? ITEMS.length + missSjt + 1 : TOTAL; render(); toast('Falta responder esta pergunta'); return;
   }
+  closeVisit();
   S.busy = true; render();
-  const resultado = scoreAnswers(q.items, q.sjt);
+  const resultado = scoreAnswers(q.items, q.sjt, q.meta);
   try {
-    const rec = await store.saveResult({ turma_id: q.turma?.id, respostas: { items: q.items, sjt: q.sjt }, resultado });
+    const rec = await store.saveResult({ turma_id: q.turma?.id, respostas: { items: q.items, sjt: q.sjt, historia: q.historia.trim(), meta: q.meta }, resultado });
     LS.del(DRAFT_KEY); S.quiz = null; S.busy = false; S.result = rec; go('resultado');
   } catch (e) { S.busy = false; render(); toast(e.message || 'Não foi possível salvar. Tente de novo.'); }
 }
@@ -991,6 +1147,18 @@ function radar(dims) {
   return `<svg viewBox="-40 0 480 350" role="img" aria-label="Radar das oito dimensões">${rings}${spokes}<polygon points="${poly}" fill="var(--accent)" fill-opacity=".16" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>${dots}${labels}${ticks}</svg>`;
 }
 
+const bandOf = v => v >= 75 ? 'alto' : v >= 50 ? 'medio' : 'baixo';
+const POSTURA_NOME = { assertiva: 'Assertiva', passiva: 'Passiva', agressiva: 'Agressiva' };
+const POSTURA_COR = { assertiva: 'var(--c-warm)', passiva: 'var(--c-cool)', agressiva: 'var(--c-third)' };
+
+function itemExtremes(dimId, items) {
+  const its = ITEMS.filter(i => i.d === dimId && items && items[i.c] != null).map(i => ({ i, r: items[i.c], a: i.inv ? 6 - items[i.c] : items[i.c] }));
+  if (!its.length) return null;
+  const sorted = its.slice().sort((x, y) => y.a - x.a);
+  const best = sorted[0], worst = sorted[sorted.length - 1];
+  return best.a === worst.a ? { uniforme: true, a: best.a } : { best, worst };
+}
+
 function resumoTexto(rec) {
   const r = rec.resultado;
   const p = PROFILES[r.perfil];
@@ -1004,24 +1172,159 @@ function resumoTexto(rec) {
     'Dimensões:',
     ...DIMS.map(d => `- ${d.nome}: ${r.dims[d.id]}`),
     '',
-    'Prioridades:',
+    'Prioridades de desenvolvimento:',
     ...r.prioridades.map((k, i) => `${i + 1}. ${DIM[k].nome}: ${DIM[k].pratica}`)
   ].join('\n');
 }
 
+/* ---------- Leitura da história por IA ---------- */
+function leituraPrompt(rec) {
+  const r = rec.resultado;
+  return `Você é um especialista no método Venda com Propósito, que combina a lógica do livro The Challenger Sale, adaptada à venda entre pessoas, com achados de neurociência da decisão. A lente do método é o OQGCI ("O Que Eu Ganho Com Isto"): o cliente se aproxima do que lhe faz bem e se afasta do que lhe faz mal.
+
+Os quatro movimentos da conversa, apoiados na linha de base do interesse genuíno em ajudar o cliente:
+1. Espelho: mostrar que conhece a realidade do cliente, perguntar e aprofundar antes de apresentar o serviço.
+2. Virada: mostrar algo que o cliente ainda não enxergou sobre o próprio problema.
+3. Custo: ajudar o cliente a perceber quanto custa deixar como está, com números e uma história, sem exagero.
+4. Caminho: recomendar com clareza, oferecer poucas opções, tirar o risco da mesa e combinar o próximo passo.
+Também importam: Quem decide (quem usa, quem paga, quem influencia) e Condução (firmeza com respeito em preço, desconto e retomada, sem passividade nem pressão).
+
+Um empreendedor descreveu a última venda que não fechou. Pontuações dele no diagnóstico (0 a 100): ${DIMS.map(d => `${d.nome} ${r.dims[d.id]}`).join(', ')}. Perfil: ${PROFILES[r.perfil].nome}.
+
+História, entre as marcas <historia>:
+<historia>
+${rec.respostas.historia}
+</historia>
+
+Analise a história com base apenas no que está escrito. Quando a história não mostrar um movimento, diga que ele não aparece no relato, sem inventar fatos. Escreva em português do Brasil, em tom direto, respeitoso e profissional, sem tom professoral, falando com a pessoa como "você". Não use construções de contraste como "não é X, é Y" ou "X, e não Y". Não faça avaliações de personalidade ou de saúde. Frases curtas.
+
+Responda somente com um objeto JSON neste formato:
+{"sintese": "duas ou três frases sobre o que a história mostra da conversa de venda",
+ "movimentos": [
+  {"nome": "Espelho", "status": "presente" | "parcial" | "ausente", "evidencia": "o trecho ou fato do relato que sustenta a avaliação, ou que ele não aparece no relato", "como_fortalecer": "uma ação concreta para uma conversa parecida"},
+  {"nome": "Virada", ...}, {"nome": "Custo", ...}, {"nome": "Caminho", ...}
+ ],
+ "quem_decide": "uma frase sobre quem participava da decisão e se foi considerado",
+ "postura": "uma frase sobre a postura na conversa: passiva, assertiva ou agressiva, com base no relato",
+ "ponto_chave": "uma frase com o principal ajuste que teria mais chance de mudar o resultado"}`;
+}
+
+async function getSampler() {
+  try { if (window.claude && typeof window.claude.use === 'function') return await window.claude.use('sample'); } catch (e) { /* */ }
+  return null;
+}
+
+async function runLeitura(rec) {
+  const id = rec.id;
+  S.leitura[id] = { st: 'loading' }; patchLeitura(rec);
+  const prompt = leituraPrompt(rec);
+  try {
+    let data = null;
+    const sample = await getSampler();
+    if (sample) {
+      data = await sample.json(prompt, { modelTier: 'default' });
+    } else if (LIVE && CONFIG.leituraIA) {
+      const token = await store.accessToken();
+      const res = await fetch('/.netlify/functions/leitura', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token }, body: JSON.stringify({ prompt }) });
+      if (!res.ok) throw { code: 'http_' + res.status };
+      const { text } = await res.json();
+      data = JSON.parse(String(text).replace(/^```(?:json)?\s*|\s*```$/g, ''));
+    } else { throw { code: 'unavailable' }; }
+    if (!data || !Array.isArray(data.movimentos)) throw { code: 'formato' };
+    rec.resultado.leitura = data;
+    S.leitura[id] = { st: 'done' };
+    try { await store.updateLeitura?.(id, data); } catch (e) { /* a leitura fica na tela mesmo sem salvar */ }
+  } catch (e) {
+    S.leitura[id] = { st: 'fail', code: e && e.code };
+  }
+  patchLeitura(rec);
+}
+
+function patchLeitura(rec) {
+  const box = $('#leitura-box');
+  if (box && S.result && S.result.id === rec.id) box.innerHTML = leituraHTML(rec);
+}
+
+function leituraHTML(rec) {
+  const L = rec.resultado.leitura;
+  const st = S.leitura[rec.id]?.st;
+  const statusChip = s => { const m = { presente: ['Presente', 'var(--good)'], parcial: ['Parcial', 'var(--warn)'], ausente: ['Não aparece', 'var(--crit)'] }[s] || ['—', 'var(--ink-3)']; return `<span class="chip" style="border-color:color-mix(in srgb, ${m[1]} 50%, transparent)"><i class="swatch" style="background:${m[1]}"></i>${m[0]}</span>`; };
+  if (L) {
+    return `<p>${esc(L.sintese)}</p>
+      <div class="mov-list">${L.movimentos.map(m => `<div class="mov"><div class="mov-head"><strong>${esc(m.nome)}</strong>${statusChip(m.status)}</div><p class="muted small">${esc(m.evidencia)}</p><p class="small"><b>Como fortalecer:</b> ${esc(m.como_fortalecer)}</p></div>`).join('')}</div>
+      ${L.quem_decide ? `<p class="small"><b>Quem decide:</b> ${esc(L.quem_decide)}</p>` : ''}
+      ${L.postura ? `<p class="small"><b>Postura:</b> ${esc(L.postura)}</p>` : ''}
+      ${L.ponto_chave ? `<div class="key-point"><span class="eyebrow">Ponto-chave</span><p>${esc(L.ponto_chave)}</p></div>` : ''}
+      <p class="muted small">Leitura gerada por IA a partir do seu relato. Use como ponto de partida para a sua própria reflexão.</p>`;
+  }
+  if (st === 'loading') return `<p class="muted"><span class="dots" aria-hidden="true"></span> Lendo a sua história com base nos quatro movimentos…</p>`;
+  const guide = `<p class="muted small">Releia a sua história com estas quatro perguntas:</p>
+    <ul class="guide"><li><b>Espelho:</b> você perguntou e aprofundou antes de apresentar o serviço?</li><li><b>Virada:</b> o cliente ouviu algo novo sobre o próprio problema?</li><li><b>Custo:</b> ficou claro quanto custa deixar como está?</li><li><b>Caminho:</b> houve uma recomendação clara e um próximo passo combinado?</li></ul>`;
+  if (st === 'fail' && S.leitura[rec.id].code !== 'unavailable') return `${guide}<p class="small muted">A leitura automática não foi concluída agora. <button class="link-btn" data-act="ler-historia">Tentar de novo</button></p>`;
+  return guide;
+}
+
+function sinaisHTML(r) {
+  const s = r.sinais;
+  if (!s) return '';
+  const dims = Object.entries(s.porDim || {}).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const linhas = [];
+  linhas.push(`<p>Você levou em média <b class="tnum">${String(s.medianaSeg).replace('.', ',')} s</b> por afirmação e trocou de resposta em <b class="tnum">${s.trocas.length}</b> ${s.trocas.length === 1 ? 'pergunta' : 'perguntas'}.</p>`);
+  if (s.rapido) linhas.push('<p class="muted">Esse ritmo é bastante rápido. Respostas muito rápidas podem refletir uma leitura apressada. Se for o caso, vale refazer o diagnóstico com mais calma.</p>');
+  if (dims.length) {
+    linhas.push(`<p>As hesitações e trocas se concentraram em: ${dims.map(([d, n]) => `<span class="chip"><b>${DIM[d].nome}</b> ${n} sinais</span>`).join(' ')}</p>`);
+    linhas.push('<p class="muted">Nesses temas, a resposta pediu mais reflexão. Vale observar se é aí que surgem as suas dúvidas também na conversa real com o cliente.</p>');
+  } else {
+    linhas.push('<p class="muted">O ritmo foi constante, sem concentração de hesitação em nenhuma dimensão.</p>');
+  }
+  if (s.interrupcoes) linhas.push(`<p class="muted small">${s.interrupcoes} ${s.interrupcoes === 1 ? 'pausa longa foi desconsiderada' : 'pausas longas foram desconsideradas'} no cálculo.</p>`);
+  return `<div class="card stack" style="gap:12px"><h2 class="h-sec" style="margin:0">Sinais de resposta</h2>${linhas.join('')}<p class="muted small">Os sinais comparam cada pergunta com o seu próprio ritmo e ficam fora do Índice OQGCI.</p></div>`;
+}
+
 function viewResultado() {
   const rec = S.result; const r = rec.resultado; const lvl = levelOf(r.indice); const p = PROFILES[r.perfil];
+  const items = rec.respostas?.items; const sjt = rec.respostas?.sjt || {};
   const total = SJT.length;
-  const seg = (k, c) => r.postura[k] ? `<i style="width:${r.postura[k] / total * 100}%;background:${c}" title="${k}: ${r.postura[k]} de ${total}"></i>` : '';
+  const seg = (k, c) => r.postura[k] ? `<i style="width:${r.postura[k] / total * 100}%;background:${c}" title="${POSTURA_NOME[k]}: ${r.postura[k]} de ${total}"></i>` : '';
   const balance = Math.abs(r.aprox - r.afast) < 20 ? 'Os dois eixos estão equilibrados.' : r.aprox > r.afast ? 'O cliente percebe o ganho e adia a decisão.' : 'O cliente sente a urgência e ainda não enxerga o ganho.';
-  const weeks = [
-    ...r.prioridades.map((k, i) => `<div class="week"><span class="week-n">Semana ${i + 1}</span><div><strong>${DIM[k].nome}</strong><p class="muted">${esc(DIM[k].exercicio)}</p></div></div>`),
-    `<div class="week"><span class="week-n">Semana 4</span><div><strong>Apresentação de 60 segundos</strong><p class="muted">Reescreva a sua apresentação com os quatro movimentos: Espelho, Virada, Custo e Caminho. O seu nome e o seu serviço entram só no Caminho. Leia as quatro perguntas abaixo antes de cada conversa.</p></div></div>`
-  ].join('');
-  const refine = DIMS.filter(d => !r.prioridades.includes(d.id) && !r.forcas.includes(d.id) && r.dims[d.id] >= 60 && r.dims[d.id] < 80);
   const isMine = rec.user_id === S.session?.id;
+  const eixoNome = e => e === 'aprox' ? 'Aproximação' : e === 'afast' ? 'Afastamento' : 'Linha de base';
+  const eixoCor = e => e === 'aprox' ? 'var(--c-warm)' : e === 'afast' ? 'var(--c-cool)' : 'var(--ink-2)';
+
+  const dimCards = DIMS.map(d => {
+    const v = r.dims[d.id]; const ex = itemExtremes(d.id, items);
+    const quote = (x) => `“${esc(x.i.t)}” <span class="muted">· você marcou ${SCALE[x.r - 1].toLowerCase()}</span>`;
+    const ext = !ex ? '' : ex.uniforme
+      ? `<p class="small muted">Suas respostas foram uniformes nesta dimensão.</p>`
+      : `<dl class="dl-mini"><dt>Ponto forte nas suas respostas</dt><dd>${quote(ex.best)}</dd><dt>Ponto de atenção</dt><dd>${quote(ex.worst)}</dd></dl>`;
+    return `<div class="card dim-card">
+      <div class="dim-card-head"><span><span class="dim-code">${d.id}</span> <strong style="font-size:18px">${d.nome}</strong></span><span class="tag" style="border-style:solid"><i class="swatch" style="background:${eixoCor(d.eixo)};margin-right:6px"></i>${eixoNome(d.eixo)}</span></div>
+      <div class="meter"><div class="meter-top"><span class="muted small">Nível ${levelOf(v).nome}</span><b class="tnum">${v}</b></div><div class="meter-track" role="img" aria-label="${d.nome}: ${v} de 100"><i style="width:${Math.max(2, v)}%;background:${eixoCor(d.eixo)}"></i></div></div>
+      <p>${esc(BANDS[d.id][bandOf(v)])}</p>
+      ${ext}
+      <p class="small muted"><b>Por que importa:</b> ${esc(d.mecanismo)}</p>
+    </div>`;
+  }).join('');
+
+  const situacoes = SJT.map((s, k) => {
+    const ch = sjt[s.id]; const mine = s.ops.find(o => o.k === ch); const best = s.ops.find(o => o.k === 'assertiva');
+    return `<div class="sit"><div class="sit-head"><span class="eyebrow">Situação ${k + 1}</span>${ch ? `<span class="chip"><i class="swatch" style="background:${POSTURA_COR[ch]}"></i>${POSTURA_NOME[ch]}</span>` : ''}</div>
+      <p><strong>${esc(s.t)}</strong></p>
+      ${mine ? `<p class="small"><span class="muted">Sua resposta:</span> ${esc(mine.t)}</p>` : ''}
+      ${ch && ch !== 'assertiva' ? `<p class="small"><span class="muted">A resposta que sustenta o valor:</span> ${esc(best.t)}</p>` : ''}</div>`;
+  }).join('');
+
+  const hasHist = Boolean(rec.respostas?.historia);
+  const historia = hasHist ? `<div class="card stack" style="gap:14px"><h2 class="h-sec" style="margin:0">Sua história de venda</h2>
+      <blockquote class="story">${esc(rec.respostas.historia)}</blockquote>
+      <div id="leitura-box" class="stack" style="gap:12px">${leituraHTML(rec)}</div></div>` : '';
+
+  const prioridades = r.prioridades.map((k, i) => `<div class="card prio"><div class="prio-head"><span class="eyebrow">Prioridade ${i + 1}</span><b class="tnum">${r.dims[k]}</b></div><h3 style="font-size:22px">${DIM[k].nome}</h3>
+      <dl><dt>O que está em jogo</dt><dd>${esc(BANDS[k][bandOf(r.dims[k])])}</dd><dt>O que desenvolver</dt><dd>${esc(DIM[k].pratica)}</dd><dt>Como começar</dt><dd>${esc(DIM[k].exercicio)}</dd></dl>
+      ${r.sinais?.porDim?.[k] >= 2 ? '<p class="small" style="color:var(--accent-strong)">Você também hesitou nas perguntas desta dimensão.</p>' : ''}</div>`).join('');
+
   return `<main class="page"><div class="wrap stack-lg">
-    <div class="hello"><div class="stack" style="gap:6px"><span class="eyebrow">Relatório · ${fmtDate(rec.created_at)}${rec.nome && !isMine ? ' · ' + esc(rec.nome) : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">Seu Diagnóstico OQGCI</h1></div>
+    <div class="hello"><div class="stack" style="gap:6px"><span class="eyebrow">Diagnóstico completo · ${fmtDate(rec.created_at)}${rec.nome && !isMine ? ' · ' + esc(rec.nome) : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">${isMine ? 'Seu Diagnóstico OQGCI' : 'Diagnóstico OQGCI'}</h1></div>
       <div class="actions no-print"><button class="btn btn-quiet btn-sm" data-act="copiar-resumo">Copiar resumo</button>${LIVE ? '<button class="btn btn-quiet btn-sm" data-act="imprimir">Salvar em PDF</button>' : ''}</div></div>
     <textarea id="resumo-fallback" hidden readonly style="width:100%;min-height:160px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px"></textarea>
 
@@ -1039,8 +1342,8 @@ function viewResultado() {
         <p>${esc(p.conversa)}</p>
         <p class="muted">${esc(p.foco)}</p>
         <div><p class="small muted" style="margin-bottom:8px">Postura nas seis situações</p>
-          <div class="stackbar" role="img" aria-label="Postura: ${r.postura.assertiva} assertiva, ${r.postura.passiva} passiva, ${r.postura.agressiva} agressiva">${seg('assertiva', 'var(--c-warm)')}${seg('passiva', 'var(--c-cool)')}${seg('agressiva', 'var(--c-third)')}</div>
-          <div class="legend"><span><i class="swatch" style="background:var(--c-warm)"></i>Assertiva <b class="tnum">${r.postura.assertiva}</b></span><span><i class="swatch" style="background:var(--c-cool)"></i>Passiva <b class="tnum">${r.postura.passiva}</b></span><span><i class="swatch" style="background:var(--c-third)"></i>Agressiva <b class="tnum">${r.postura.agressiva}</b></span></div>
+          <div class="stackbar" role="img" aria-label="Postura: ${r.postura.assertiva} assertiva, ${r.postura.passiva} passiva, ${r.postura.agressiva} agressiva">${seg('assertiva', POSTURA_COR.assertiva)}${seg('passiva', POSTURA_COR.passiva)}${seg('agressiva', POSTURA_COR.agressiva)}</div>
+          <div class="legend">${['assertiva', 'passiva', 'agressiva'].map(k => `<span><i class="swatch" style="background:${POSTURA_COR[k]}"></i>${POSTURA_NOME[k]} <b class="tnum">${r.postura[k]}</b></span>`).join('')}</div>
         </div>
       </div>
     </div>
@@ -1051,28 +1354,39 @@ function viewResultado() {
       <div class="card"><h2 class="h-sec">As oito dimensões</h2><div class="radar-wrap">${radar(r.dims)}</div>
         <div class="legend"><span><i class="swatch" style="background:var(--c-warm)"></i>Aproximação</span><span><i class="swatch" style="background:var(--cool)"></i>Afastamento</span><span><i class="swatch" style="background:var(--ink-2)"></i>Linha de base</span></div></div>
       <div class="card"><h2 class="h-sec">Suas forças</h2>
-        <div class="stack">${r.forcas.map(k => `<div class="prio"><div class="prio-head"><strong>${DIM[k].nome}</strong><b class="tnum">${r.dims[k]}</b></div><p class="muted small">${esc(DIM[k].mecanismo)}</p></div>`).join('<hr style="border:0;border-top:1px solid var(--line);margin:0">')}</div>
-        ${refine.length ? `<p class="small muted" style="margin-top:18px">Para refinar: ${refine.map(d => `${d.nome} (${d.pratica.charAt(0).toLowerCase() + d.pratica.slice(1, -1)})`).join('; ')}.</p>` : ''}
+        <div class="stack">${r.forcas.map(k => `<div class="prio"><div class="prio-head"><strong>${DIM[k].nome}</strong><b class="tnum">${r.dims[k]}</b></div><p class="muted small">${esc(BANDS[k][bandOf(r.dims[k])])}</p></div>`).join('<hr style="border:0;border-top:1px solid var(--line);margin:0">')}</div>
       </div>
     </div>
 
-    <div class="stack"><h2 class="h-sec" style="margin:0">Suas três prioridades</h2>
-      <div class="grid-3">${r.prioridades.map((k, i) => `<div class="card prio"><div class="prio-head"><span class="eyebrow">Prioridade ${i + 1}</span><b class="tnum">${r.dims[k]}</b></div><h3 style="font-size:22px">${DIM[k].nome}</h3>
-        <dl><dt>Prática</dt><dd>${esc(DIM[k].pratica)}</dd><dt>Exercício</dt><dd>${esc(DIM[k].exercicio)}</dd><dt>Indicador em 30 dias</dt><dd>${esc(DIM[k].indicador)}</dd></dl></div>`).join('')}</div>
-    </div>
+    <div class="stack"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Leitura das oito dimensões</h2><p class="muted small">Cada dimensão traz a sua pontuação, o que ela mostra sobre a sua conversa de venda e as afirmações em que você mais se destacou e em que há mais espaço para evoluir.</p></div>
+      <div class="dim-grid">${dimCards}</div></div>
 
-    <div class="card"><h2 class="h-sec">Trilha de 30 dias</h2><div class="weeks">${weeks}</div></div>
+    <div class="card stack" style="gap:6px"><h2 class="h-sec" style="margin:0 0 6px">Sua postura nas situações</h2><div class="sit-list">${situacoes}</div></div>
+
+    ${historia}
+    ${sinaisHTML(r)}
+
+    <div class="stack"><h2 class="h-sec" style="margin:0">Prioridades de desenvolvimento</h2><div class="grid-3">${prioridades}</div></div>
+
+    <div class="card cta-card"><span class="eyebrow">Próximo passo</span><h2 style="font-size:26px">${esc(CTA.titulo)}</h2><p class="muted">${esc(CTA.texto)}</p>${CTA.link ? `<div><a class="btn btn-primary btn-sm" href="${esc(CTA.link)}" target="_blank" rel="noopener">${esc(CTA.botao || 'Saiba mais')}</a></div>` : ''}</div>
 
     <div class="stack"><h2 class="h-sec" style="margin:0">Quatro perguntas antes da próxima conversa</h2>
       <div class="questions">${QUESTIONS.map(([k, t]) => `<div class="question"><span class="eyebrow">${k}</span><strong style="font-family:var(--font-display);font-size:19px;font-weight:600">${esc(t)}</strong></div>`).join('')}</div></div>
 
     <details class="card"><summary style="cursor:pointer;font-weight:700">Tabela das pontuações</summary>
       <div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Dimensão</th><th>Eixo</th><th class="num">Pontuação</th><th>Nível</th></tr></thead><tbody>
-      ${DIMS.map(d => `<tr><td>${d.id} · ${d.nome}</td><td>${d.eixo === 'aprox' ? 'Aproximação' : d.eixo === 'afast' ? 'Afastamento' : 'Linha de base'}</td><td class="num">${r.dims[d.id]}</td><td>${levelOf(r.dims[d.id]).nome}</td></tr>`).join('')}
+      ${DIMS.map(d => `<tr><td>${d.id} · ${d.nome}</td><td>${eixoNome(d.eixo)}</td><td class="num">${r.dims[d.id]}</td><td>${levelOf(r.dims[d.id]).nome}</td></tr>`).join('')}
       </tbody></table></div></details>
 
     <div class="actions no-print">${isMine ? '<button class="btn btn-primary" data-go="painel">Voltar ao meu painel</button>' : '<button class="btn btn-primary" data-go="facilitador">Voltar ao painel do facilitador</button>'}<button class="btn btn-ghost" data-go="referencias">Referências científicas</button></div>
   </div></main>`;
+}
+
+// Dispara a leitura da história uma vez por relatório aberto, quando ainda não existe.
+function afterRenderResultado() {
+  const rec = S.result;
+  if (!rec || !rec.respostas?.historia || rec.resultado.leitura || S.leitura[rec.id]) return;
+  runLeitura(rec);
 }
 
 /* ============================== FACILITADOR =============================== */
@@ -1085,9 +1399,9 @@ async function loadFac() {
 }
 
 function csvOf(results) {
-  const head = ['nome', 'data', 'indice', 'nivel', 'perfil', 'aproximacao', 'afastamento', ...DIMS.map(d => d.id + '_' + d.nome), 'assertiva', 'passiva', 'agressiva', 'alertas'];
+  const head = ['nome', 'data', 'indice', 'nivel', 'perfil', 'aproximacao', 'afastamento', ...DIMS.map(d => d.id + '_' + d.nome), 'assertiva', 'passiva', 'agressiva', 'alertas', 'hesitacoes', 'trocas', 'historia'];
   const q = v => /[",;\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
-  const rows = results.map(x => { const r = x.resultado; return [x.nome || '', x.created_at.slice(0, 10), r.indice, r.nivel, PROFILES[r.perfil].nome, r.aprox, r.afast, ...DIMS.map(d => r.dims[d.id]), r.postura.assertiva, r.postura.passiva, r.postura.agressiva, r.alerts.map(a => a.t).join(' | ')].map(q).join(','); });
+  const rows = results.map(x => { const r = x.resultado; return [x.nome || '', x.created_at.slice(0, 10), r.indice, r.nivel, PROFILES[r.perfil].nome, r.aprox, r.afast, ...DIMS.map(d => r.dims[d.id]), r.postura.assertiva, r.postura.passiva, r.postura.agressiva, r.alerts.map(a => a.t).join(' | '), r.sinais ? r.sinais.hesitacoes.length : '', r.sinais ? r.sinais.trocas.length : '', x.respostas?.historia || ''].map(q).join(','); });
   return [head.map(q).join(','), ...rows].join('\n');
 }
 
@@ -1143,7 +1457,9 @@ function installBar() {
 
 function render() {
   const views = { inicio: viewInicio, referencias: viewReferencias, entrar: viewEntrar, painel: viewPainel, diagnostico: viewDiagnostico, resultado: viewResultado, facilitador: viewFacilitador, 'nova-senha': viewNovaSenha };
+  trackVisit();
   $('#app').innerHTML = topBar() + views[S.route]() + installBar();
+  if (S.route === 'resultado') afterRenderResultado();
 }
 
 /* ================================ EVENTOS ================================= */
@@ -1154,12 +1470,12 @@ document.addEventListener('click', async (ev) => {
   if (t.dataset.tab) { S.authTab = t.dataset.tab; S.authMsg = null; render(); return; }
   if (t.dataset.copy) { copyText(t.dataset.copy); return; }
   if (t.dataset.ans) {
-    const q = S.quiz; const it = ITEMS[q.step - 1]; q.items[it.c] = Number(t.dataset.ans); saveDraft(); S.enter = false; render();
+    const q = S.quiz; const it = ITEMS[q.step - 1]; const v = Number(t.dataset.ans); noteChange(it.c, q.items[it.c], v); q.items[it.c] = v; saveDraft(); S.enter = false; render();
     $('[data-act=qz-next],[data-act=qz-finish]')?.focus({ preventScroll: true });
     return;
   }
   if (t.dataset.sjt) {
-    const q = S.quiz; const sc = SJT[q.step - 1 - ITEMS.length]; q.sjt[sc.id] = t.dataset.sjt; saveDraft(); S.enter = false; render();
+    const q = S.quiz; const sc = SJT[q.step - 1 - ITEMS.length]; noteChange(sc.id, q.sjt[sc.id], t.dataset.sjt); q.sjt[sc.id] = t.dataset.sjt; saveDraft(); S.enter = false; render();
     $('[data-act=qz-next],[data-act=qz-finish]')?.focus({ preventScroll: true });
     return;
   }
@@ -1175,6 +1491,7 @@ document.addEventListener('click', async (ev) => {
   else if (act === 'qz-back') { const q = S.quiz; q.step = Math.max(0, q.step - 1); saveDraft(); render(); }
   else if (act === 'qz-next') { const q = S.quiz; q.step = Math.min(TOTAL, q.step + 1); saveDraft(); S.enter = true; render(); S.enter = false; }
   else if (act === 'qz-finish') { quizFinish(); }
+  else if (act === 'ler-historia') { delete S.leitura[S.result.id]; render(); }
   else if (act === 'copiar-resumo') { copyText(resumoTexto(S.result), $('#resumo-fallback')); }
   else if (act === 'imprimir') { window.print(); }
   else if (act === 'copiar-csv') { copyText(csvOf(S.fac.results || []), $('#csv-fallback')); }
@@ -1190,9 +1507,10 @@ document.addEventListener('keydown', (ev) => {
   if (S.route !== 'diagnostico' || !S.quiz || S.quiz.step === 0) return;
   if (ev.target.closest('input,textarea')) return;
   const idx = S.quiz.step - 1;
+  if (idx >= ITEMS.length + SJT.length) return;
   const n = idx < ITEMS.length ? 5 : 3;
   const k = idx < ITEMS.length ? Number(ev.key) : ' abc'.indexOf(ev.key.toLowerCase());
-  if (k >= 1 && k <= n) { const btn = document.querySelectorAll('.opt')[k - 1]; if (btn) btn.click(); }
+  if (k >= 1 && k <= n) { const btn = document.querySelectorAll('[data-ans],[data-sjt]')[k - 1]; if (btn) btn.click(); }
   else if (ev.key === 'Enter' && !ev.target.closest('button')) { const nx = $('[data-act=qz-next]:not([disabled]),[data-act=qz-finish]:not([disabled])'); if (nx) nx.click(); }
 });
 

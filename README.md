@@ -1,6 +1,6 @@
 # Diagnóstico OQGCI
 
-Aplicação web do Diagnóstico OQGCI (método Venda com Propósito): página de entrada, referências científicas, cadastro e login, questionário de 33 afirmações e 6 situações, relatório com Índice OQGCI, perfil e trilha de 30 dias, e painel do facilitador com turmas por código.
+Aplicação web do Diagnóstico OQGCI (método Venda com Propósito): página de entrada, referências científicas, cadastro e login, questionário com 33 afirmações, 6 situações e uma pergunta aberta, diagnóstico completo (Índice OQGCI, perfil, leitura das oito dimensões, postura, história de venda, sinais de resposta e prioridades) e painel do facilitador com turmas por código.
 
 ## Estrutura
 
@@ -36,6 +36,12 @@ Aplicação web do Diagnóstico OQGCI (método Venda com Propósito): página de
 
 ### 4. Domínio próprio (quando quiser)
 No Netlify, **Domain management > Add a domain**. Depois, atualize o Site URL no Supabase com o novo endereço.
+
+### 5. Leitura da história por IA (opcional)
+1. Crie uma chave no Console do Claude (console.anthropic.com). O uso da API é cobrado à parte da assinatura do Claude; os planos Max e Team incluem créditos mensais de API.
+2. No Netlify, em **Site configuration > Environment variables**, crie `ANTHROPIC_API_KEY`, `SUPABASE_URL` e `SUPABASE_ANON_KEY`.
+3. Em `public/config.js`, troque `leituraIA: false` por `leituraIA: true`.
+Sem isso, o relatório mostra a história com um roteiro de autoleitura.
 
 ## Observações
 - A chave anon public pode ficar no site: o acesso aos dados é protegido pelas regras de RLS do `schema.sql`.
