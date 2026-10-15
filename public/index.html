@@ -117,6 +117,31 @@ p { margin: 0; }
 .section-head { display: grid; gap: 10px; margin-bottom: 32px; max-width: 46em; }
 .section-head h2 { font-size: clamp(26px, 3.4vw, 36px); }
 .axis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.dims-hint { margin: -8px 0 16px; }
+.dims-map { display: grid; gap: 14px; }
+.dims-row { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 16px; align-items: start; }
+.dims-label { display: flex; gap: 10px; align-items: flex-start; padding-top: 16px; }
+.dims-label .swatch { margin-top: 6px; flex: none; }
+.dims-label strong { display: block; font-family: var(--font-display); font-size: 18px; }
+.dims-tiles { display: grid; gap: 10px; align-items: start; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.dims-tiles.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dims-tiles.n1 { grid-template-columns: minmax(0, 1fr); }
+.dim-tile { background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--ink-2); border-radius: var(--r-sm); }
+.dim-tile.aprox { border-top-color: var(--c-warm); }
+.dim-tile.afast { border-top-color: var(--c-cool); }
+.dim-tile summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) 14px; gap: 4px 10px; padding: 14px 16px; align-items: center; }
+.dim-tile summary::-webkit-details-marker { display: none; }
+.dim-tile summary .dim-code { grid-column: 1; padding: 0; }
+.dim-tile summary strong { grid-column: 1; font-size: 17px; font-weight: 700; }
+.dim-tile summary .dim-q { grid-column: 1; font-size: 14px; color: var(--ink-2); font-style: italic; }
+.dim-tile summary .chev { grid-column: 2; grid-row: 1 / span 3; }
+.dim-tile[open] .chev { transform: rotate(225deg); margin-top: 4px; }
+.dim-tile summary:hover { background: var(--surface-2); }
+.dim-tile[open] { border-left-color: var(--ink-3); border-right-color: var(--ink-3); border-bottom-color: var(--ink-3); }
+.dims-tiles.n4 summary { min-height: 150px; align-content: start; }
+.dims-tiles.n3 summary { min-height: 128px; align-content: start; }
+.dim-tile-body { display: grid; gap: 12px; padding: 14px 16px 16px; border-top: 1px solid var(--line); font-size: 14px; color: var(--ink-2); }
+.dim-tile-body .eyebrow { display: block; margin-bottom: 4px; }
 .axis-col { border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; gap: 12px; align-content: start; background: var(--surface); }
 .axis-col h3 { font-size: 20px; display: flex; gap: 10px; align-items: center; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: none; }
@@ -356,6 +381,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   .hero .wrap, .report-hero, .grid-2 { grid-template-columns: minmax(0, 1fr); }
   .hero .wrap { padding-block: 48px 44px; gap: 36px; }
   .steps, .grid-3 { grid-template-columns: minmax(0, 1fr); }
+  .dims-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .dims-label { padding-top: 6px; }
+  .dims-tiles, .dims-tiles.n3 { grid-template-columns: minmax(0, 1fr); }
+  .dims-tiles.n4 summary, .dims-tiles.n3 summary { min-height: 0; }
   .steps { gap: 14px; }
   .seta, .step:first-child .seta { --tip: 18px; min-height: 0; padding: 16px 22px calc(var(--tip) + 14px); }
   .seta { padding-top: calc(var(--tip) + 12px); clip-path: polygon(0 0, 50% var(--tip), 100% 0, 100% calc(100% - var(--tip)), 50% 100%, 0 calc(100% - var(--tip))); }
@@ -1327,8 +1356,10 @@ function topBar() {
 
 function viewInicio() {
   const ex = { indice: 64, nivel: 'Conversa', perfil: 'Prestativo', aprox: 71, afast: 52 };
-  const group = eixo => DIMS.filter(d => d.eixo === eixo).map(d => `<div class="dim-row"><span class="dim-code">${d.id}</span><div><strong>${d.nome}</strong><span class="muted small">${esc(d.mede)}</span></div></div>`).join('');
-  const d1 = DIM.D1;
+  const PERGUNTA = { D1: 'Essa pessoa quer o meu bem?', D2: 'Por que eu confiaria antes mesmo de conversar?', D3: 'Ele entende a minha situação?', D4: 'O que eu ainda não sabia sobre isso?', D7: 'Como eu decido com quem decide comigo?', D5: 'Quanto me custa deixar como está?', D6: 'Qual é o próximo passo seguro?', D8: 'Posso decidir sem me sentir pressionado?' };
+  const tile = d => `<details class="dim-tile ${d.eixo}" data-acc id="home-${d.id}" ${S.accOpen['home-' + d.id] ? 'open' : ''}><summary><span class="dim-code">${d.id}</span><strong>${d.nome}</strong><span class="dim-q">“${PERGUNTA[d.id]}”</span><span class="chev" aria-hidden="true"></span></summary>
+    <div class="dim-tile-body"><p><span class="eyebrow">O que mede</span>${esc(d.mede)}</p><p><span class="eyebrow">Por que importa</span>${esc(d.mecanismo)}</p></div></details>`;
+  const row = (eixo, nome, sub, cor) => `<div class="dims-row"><div class="dims-label"><span class="swatch" style="background:${cor}"></span><div><strong>${nome}</strong><span class="muted small">${sub}</span></div></div><div class="dims-tiles n${DIMS.filter(d => d.eixo === eixo).length}">${DIMS.filter(d => d.eixo === eixo).map(tile).join('')}</div></div>`;
   return `
   <section class="hero"><div class="wrap">
     <div>
@@ -1355,11 +1386,12 @@ function viewInicio() {
 
   <section class="section"><div class="wrap">
     <div class="section-head"><span class="eyebrow">O que o diagnóstico mede</span><h2>Oito dimensões, organizadas pela pergunta do cliente</h2><p class="muted">O cliente se aproxima do que lhe faz bem e se afasta do que lhe faz mal. Cada dimensão mede quanto você ajuda nesse movimento.</p></div>
-    <div class="axis-grid">
-      <div class="axis-col"><h3><span class="swatch" style="background:var(--c-warm)"></span>Aproximação</h3><p class="muted small">O cliente percebe o que ganha.</p>${group('aprox')}</div>
-      <div class="axis-col"><h3><span class="swatch" style="background:var(--c-cool)"></span>Afastamento</h3><p class="muted small">O cliente se afasta do custo de ficar parado, do medo de errar e da pressão.</p>${group('afast')}</div>
+    <p class="small muted dims-hint">Toque em uma dimensão para ver o que ela mede e por que importa.</p>
+    <div class="dims-map">
+      ${row('aprox', 'Aproximação', 'O cliente percebe o que ganha.', 'var(--c-warm)')}
+      ${row('afast', 'Afastamento', 'O cliente se livra do custo de ficar parado, do medo de errar e da pressão.', 'var(--c-cool)')}
+      ${row('base', 'Linha de base', 'Sustenta as outras sete dimensões.', 'var(--ink-2)')}
     </div>
-    <div class="base-band"><span class="dim-code">${d1.id}</span><div><strong>${d1.nome}, a linha de base</strong><span class="muted small">${esc(d1.mede)} Ela sustenta as outras sete dimensões.</span></div></div>
   </div></section>
 
   <section class="section"><div class="wrap">
