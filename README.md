@@ -1,6 +1,6 @@
 # Diagnóstico OQGCI
 
-Aplicação web do Diagnóstico OQGCI (método Venda com Propósito): página de entrada, referências científicas, cadastro e login, questionário com 33 afirmações, 6 situações e uma pergunta aberta, diagnóstico completo (Índice OQGCI, perfil, leitura das oito dimensões, postura, história de venda, sinais de resposta e prioridades) e painel do facilitador com turmas por código.
+Aplicação web do Diagnóstico OQGCI (Metodologia OQGCI): página de entrada, referências científicas, cadastro e login, questionário com 33 afirmações, 6 situações e uma pergunta aberta, diagnóstico completo (Índice OQGCI, perfil, leitura das oito dimensões, postura, história de venda, sinais de resposta e prioridades) e painel do facilitador com turmas por código.
 
 ## Estrutura
 
@@ -43,7 +43,14 @@ No Netlify, **Domain management > Add a domain**. Depois, atualize o Site URL no
 3. Em `public/config.js`, troque `leituraIA: false` por `leituraIA: true`.
 Sem isso, o relatório mostra a história com um roteiro de autoleitura.
 
+### Atualizações do banco
+Projetos criados com o `schema.sql` atual já têm tudo. Em projetos antigos, rode no **SQL Editor** (New query > colar > Run), uma vez cada, as atualizações que ainda não foram aplicadas:
+- `supabase/atualizacao-01-tipo-de-negocio.sql` · pergunta do tipo de negócio por turma
+- `supabase/atualizacao-02-controle-de-acesso.sql` · acesso por turma e por pessoa
+- `supabase/atualizacao-03-evolucao.sql` · data de reavaliação da turma e relatório de evolução (pareamento automático, revisão e liberação pelo facilitador)
+
 ## Observações
 - A chave anon public pode ficar no site: o acesso aos dados é protegido pelas regras de RLS do `schema.sql`.
 - No plano gratuito do Supabase, o projeto pode pausar após um período sem uso. Ele é reativado pelo painel.
 - Para alterar a aplicação, edite `src/app.html` e rode `python3 build.py`.
+- Relatório de evolução: na aba **Evolução** do painel do facilitador, defina a data de reavaliação da turma. O novo diagnóstico de cada pessoa a partir dessa data gera o relatório como rascunho; o facilitador revisa, comenta e libera, e a pessoa passa a ver o relatório e o PDF no próprio painel.
