@@ -48,6 +48,7 @@ Projetos criados com o `schema.sql` atual já têm tudo. Em projetos antigos, ro
 - `supabase/atualizacao-01-tipo-de-negocio.sql` · pergunta do tipo de negócio por turma
 - `supabase/atualizacao-02-controle-de-acesso.sql` · acesso por turma e por pessoa
 - `supabase/atualizacao-03-evolucao.sql` · data de reavaliação da turma e relatório de evolução (pareamento automático, revisão e liberação pelo facilitador)
+- `supabase/atualizacao-04-correcao-pareamento.sql` · correção do pareamento ao definir a data de reavaliação (necessária em quem já rodou a 03)
 
 ## Observações
 - A chave anon public pode ficar no site: o acesso aos dados é protegido pelas regras de RLS do `schema.sql`.

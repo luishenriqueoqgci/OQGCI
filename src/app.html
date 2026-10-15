@@ -3010,7 +3010,7 @@ document.addEventListener('click', async (ev) => {
     const v = act === 'turma-reavaliar-limpar' ? null : ($('#tm-reavaliar')?.value || null);
     if (act === 'turma-reavaliar' && !v) { toast('Escolha a data de reavaliação'); return; }
     if (act === 'turma-reavaliar-limpar' && (S.fac.evos || []).some(e => e.status === 'liberado') && !confirm('Remover a data de reavaliação? Os relatórios já liberados continuam com as pessoas; os rascunhos são descartados.')) return;
-    try { await store.updateTurma(tm.id, { reavaliar_em: v }); S.fac.turmas = await store.listTurmas(); S.fac.evos = null; render(); await loadEvos(); render(); toast(v ? 'Reavaliação a partir de ' + fmtDia(v) : 'Data de reavaliação removida'); } catch (e) { toast(e.message); }
+    try { await store.updateTurma(tm.id, { reavaliar_em: v }); S.fac.turmas = await store.listTurmas(); S.fac.evos = null; render(); await loadEvos(); render(); toast(v ? 'Reavaliação a partir de ' + fmtDia(v) : 'Data de reavaliação removida'); } catch (e) { try { S.fac.turmas = await store.listTurmas(); } catch (x) { /* */ } render(); toast(e.message); }
   }
   else if (act === 'turma-estender') {
     const tm = (S.fac.turmas || []).find(x => x.id === S.fac.sel); if (!tm) return;
