@@ -40,7 +40,7 @@ body {
   min-height: 100%;
 }
 a { color: var(--accent); text-underline-offset: 3px; }
-button, input { font: inherit; color: inherit; }
+button, input, textarea, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
 h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 p { margin: 0; }
@@ -190,6 +190,31 @@ p { margin: 0; }
 .cta-card { display: grid; gap: 10px; background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 12%, var(--surface)), var(--surface) 60%); }
 .dots { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin-right: 8px; vertical-align: middle; animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+.gauge-wrap { max-width: 320px; width: 100%; margin: 4px auto 0; }
+.gauge-wrap svg, .map-wrap svg { width: 100%; height: auto; display: block; }
+.map-wrap { max-width: 340px; margin: 0 auto; }
+.level-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; font-size: 11.5px; text-align: center; }
+.level-steps span { padding: 6px 2px; border-radius: 6px; background: var(--surface-2); color: var(--ink-3); font-weight: 600; }
+.level-steps span.on { background: color-mix(in srgb, var(--accent) 20%, var(--surface)); color: var(--accent-strong); }
+.lvl-meter { width: 100%; }
+.lvl-track { position: relative; height: 10px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.lvl-track > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 4px 4px 0; }
+.lvl-track > span { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--bg); opacity: .9; }
+.acc-headrow { display: flex; justify-content: space-between; align-items: end; gap: 12px; flex-wrap: wrap; }
+.acc-headrow .btn { width: auto; }
+.acc-list { display: grid; gap: 10px; }
+.acc { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); }
+.acc[open] { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.acc summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto 18px; gap: 14px; align-items: center; padding: 14px 16px; }
+.sit-acc summary { grid-template-columns: minmax(0, 1fr) auto 18px; }
+.acc summary::-webkit-details-marker { display: none; }
+.acc-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.acc-title .flag { margin-left: 0; }
+.acc-score { display: grid; justify-items: end; line-height: 1.2; }
+.acc-score b { font-size: 18px; }
+.chev { width: 10px; height: 10px; border-right: 2px solid var(--ink-3); border-bottom: 2px solid var(--ink-3); transform: rotate(45deg); justify-self: center; transition: transform .15s ease; margin-top: -4px; }
+.acc[open] .chev { transform: rotate(225deg); margin-top: 4px; }
+.acc-body { display: grid; gap: 12px; padding: 0 16px 16px; border-top: 1px solid var(--line); padding-top: 14px; }
 
 /* Relatório */
 .report-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: stretch; }
@@ -276,6 +301,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 @media (max-width: 600px) {
   .axis-grid, .questions, .dim-grid, .mov-list { grid-template-columns: minmax(0, 1fr); }
+  .acc summary { grid-template-columns: minmax(0, 1fr) auto 14px; gap: 10px; row-gap: 8px; }
+  .acc .acc-meter { grid-column: 1 / -1; grid-row: 2; }
+  .acc-headrow .btn { width: auto; }
   .likert { gap: 5px; }
   .lk { padding: 12px 2px 10px; gap: 8px; }
   .lk-n { width: 30px; height: 30px; font-size: 14px; }
@@ -294,6 +322,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 440px) { .hide-xs { display: none; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 @media print {
+  details.acc > .acc-body { display: grid !important; }
   .top, .demo-strip, .install, .actions, .no-print { display: none !important; }
   html, body { background: #fff; color: #111; }
   .card, .kpi, .question, .alert { background: #fff; border-color: #ccc; color: #111; }
@@ -808,6 +837,8 @@ const S = {
   installEvt: null,
   installHidden: false,
   leitura: {},
+  accOpen: {},
+  pdfBusy: false,
   qv: null,
   enter: false
 };
@@ -1265,15 +1296,64 @@ function sinaisHTML(r) {
   return `<div class="card stack" style="gap:12px"><h2 class="h-sec" style="margin:0">Sinais de resposta</h2>${linhas.join('')}<p class="muted small">Os sinais comparam cada pergunta com o seu próprio ritmo e ficam fora do Índice OQGCI.</p></div>`;
 }
 
+/* ---------- Elementos visuais do relatório ---------- */
+function gauge(v) {
+  // Semicírculo de 0 a 100 com as quatro faixas de nível e o marcador do índice.
+  const cx = 150, cy = 140, R = 112, W = 18;
+  const pt = (val, rad) => { const a = Math.PI * (1 - val / 100); return [cx + rad * Math.cos(a), cy - rad * Math.sin(a)]; };
+  const arc = (a, b, op) => { const [x1, y1] = pt(a, R); const [x2, y2] = pt(b, R); return `<path d="M${x1} ${y1} A${R} ${R} 0 0 1 ${x2} ${y2}" fill="none" stroke="var(--accent)" stroke-opacity="${op}" stroke-width="${W}"/>`; };
+  const segs = [[0, 39.4, .18], [40.6, 59.4, .38], [60.6, 79.4, .62], [80.6, 100, .95]].map(([a, b, o]) => arc(a, b, o)).join('');
+  const [mx, my] = pt(v, R);
+  const ticks = [40, 60, 80].map(t => { const [x1, y1] = pt(t, R + W / 2 + 3); const [x2, y2] = pt(t, R + W / 2 + 9); const [lx, ly] = pt(t, R + W / 2 + 20); return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--ink-3)" stroke-width="1"/><text x="${lx}" y="${ly + 4}" text-anchor="middle" font-size="11" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace">${t}</text>`; }).join('');
+  return `<svg viewBox="0 0 300 170" role="img" aria-label="Índice OQGCI ${v} de 100, nível ${levelOf(v).nome}" class="gauge">${segs}${ticks}
+    <circle cx="${mx}" cy="${my}" r="12" fill="var(--bg)" stroke="var(--ink)" stroke-width="3"/>
+    <text x="${cx}" y="${cy - 18}" text-anchor="middle" font-size="58" font-weight="300" fill="var(--ink)" font-family="Urbanist, sans-serif">${v}</text>
+    <text x="${cx}" y="${cy + 6}" text-anchor="middle" font-size="12" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace" letter-spacing="1.5">DE 100</text></svg>`;
+}
+
+const QUADS = {
+  conduz: { nome: 'Conduz a decisão', linhas: ['Conduz a', 'decisão'], t: 'O cliente enxerga o ganho e recebe ajuda para decidir.' },
+  encanta: { nome: 'Encanta e não fecha', linhas: ['Encanta e', 'não fecha'], t: 'O cliente se interessa, mas a decisão fica para depois.' },
+  pressiona: { nome: 'Conduz sem conectar', linhas: ['Conduz sem', 'conectar'], t: 'Há firmeza para decidir, mas o cliente ainda não enxerga o ganho.' },
+  vitrine: { nome: 'Na vitrine', linhas: ['Na vitrine'], t: 'A conversa ainda gira em torno do serviço.' }
+};
+const quadOf = r => r.aprox >= 60 ? (r.afast >= 60 ? 'conduz' : 'encanta') : (r.afast >= 60 ? 'pressiona' : 'vitrine');
+
+function oqgciMap(r) {
+  // Mapa 2x2: Aproximação no eixo horizontal, Afastamento no vertical, limite em 60.
+  const L = 44, T = 16, S = 236;
+  const X = v => L + v / 100 * S, Y = v => T + (100 - v) / 100 * S;
+  const q = quadOf(r);
+  const cell = (key, x, y, w, h, lx, ly, anchor) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${q === key ? 'var(--accent)' : 'var(--surface-2)'}" fill-opacity="${q === key ? .16 : .55}"/>
+    <text x="${lx}" y="${ly}" text-anchor="${anchor}" font-size="11" font-weight="${q === key ? 700 : 500}" fill="${q === key ? 'var(--ink)' : 'var(--ink-3)'}" font-family="Manrope, sans-serif">${QUADS[key].linhas.map((t, i) => `<tspan x="${lx}" dy="${i ? 13 : 0}">${t}</tspan>`).join('')}</text>`;
+  const x60 = X(60), y60 = Y(60);
+  return `<svg viewBox="0 0 300 300" role="img" aria-label="Mapa OQGCI: ${QUADS[q].nome}" class="map2x2">
+    ${cell('encanta', x60, y60, L + S - x60, T + S - y60, L + S - 6, T + S - 21, 'end')}
+    ${cell('conduz', x60, T, L + S - x60, y60 - T, L + S - 6, T + 16, 'end')}
+    ${cell('vitrine', L, y60, x60 - L, T + S - y60, L + 6, T + S - 8, 'start')}
+    ${cell('pressiona', L, T, x60 - L, y60 - T, L + 6, T + 16, 'start')}
+    <line x1="${x60}" y1="${T}" x2="${x60}" y2="${T + S}" stroke="var(--line)" stroke-dasharray="3 3"/><line x1="${L}" y1="${y60}" x2="${L + S}" y2="${y60}" stroke="var(--line)" stroke-dasharray="3 3"/>
+    <rect x="${L}" y="${T}" width="${S}" height="${S}" fill="none" stroke="var(--line)"/>
+    <text x="${L + S / 2}" y="${T + S + 30}" text-anchor="middle" font-size="11.5" fill="var(--c-warm)" font-family="Manrope, sans-serif" font-weight="700">Aproximação →</text>
+    <text transform="translate(${L - 24} ${T + S / 2}) rotate(-90)" text-anchor="middle" font-size="11.5" fill="var(--cool)" font-family="Manrope, sans-serif" font-weight="700">Afastamento →</text>
+    <text x="${L}" y="${T + S + 14}" font-size="10.5" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace">0</text><text x="${x60}" y="${T + S + 14}" text-anchor="middle" font-size="10.5" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace">60</text><text x="${L + S}" y="${T + S + 14}" text-anchor="end" font-size="10.5" fill="var(--ink-3)" font-family="IBM Plex Mono, monospace">100</text>
+    <circle cx="${X(r.aprox)}" cy="${Y(r.afast)}" r="9" fill="var(--accent)" stroke="var(--bg)" stroke-width="3"><title>Aproximação ${r.aprox}, Afastamento ${r.afast}</title></circle>
+  </svg>`;
+}
+
+function levelMeter(v, color, label) {
+  return `<div class="lvl-meter" role="img" aria-label="${label}: ${v} de 100"><div class="lvl-track"><i style="width:${Math.max(2, v)}%;background:${color}"></i><span style="left:40%"></span><span style="left:60%"></span><span style="left:80%"></span></div></div>`;
+}
+
 function viewResultado() {
   const rec = S.result; const r = rec.resultado; const lvl = levelOf(r.indice); const p = PROFILES[r.perfil];
   const items = rec.respostas?.items; const sjt = rec.respostas?.sjt || {};
   const total = SJT.length;
   const seg = (k, c) => r.postura[k] ? `<i style="width:${r.postura[k] / total * 100}%;background:${c}" title="${POSTURA_NOME[k]}: ${r.postura[k]} de ${total}"></i>` : '';
-  const balance = Math.abs(r.aprox - r.afast) < 20 ? 'Os dois eixos estão equilibrados.' : r.aprox > r.afast ? 'O cliente percebe o ganho e adia a decisão.' : 'O cliente sente a urgência e ainda não enxerga o ganho.';
   const isMine = rec.user_id === S.session?.id;
   const eixoNome = e => e === 'aprox' ? 'Aproximação' : e === 'afast' ? 'Afastamento' : 'Linha de base';
   const eixoCor = e => e === 'aprox' ? 'var(--c-warm)' : e === 'afast' ? 'var(--c-cool)' : 'var(--ink-2)';
+  const q = quadOf(r);
 
   const dimCards = DIMS.map(d => {
     const v = r.dims[d.id]; const ex = itemExtremes(d.id, items);
@@ -1281,21 +1361,24 @@ function viewResultado() {
     const ext = !ex ? '' : ex.uniforme
       ? `<p class="small muted">Suas respostas foram uniformes nesta dimensão.</p>`
       : `<dl class="dl-mini"><dt>Ponto forte nas suas respostas</dt><dd>${quote(ex.best)}</dd><dt>Ponto de atenção</dt><dd>${quote(ex.worst)}</dd></dl>`;
-    return `<div class="card dim-card">
-      <div class="dim-card-head"><span><span class="dim-code">${d.id}</span> <strong style="font-size:18px">${d.nome}</strong></span><span class="tag" style="border-style:solid"><i class="swatch" style="background:${eixoCor(d.eixo)};margin-right:6px"></i>${eixoNome(d.eixo)}</span></div>
-      <div class="meter"><div class="meter-top"><span class="muted small">Nível ${levelOf(v).nome}</span><b class="tnum">${v}</b></div><div class="meter-track" role="img" aria-label="${d.nome}: ${v} de 100"><i style="width:${Math.max(2, v)}%;background:${eixoCor(d.eixo)}"></i></div></div>
-      <p>${esc(BANDS[d.id][bandOf(v)])}</p>
-      ${ext}
-      <p class="small muted"><b>Por que importa:</b> ${esc(d.mecanismo)}</p>
-    </div>`;
+    const isPrio = r.prioridades.includes(d.id);
+    return `<details class="acc dim-acc" data-acc id="acc-${d.id}" ${S.accOpen[`acc-${d.id}`] ? 'open' : ''}>
+      <summary><span class="acc-title"><span class="dim-code">${d.id}</span><strong>${d.nome}</strong>${isPrio ? '<span class="flag">prioridade</span>' : ''}</span>
+        <span class="acc-meter">${levelMeter(v, eixoCor(d.eixo), d.nome)}</span>
+        <span class="acc-score"><b class="tnum">${v}</b><span class="muted small">${levelOf(v).nome}</span></span><span class="chev" aria-hidden="true"></span></summary>
+      <div class="acc-body">
+        <span class="tag" style="border-style:solid;justify-self:start"><i class="swatch" style="background:${eixoCor(d.eixo)};margin-right:6px"></i>${eixoNome(d.eixo)}</span>
+        <p>${esc(BANDS[d.id][bandOf(v)])}</p>
+        ${ext}
+        <p class="small muted"><b>Por que importa:</b> ${esc(d.mecanismo)}</p>
+      </div></details>`;
   }).join('');
 
   const situacoes = SJT.map((s, k) => {
     const ch = sjt[s.id]; const mine = s.ops.find(o => o.k === ch); const best = s.ops.find(o => o.k === 'assertiva');
-    return `<div class="sit"><div class="sit-head"><span class="eyebrow">Situação ${k + 1}</span>${ch ? `<span class="chip"><i class="swatch" style="background:${POSTURA_COR[ch]}"></i>${POSTURA_NOME[ch]}</span>` : ''}</div>
-      <p><strong>${esc(s.t)}</strong></p>
-      ${mine ? `<p class="small"><span class="muted">Sua resposta:</span> ${esc(mine.t)}</p>` : ''}
-      ${ch && ch !== 'assertiva' ? `<p class="small"><span class="muted">A resposta que sustenta o valor:</span> ${esc(best.t)}</p>` : ''}</div>`;
+    return `<details class="acc sit-acc" data-acc id="acc-${s.id}" ${S.accOpen[`acc-${s.id}`] ? 'open' : ''}><summary><span class="acc-title"><span class="dim-code">S${k + 1}</span><strong>${esc(s.t)}</strong></span>${ch ? `<span class="chip"><i class="swatch" style="background:${POSTURA_COR[ch]}"></i>${POSTURA_NOME[ch]}</span>` : ''}<span class="chev" aria-hidden="true"></span></summary>
+      <div class="acc-body">${mine ? `<p class="small"><span class="muted">Sua resposta:</span> ${esc(mine.t)}</p>` : ''}
+      ${ch && ch !== 'assertiva' ? `<p class="small"><span class="muted">A resposta que sustenta o valor:</span> ${esc(best.t)}</p>` : '<p class="small muted">Você escolheu a resposta que sustenta o valor do seu trabalho com respeito ao cliente.</p>'}</div></details>`;
   }).join('');
 
   const hasHist = Boolean(rec.respostas?.historia);
@@ -1304,21 +1387,26 @@ function viewResultado() {
       <div id="leitura-box" class="stack" style="gap:12px">${leituraHTML(rec)}</div></div>` : '';
 
   const prioridades = r.prioridades.map((k, i) => `<div class="card prio"><div class="prio-head"><span class="eyebrow">Prioridade ${i + 1}</span><b class="tnum">${r.dims[k]}</b></div><h3 style="font-size:22px">${DIM[k].nome}</h3>
+      ${levelMeter(r.dims[k], eixoCor(DIM[k].eixo), DIM[k].nome)}
       <dl><dt>O que está em jogo</dt><dd>${esc(BANDS[k][bandOf(r.dims[k])])}</dd><dt>O que desenvolver</dt><dd>${esc(DIM[k].pratica)}</dd><dt>Como começar</dt><dd>${esc(DIM[k].exercicio)}</dd></dl>
       ${r.sinais?.porDim?.[k] >= 2 ? '<p class="small" style="color:var(--accent-strong)">Você também hesitou nas perguntas desta dimensão.</p>' : ''}</div>`).join('');
 
+  const exportBtns = `<button class="btn btn-primary btn-sm" data-act="pdf" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando PDF…' : 'Baixar relatório em PDF'}</button>
+    ${LIVE && navigator.canShare ? '<button class="btn btn-quiet btn-sm" data-act="compartilhar">Compartilhar</button>' : ''}
+    ${LIVE ? '<button class="btn btn-quiet btn-sm" data-act="email">Enviar por e-mail</button>' : ''}
+    <button class="btn btn-quiet btn-sm" data-act="copiar-resumo">Copiar resumo</button>`;
+
   return `<main class="page"><div class="wrap stack-lg">
     <div class="hello"><div class="stack" style="gap:6px"><span class="eyebrow">Diagnóstico completo · ${fmtDate(rec.created_at)}${rec.nome && !isMine ? ' · ' + esc(rec.nome) : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">${isMine ? 'Seu Diagnóstico OQGCI' : 'Diagnóstico OQGCI'}</h1></div>
-      <div class="actions no-print"><button class="btn btn-quiet btn-sm" data-act="copiar-resumo">Copiar resumo</button>${LIVE ? '<button class="btn btn-quiet btn-sm" data-act="imprimir">Salvar em PDF</button>' : ''}</div></div>
+      <div class="actions no-print">${exportBtns}</div></div>
     <textarea id="resumo-fallback" hidden readonly style="width:100%;min-height:160px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px"></textarea>
 
     <div class="report-hero">
       <div class="card score-card">
         <span class="eyebrow">Índice OQGCI</span>
-        <div style="display:flex;align-items:end;gap:14px;flex-wrap:wrap"><div class="big-num tnum">${r.indice}<small>/100</small></div><span class="level-chip">Nível ${lvl.n} · ${lvl.nome}</span></div>
+        <div class="gauge-wrap">${gauge(r.indice)}</div>
+        <div class="level-steps" aria-hidden="true">${LEVELS.slice().reverse().map(l => `<span class="${l.nome === lvl.nome ? 'on' : ''}">${l.n} · ${l.nome}</span>`).join('')}</div>
         <p class="muted">${esc(lvl.leitura)}</p>
-        <div class="stack" style="gap:12px">${meter('Aproximação · o cliente percebe o ganho', r.aprox, 'var(--c-warm)')}${meter('Afastamento · o cliente se livra do que faz mal', r.afast, 'var(--c-cool)')}</div>
-        <p class="small muted">${balance}</p>
       </div>
       <div class="card profile-card stack">
         <span class="eyebrow">Seu perfil</span>
@@ -1335,17 +1423,21 @@ function viewResultado() {
     ${r.alerts.length ? `<div class="stack"><h2 class="h-sec" style="margin:0">Pontos de atenção</h2>${r.alerts.map(a => `<div class="alert ${a.sev}"><span class="alert-ico" aria-hidden="true">!</span><div><strong>${esc(a.t)}</strong><span class="muted small">${esc(a.d)}</span></div></div>`).join('')}</div>` : ''}
 
     <div class="grid-2">
+      <div class="card"><h2 class="h-sec">Mapa OQGCI</h2><div class="map-wrap">${oqgciMap(r)}</div>
+        <div class="stack" style="gap:10px;margin-top:6px">${meter('Aproximação · o cliente percebe o ganho', r.aprox, 'var(--c-warm)')}${meter('Afastamento · o cliente se livra do que faz mal', r.afast, 'var(--c-cool)')}</div>
+        <p class="small" style="margin-top:12px"><b>${QUADS[q].nome}.</b> <span class="muted">${QUADS[q].t}</span></p></div>
       <div class="card"><h2 class="h-sec">As oito dimensões</h2><div class="radar-wrap">${radar(r.dims)}</div>
         <div class="legend"><span><i class="swatch" style="background:var(--c-warm)"></i>Aproximação</span><span><i class="swatch" style="background:var(--cool)"></i>Afastamento</span><span><i class="swatch" style="background:var(--ink-2)"></i>Linha de base</span></div></div>
-      <div class="card"><h2 class="h-sec">Suas forças</h2>
-        <div class="stack">${r.forcas.map(k => `<div class="prio"><div class="prio-head"><strong>${DIM[k].nome}</strong><b class="tnum">${r.dims[k]}</b></div><p class="muted small">${esc(BANDS[k][bandOf(r.dims[k])])}</p></div>`).join('<hr style="border:0;border-top:1px solid var(--line);margin:0">')}</div>
-      </div>
     </div>
 
-    <div class="stack"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Leitura das oito dimensões</h2><p class="muted small">Cada dimensão traz a sua pontuação, o que ela mostra sobre a sua conversa de venda e as afirmações em que você mais se destacou e em que há mais espaço para evoluir.</p></div>
-      <div class="dim-grid">${dimCards}</div></div>
+    <div class="stack"><h2 class="h-sec" style="margin:0">Suas forças</h2>
+      <div class="grid-3">${r.forcas.map(k => `<div class="card prio"><div class="prio-head"><strong>${DIM[k].nome}</strong><b class="tnum">${r.dims[k]}</b></div>${levelMeter(r.dims[k], eixoCor(DIM[k].eixo), DIM[k].nome)}<p class="muted small">${esc(BANDS[k][bandOf(r.dims[k])])}</p></div>`).join('')}</div></div>
 
-    <div class="card stack" style="gap:6px"><h2 class="h-sec" style="margin:0 0 6px">Sua postura nas situações</h2><div class="sit-list">${situacoes}</div></div>
+    <div class="stack"><div class="acc-headrow"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Leitura das oito dimensões</h2><p class="muted small">Toque em uma dimensão para abrir a leitura completa. As linhas na barra marcam os níveis 40, 60 e 80.</p></div><button class="btn btn-quiet btn-sm no-print" data-act="acc-all" data-target="dim-acc">Abrir todas</button></div>
+      <div class="acc-list">${dimCards}</div></div>
+
+    <div class="stack"><div class="acc-headrow"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Sua postura nas situações</h2><p class="muted small">Toque em uma situação para ver a sua resposta.</p></div><button class="btn btn-quiet btn-sm no-print" data-act="acc-all" data-target="sit-acc">Abrir todas</button></div>
+      <div class="acc-list">${situacoes}</div></div>
 
     ${historia}
     ${sinaisHTML(r)}
@@ -1357,13 +1449,202 @@ function viewResultado() {
     <div class="stack"><h2 class="h-sec" style="margin:0">Quatro perguntas antes da próxima conversa</h2>
       <div class="questions">${QUESTIONS.map(([k, t]) => `<div class="question"><span class="eyebrow">${k}</span><strong style="font-family:var(--font-display);font-size:19px;font-weight:600">${esc(t)}</strong></div>`).join('')}</div></div>
 
-    <details class="card"><summary style="cursor:pointer;font-weight:700">Tabela das pontuações</summary>
-      <div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Dimensão</th><th>Eixo</th><th class="num">Pontuação</th><th>Nível</th></tr></thead><tbody>
-      ${DIMS.map(d => `<tr><td>${d.id} · ${d.nome}</td><td>${eixoNome(d.eixo)}</td><td class="num">${r.dims[d.id]}</td><td>${levelOf(r.dims[d.id]).nome}</td></tr>`).join('')}
-      </tbody></table></div></details>
+    <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o seu diagnóstico</h2><p class="muted small">O relatório em PDF traz todas as leituras, abertas, para guardar ou enviar.${LIVE ? ' No celular, Compartilhar envia o PDF por WhatsApp ou e-mail.' : ''}</p><div class="actions">${exportBtns}</div></div>
 
     <div class="actions no-print">${isMine ? '<button class="btn btn-primary" data-go="painel">Voltar ao meu painel</button>' : '<button class="btn btn-primary" data-go="facilitador">Voltar ao painel do facilitador</button>'}<button class="btn btn-ghost" data-go="referencias">Referências científicas</button></div>
   </div></main>`;
+}
+
+/* ---------- Relatório em PDF ---------- */
+const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+function loadJsPDF() {
+  if (window.jspdf) return Promise.resolve(window.jspdf);
+  return new Promise((ok, fail) => {
+    const s = document.createElement('script'); s.src = JSPDF_URL; s.async = true;
+    s.onload = () => window.jspdf ? ok(window.jspdf) : fail(new Error('jspdf'));
+    s.onerror = () => fail(new Error('Não foi possível carregar o gerador de PDF. Verifique a conexão.'));
+    document.head.appendChild(s);
+  });
+}
+// As fontes padrão do PDF cobrem os acentos do português; aspas curvas e símbolos viram equivalentes simples.
+const pdfText = t => String(t ?? '').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[–—]/g, '-').replace(/·/g, '-').replace(/…/g, '...').replace(/→/g, '->').replace(/[✓●]/g, '').replace(/­/g, '').replace(/[^\x00-\xFF]/g, '');
+
+async function buildPDF(rec) {
+  const { jsPDF } = await loadJsPDF();
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const r = rec.resultado; const p = PROFILES[r.perfil]; const lvl = levelOf(r.indice);
+  const W = 210, M = 16, CW = W - 2 * M, BOTTOM = 280;
+  const C = { ink: [27, 26, 34], ink2: [88, 84, 100], ink3: [130, 126, 144], line: [222, 219, 228], warm: [194, 131, 30], cool: [74, 139, 220], third: [194, 85, 159], dark: [15, 14, 20], soft: [248, 245, 240], good: [47, 143, 98], warn: [190, 135, 20], crit: [196, 72, 86] };
+  let y = 0;
+  const color = (c, kind = 'text') => kind === 'text' ? doc.setTextColor(...c) : kind === 'fill' ? doc.setFillColor(...c) : doc.setDrawColor(...c);
+  const font = (size, style = 'normal', c = C.ink) => { doc.setFont('helvetica', style); doc.setFontSize(size); color(c); };
+  const lh = size => size * 0.42;
+  const footer = () => { const n = doc.getNumberOfPages(); font(8, 'normal', C.ink3); doc.text(pdfText('Diagnóstico OQGCI · Método Venda com Propósito'), M, 290); doc.text(String(n), W - M, 290, { align: 'right' }); };
+  const newPage = () => { footer(); doc.addPage(); y = 18; };
+  const need = h => { if (y + h > BOTTOM) newPage(); };
+  const para = (t, size = 10, style = 'normal', c = C.ink, width = CW, x = M, gap = 1.5) => {
+    font(size, style, c);
+    const lines = doc.splitTextToSize(pdfText(t), width);
+    for (const ln of lines) { need(lh(size) + 1); doc.text(ln, x, y + lh(size)); y += lh(size) + 0.9; }
+    y += gap;
+  };
+  const h2 = t => { need(28); y += 3; font(13, 'bold', C.ink); doc.text(pdfText(t), M, y + 5); y += 8; color(C.warm, 'draw'); doc.setLineWidth(0.6); doc.line(M, y, M + 14, y); y += 5; };
+  const bar = (x, yy, w, h, v, c) => { color(C.line, 'fill'); doc.roundedRect(x, yy, w, h, h / 2, h / 2, 'F'); color(c, 'fill'); doc.roundedRect(x, yy, Math.max(h, w * v / 100), h, h / 2, h / 2, 'F'); color([255, 255, 255], 'draw'); doc.setLineWidth(0.3); [40, 60, 80].forEach(t => doc.line(x + w * t / 100, yy, x + w * t / 100, yy + h)); };
+  const eixoRGB = e => e === 'aprox' ? C.warm : e === 'afast' ? C.cool : C.ink2;
+
+  // Capa
+  color(C.dark, 'fill'); doc.rect(0, 0, W, 46, 'F');
+  color(C.warm, 'fill'); doc.circle(M + 6, 17, 6, 'F'); color(C.dark, 'fill'); doc.rect(M + 6, 10.8, 6.4, 12.4, 'F');
+  color(C.cool, 'fill'); doc.circle(M + 6, 17, 3.8, 'F'); color(C.warm, 'fill'); doc.rect(M + 2.1, 13.1, 3.9, 7.8, 'F');
+  font(18, 'bold', [255, 255, 255]); doc.text(pdfText('Diagnóstico OQGCI'), M + 16, 19.5);
+  font(9.5, 'normal', [200, 196, 212]); doc.text(pdfText(`Diagnóstico completo${rec.nome ? ' · ' + rec.nome : ''} · ${fmtDate(rec.created_at)}`), M, 34);
+  doc.text(pdfText('Método Venda com Propósito · neurociência aplicada à venda'), M, 39.5);
+  y = 56;
+
+  // Índice e perfil
+  font(9, 'bold', C.ink3); doc.text('INDICE OQGCI', M, y); doc.text('PERFIL', M + 92, y); y += 4;
+  font(40, 'normal', C.ink); doc.text(String(r.indice), M, y + 14); font(12, 'normal', C.ink3); doc.text('/100', M + (r.indice >= 100 ? 31 : 22), y + 14);
+  font(10.5, 'bold', C.warm); doc.text(pdfText(`Nível ${lvl.n} · ${lvl.nome}`), M, y + 22);
+  bar(M, y + 26, 76, 3.2, r.indice, C.warm);
+  font(16, 'bold', C.ink); doc.text(pdfText(p.nome), M + 92, y + 9);
+  font(9.5, 'normal', C.ink2); const pl = doc.splitTextToSize(pdfText(p.conversa + ' ' + p.foco), CW - 92); doc.text(pl.slice(0, 7), M + 92, y + 15);
+  y += 36;
+  font(9.5, 'normal', C.ink2); const ll = doc.splitTextToSize(pdfText(lvl.leitura), 76); doc.text(ll, M, y); y += ll.length * 4.4 + 6;
+
+  // Eixos OQGCI
+  h2('Mapa OQGCI');
+  const q = quadOf(r);
+  [['Aproximação · o cliente percebe o ganho', r.aprox, C.warm], ['Afastamento · o cliente se livra do que faz mal', r.afast, C.cool]].forEach(([t, v, c]) => {
+    font(9.5, 'normal', C.ink); doc.text(pdfText(t), M, y + 3.5); font(9.5, 'bold', C.ink); doc.text(String(v), M + CW, y + 3.5, { align: 'right' });
+    bar(M, y + 5.5, CW, 3, v, c); y += 12;
+  });
+  para(`${QUADS[q].nome}. ${QUADS[q].t}`, 10, 'normal', C.ink);
+  font(9, 'normal', C.ink3); doc.text(pdfText(`Postura nas seis situações: ${r.postura.assertiva} assertiva, ${r.postura.passiva} passiva, ${r.postura.agressiva} agressiva.`), M, y + 3); y += 8;
+
+  if (r.alerts.length) {
+    h2('Pontos de atenção');
+    r.alerts.forEach(a => { need(14); color(a.sev === 'crit' ? C.crit : C.warn, 'fill'); doc.circle(M + 1.6, y + 2.2, 1.6, 'F'); font(10, 'bold', C.ink); doc.text(pdfText(a.t), M + 6, y + 3.4); y += 5.5; para(a.d, 9.5, 'normal', C.ink2, CW - 6, M + 6, 2); });
+  }
+
+  // Dimensões
+  h2('As oito dimensões');
+  DIMS.forEach(d => {
+    need(9); const v = r.dims[d.id];
+    font(9.5, 'bold', C.ink); doc.text(pdfText(`${d.id} ${d.nome}`), M, y + 3.4);
+    bar(M + 40, y + 1, CW - 72, 3.2, v, eixoRGB(d.eixo));
+    font(9.5, 'bold', C.ink); doc.text(String(v), M + CW - 22, y + 3.6, { align: 'right' }); font(8.5, 'normal', C.ink3); doc.text(pdfText(levelOf(v).nome), M + CW, y + 3.6, { align: 'right' });
+    y += 7.5;
+  });
+  font(8, 'normal', C.ink3); doc.text(pdfText('Cor dourada: Aproximação · azul: Afastamento · cinza: linha de base. As marcas na barra indicam os níveis 40, 60 e 80.'), M, y + 2); y += 8;
+
+  h2('Leitura das dimensões');
+  const items = rec.respostas?.items;
+  DIMS.forEach(d => {
+    const v = r.dims[d.id]; need(30);
+    font(11, 'bold', C.ink); doc.text(pdfText(`${d.nome}`), M, y + 4); font(10, 'bold', eixoRGB(d.eixo)); doc.text(pdfText(`${v} · ${levelOf(v).nome}`), M + CW, y + 4, { align: 'right' }); y += 7;
+    para(BANDS[d.id][bandOf(v)], 9.5, 'normal', C.ink, CW, M, 1);
+    const ex = itemExtremes(d.id, items);
+    if (ex && !ex.uniforme) {
+      para(`Ponto forte: "${ex.best.i.t}" (você marcou ${SCALE[ex.best.r - 1].toLowerCase()})`, 9, 'normal', C.ink2, CW, M, 0.5);
+      para(`Ponto de atenção: "${ex.worst.i.t}" (você marcou ${SCALE[ex.worst.r - 1].toLowerCase()})`, 9, 'normal', C.ink2, CW, M, 0.5);
+    }
+    para(`Por que importa: ${d.mecanismo}`, 8.5, 'italic', C.ink3, CW, M, 4);
+  });
+
+  h2('Sua postura nas situações');
+  const sjt = rec.respostas?.sjt || {};
+  SJT.forEach((s, k) => {
+    const ch = sjt[s.id]; const mine = s.ops.find(o => o.k === ch); const best = s.ops.find(o => o.k === 'assertiva');
+    need(18); font(10, 'bold', C.ink); const tl = doc.splitTextToSize(pdfText(`${k + 1}. ${s.t}`), CW - 30); doc.text(tl, M, y + 3.6);
+    if (ch) { color(ch === 'assertiva' ? C.warm : ch === 'passiva' ? C.cool : C.third, 'fill'); doc.roundedRect(M + CW - 26, y, 26, 5.4, 2.7, 2.7, 'F'); font(8.5, 'bold', [255, 255, 255]); doc.text(pdfText(POSTURA_NOME[ch]), M + CW - 13, y + 3.8, { align: 'center' }); }
+    y += tl.length * 4.6 + 1.5;
+    if (mine) para(`Sua resposta: ${mine.t}`, 9, 'normal', C.ink2, CW, M, 0.5);
+    if (ch && ch !== 'assertiva') para(`A resposta que sustenta o valor: ${best.t}`, 9, 'normal', C.ink2, CW, M, 0.5);
+    y += 2.5;
+  });
+
+  if (rec.respostas?.historia) {
+    h2('Sua história de venda');
+    color(C.soft, 'fill'); const hl = doc.splitTextToSize(pdfText(rec.respostas.historia), CW - 8); const hh = hl.length * 4.4 + 6;
+    need(Math.min(hh, 120)); doc.rect(M, y, CW, Math.min(hh, BOTTOM - y), 'F'); color(C.warm, 'fill'); doc.rect(M, y, 1, Math.min(hh, BOTTOM - y), 'F');
+    y += 3; para(rec.respostas.historia, 9.5, 'italic', C.ink, CW - 8, M + 5, 3);
+    const L = r.leitura;
+    if (L) {
+      para(L.sintese, 10, 'normal', C.ink, CW, M, 2);
+      (L.movimentos || []).forEach(m => {
+        need(16); const st = { presente: ['Presente', C.good], parcial: ['Parcial', C.warn], ausente: ['Não aparece', C.crit] }[m.status] || ['-', C.ink3];
+        font(10, 'bold', C.ink); doc.text(pdfText(m.nome), M, y + 3.6); color(st[1], 'fill'); doc.circle(M + 26, y + 2.4, 1.4, 'F'); font(9, 'bold', st[1]); doc.text(pdfText(st[0]), M + 29, y + 3.6); y += 6;
+        para(m.evidencia, 9, 'normal', C.ink2, CW, M, 0.5); para(`Como fortalecer: ${m.como_fortalecer}`, 9, 'normal', C.ink, CW, M, 2.5);
+      });
+      if (L.quem_decide) para(`Quem decide: ${L.quem_decide}`, 9.5, 'normal', C.ink, CW, M, 1);
+      if (L.postura) para(`Postura: ${L.postura}`, 9.5, 'normal', C.ink, CW, M, 1);
+      if (L.ponto_chave) para(`Ponto-chave: ${L.ponto_chave}`, 10, 'bold', C.warm, CW, M, 2);
+      para('Leitura gerada por IA a partir do relato.', 8, 'italic', C.ink3, CW, M, 2);
+    } else {
+      para('Releia a sua história com as quatro perguntas: houve Espelho (você perguntou antes de apresentar)? Virada (o cliente ouviu algo novo)? Custo (ficou claro quanto custa deixar como está)? Caminho (recomendação clara e próximo passo)?', 9.5, 'normal', C.ink2);
+    }
+  }
+
+  if (r.sinais) {
+    const s = r.sinais;
+    h2('Sinais de resposta');
+    para(`Você levou em média ${String(s.medianaSeg).replace('.', ',')} s por afirmação e trocou de resposta em ${s.trocas.length} ${s.trocas.length === 1 ? 'pergunta' : 'perguntas'}.`, 9.5);
+    const dims = Object.entries(s.porDim || {}).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    if (dims.length) para(`As hesitações e trocas se concentraram em: ${dims.map(([d, n]) => `${DIM[d].nome} (${n})`).join(', ')}. Vale observar se é aí que surgem as suas dúvidas também na conversa real com o cliente.`, 9.5, 'normal', C.ink2);
+    else para('O ritmo foi constante, sem concentração de hesitação em nenhuma dimensão.', 9.5, 'normal', C.ink2);
+    if (s.rapido) para('O ritmo foi bastante rápido. Se a leitura foi apressada, vale refazer o diagnóstico com mais calma.', 9.5, 'normal', C.ink2);
+    para('Os sinais comparam cada pergunta com o seu próprio ritmo e ficam fora do Índice OQGCI.', 8, 'italic', C.ink3);
+  }
+
+  h2('Prioridades de desenvolvimento');
+  r.prioridades.forEach((k, i) => {
+    need(30); font(11, 'bold', C.ink); doc.text(pdfText(`${i + 1}. ${DIM[k].nome}`), M, y + 4); font(10, 'bold', C.warm); doc.text(String(r.dims[k]), M + CW, y + 4, { align: 'right' }); y += 7;
+    para(BANDS[k][bandOf(r.dims[k])], 9.5, 'normal', C.ink2, CW, M, 1);
+    para(`O que desenvolver: ${DIM[k].pratica}`, 9.5, 'bold', C.ink, CW, M, 0.5);
+    para(`Como começar: ${DIM[k].exercicio}`, 9.5, 'normal', C.ink, CW, M, 4);
+  });
+
+  need(30); y += 2; color(C.soft, 'fill'); doc.roundedRect(M, y, CW, 26, 3, 3, 'F'); font(8.5, 'bold', C.warm); doc.text(pdfText('PRÓXIMO PASSO'), M + 6, y + 7);
+  font(12, 'bold', C.ink); doc.text(pdfText(CTA.titulo), M + 6, y + 13); font(9, 'normal', C.ink2); doc.text(doc.splitTextToSize(pdfText(CTA.texto + (CTA.link ? ' ' + CTA.link : '')), CW - 12).slice(0, 2), M + 6, y + 18.5); y += 32;
+
+  h2('Quatro perguntas antes da próxima conversa');
+  QUESTIONS.forEach(([k, t]) => para(`${k}: ${t}`, 10, 'normal', C.ink, CW, M, 1.5));
+  para('O instrumento está em fase de validação. Use o resultado como ferramenta de desenvolvimento.', 8, 'italic', C.ink3, CW, M, 0);
+  footer();
+  return doc.output('blob');
+}
+
+function setPdfButtons() { document.querySelectorAll('[data-act=pdf]').forEach(b => { b.disabled = S.pdfBusy; b.textContent = S.pdfBusy ? 'Gerando PDF…' : 'Baixar relatório em PDF'; }); }
+function pdfName(rec) { return `diagnostico-oqgci-${(rec.nome || 'relatorio').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'relatorio'}-${rec.created_at.slice(0, 10)}.pdf`; }
+
+async function exportPDF(mode) {
+  const rec = S.result; if (!rec || S.pdfBusy) return;
+  S.pdfBusy = true; setPdfButtons();
+  try {
+    const blob = await buildPDF(rec);
+    const name = pdfName(rec);
+    let dl = null;
+    try { if (window.claude && typeof window.claude.use === 'function') dl = await window.claude.use('downloads'); } catch (e) { dl = null; }
+    if (mode === 'share' && navigator.canShare) {
+      const file = new File([blob], name, { type: 'application/pdf' });
+      if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Diagnóstico OQGCI', text: 'Meu Diagnóstico OQGCI' }); return; }
+    }
+    if (dl) { await dl.save({ filename: name, data: blob }); toast('Relatório salvo'); }
+    else if (!window.claude) {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      toast('PDF baixado');
+    } else { toast('O download não está disponível nesta visualização'); }
+  } catch (e) {
+    if (e && (e.code === 'declined' || e.name === 'AbortError')) { /* a pessoa cancelou */ }
+    else toast((e && e.message && e.message.length < 120) ? e.message : 'Não foi possível gerar o PDF agora.');
+  } finally { S.pdfBusy = false; setPdfButtons(); }
+}
+
+function emailReport() {
+  const rec = S.result; if (!rec) return;
+  const subject = 'Meu Diagnóstico OQGCI';
+  const body = resumoTexto(rec) + '\n\nO relatório completo em PDF pode ser baixado em ' + location.origin + location.pathname + ' (Meu painel > diagnóstico).';
+  location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 // Dispara a leitura da história uma vez por relatório aberto, quando ainda não existe.
@@ -1475,6 +1756,15 @@ document.addEventListener('click', async (ev) => {
   else if (act === 'qz-back') { const q = S.quiz; q.step = Math.max(0, q.step - 1); saveDraft(); render(); }
   else if (act === 'qz-next') { const q = S.quiz; q.step = Math.min(TOTAL, q.step + 1); saveDraft(); S.enter = true; render(); S.enter = false; }
   else if (act === 'qz-finish') { quizFinish(); }
+  else if (act === 'pdf') { exportPDF('download'); }
+  else if (act === 'compartilhar') { exportPDF('share'); }
+  else if (act === 'email') { emailReport(); }
+  else if (act === 'acc-all') {
+    const els = [...document.querySelectorAll('details.' + t.dataset.target)];
+    const open = els.some(e => !e.open);
+    els.forEach(e => { e.open = open; S.accOpen[e.id] = open; });
+    t.textContent = open ? 'Fechar todas' : 'Abrir todas';
+  }
   else if (act === 'ler-historia') { delete S.leitura[S.result.id]; render(); }
   else if (act === 'copiar-resumo') { copyText(resumoTexto(S.result), $('#resumo-fallback')); }
   else if (act === 'imprimir') { window.print(); }
@@ -1486,6 +1776,8 @@ document.addEventListener('click', async (ev) => {
   else if (act === 'instalar') { const e = S.installEvt; S.installEvt = null; render(); if (e) { e.prompt(); try { await e.userChoice; } catch (x) { /* */ } } }
   else if (act === 'fechar-instalar') { S.installHidden = true; render(); }
 });
+
+document.addEventListener('toggle', (ev) => { const d = ev.target; if (d && d.matches && d.matches('details[data-acc]')) S.accOpen[d.id] = d.open; }, true);
 
 document.addEventListener('keydown', (ev) => {
   if (S.route !== 'diagnostico' || !S.quiz || S.quiz.step === 0) return;
