@@ -173,7 +173,7 @@ p { margin: 0; }
 .stack-lg { display: grid; gap: 28px; grid-template-columns: minmax(0, 1fr); }
 .field { display: grid; gap: 6px; }
 .field label { font-size: 14px; font-weight: 600; color: var(--ink-2); }
-.field input[type=text], .field input[type=email], .field input[type=password] { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 13px 14px; font-size: 16px; }
+.field input[type=text], .field input[type=email], .field input[type=password], .field input[type=search], .field input[type=date] { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 13px 14px; font-size: 16px; }
 .field input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
 .check { display: grid; grid-template-columns: 22px minmax(0,1fr); gap: 10px; font-size: 14px; color: var(--ink-2); align-items: start; }
 .check input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent); }
@@ -268,6 +268,16 @@ p { margin: 0; }
 .seg { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px 10px; font-weight: 600; font-size: 14px; cursor: pointer; text-align: center; color: var(--ink-2); touch-action: manipulation; }
 .seg:hover { border-color: var(--ink-3); }
 .seg[aria-pressed=true] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--ink); }
+.acesso-ok { display: flex; gap: 8px; align-items: center; margin: 0; }
+.acesso-ok .swatch { flex: none; }
+.fac-tabs { max-width: 460px; }
+.turma-form .field + .field { flex: 0 1 190px; }
+.validade-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.validade-row input[type=date], .acesso-acoes input[type=date] { width: auto; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 6px 10px; font-size: 13px; color-scheme: dark; }
+.field input[type=date] { color-scheme: dark; }
+.acesso-acoes { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
+.acesso-acoes .btn { width: auto; white-space: nowrap; }
+table.pessoas td { vertical-align: top; }
 .modo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .modo { display: grid; gap: 4px; text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px; cursor: pointer; color: var(--ink-2); touch-action: manipulation; }
 .modo strong { font-size: 15px; color: var(--ink); }
@@ -1128,6 +1138,25 @@ async function copyText(t, fallbackEl) {
     toast('Selecione o texto e copie');
   }
 }
+// Datas de acesso no horário de Brasília, no formato AAAA-MM-DD; a validade vale até o fim do dia informado.
+const hojeBR = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+const somaDias = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const fmtDia = iso => iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '';
+// Mesma regra do banco (atualizacao-02): facilitador sempre; encerrado nunca; senão, acesso individual ou turma dentro da validade.
+function calcAcesso(u, t) {
+  const hoje = hojeBR();
+  if (!u) return { pode: false, motivo: 'sem_acesso' };
+  const ind = Boolean(u.acesso_ate && u.acesso_ate >= hoje);
+  const tur = Boolean(t && (!t.expira_em || t.expira_em >= hoje));
+  const motivo = u.role === 'facilitador' ? 'facilitador' : u.acesso_bloqueado ? 'encerrado' : (ind || tur) ? 'ativo' : (t || u.acesso_ate) ? 'expirado' : 'sem_acesso';
+  const datas = (ind || tur) ? [ind && u.acesso_ate, tur && t.expira_em].filter(Boolean) : [u.acesso_ate, t && t.expira_em].filter(Boolean);
+  return {
+    pode: u.role === 'facilitador' || (!u.acesso_bloqueado && (ind || tur)), motivo,
+    valido_ate: tur && !t.expira_em ? null : (datas.sort().at(-1) || null),
+    turma_id: t ? t.id : null, turma_nome: t ? t.nome : null, perguntar_nicho: t ? t.perguntar_nicho !== false : true,
+    turma_expira: t ? t.expira_em || null : null, acesso_ate: u.acesso_ate || null, acesso_bloqueado: Boolean(u.acesso_bloqueado)
+  };
+}
 const hashStr = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return 'h' + (h >>> 0).toString(36); };
 
 /* ===================== ARMAZENAMENTO · DEMONSTRAÇÃO ======================= */
@@ -1180,7 +1209,7 @@ function DemoStore() {
     async signUp({ nome, email, senha }) {
       email = email.trim().toLowerCase();
       if (db.users.some(u => u.email === email)) throw new Error('Já existe uma conta com este e-mail. Use a aba Entrar.');
-      const u = { id: uid(), nome: nome.trim(), email, pw: hashStr(senha), role: 'respondente', consentimento_em: new Date().toISOString() };
+      const u = { id: uid(), nome: nome.trim(), email, pw: hashStr(senha), role: 'respondente', consentimento_em: new Date().toISOString(), created_at: new Date().toISOString(), turma_id: null, acesso_ate: null, acesso_bloqueado: false };
       db.users.push(u); db.session = u.id; save();
       return { user: pub(u) };
     },
@@ -1198,8 +1227,30 @@ function DemoStore() {
     async resetPassword() { return { demo: true }; },
     async signOut() { db.session = null; save(); },
     async findTurma(codigo) { const t = db.turmas.find(x => x.codigo.toUpperCase() === codigo.trim().toUpperCase()); return t ? { id: t.id, nome: t.nome, perguntar_nicho: t.perguntar_nicho !== false } : null; },
+    async meuAcesso() { const u = db.users.find(x => x.id === db.session); return calcAcesso(u, db.turmas.find(t => t.id === u?.turma_id)); },
+    async entrarTurma(codigo) {
+      const u = db.users.find(x => x.id === db.session);
+      const t = db.turmas.find(x => x.codigo.toUpperCase() === codigo.trim().toUpperCase());
+      if (!t) return { status: 'nao_encontrada' };
+      if (t.expira_em && t.expira_em < hojeBR()) return { status: 'expirada', nome: t.nome, expira_em: t.expira_em };
+      u.turma_id = t.id; save(); return { status: 'ok', id: t.id, nome: t.nome, perguntar_nicho: t.perguntar_nicho !== false, expira_em: t.expira_em || null };
+    },
+    async pessoas() {
+      const exemplos = db.results.filter(r => r.exemplo).map(r => ({ id: r.user_id, nome: r.nome, email: r.user_id.replace('ex-user-', 'exemplo') + '@demo', role: 'respondente', turma_id: 'turma-exemplo', created_at: r.created_at, ...(db.acessos?.[r.user_id] || {}) }));
+      return [...db.users, ...exemplos].map(u => {
+        const t = db.turmas.find(x => x.id === u.turma_id); const rs = db.results.filter(r => r.user_id === u.id);
+        return { id: u.id, nome: u.nome, email: u.email, role: u.role, created_at: u.created_at || rs.at(-1)?.created_at || null, turma_nome: t?.nome || null, ...calcAcesso(u, t), diagnosticos: rs.length, ultimo: rs.map(r => r.created_at).sort().at(-1) || null };
+      }).sort((a, b) => (b.ultimo || b.created_at || '').localeCompare(a.ultimo || a.created_at || ''));
+    },
+    async definirAcesso(userId, ate, bloqueado) {
+      const u = db.users.find(x => x.id === userId);
+      if (u) { u.acesso_ate = ate || null; u.acesso_bloqueado = Boolean(bloqueado); }
+      else { db.acessos = db.acessos || {}; db.acessos[userId] = { acesso_ate: ate || null, acesso_bloqueado: Boolean(bloqueado) }; }
+      save();
+    },
     async saveResult({ turma_id, respostas, resultado }) {
       const u = db.users.find(x => x.id === db.session);
+      if (!calcAcesso(u, db.turmas.find(t => t.id === u.turma_id)).pode) throw new Error('O seu período de acesso para novos diagnósticos terminou. Fale com o facilitador para renovar.');
       const rec = { id: uid(), user_id: u.id, nome: u.nome, turma_id: turma_id || null, respostas, resultado, created_at: new Date().toISOString() };
       db.results.push(rec); save(); return rec;
     },
@@ -1207,7 +1258,7 @@ function DemoStore() {
     async getResult(id) { return db.results.find(r => r.id === id) || null; },
     async updateLeitura(id, leitura) { const r = db.results.find(x => x.id === id); if (r) { r.resultado.leitura = leitura; save(); } },
     async listTurmas() { return db.turmas.slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')); },
-    async createTurma(nome, perguntar) { const t = { id: uid(), nome: nome.trim(), codigo: genCode(), perguntar_nicho: perguntar !== false, created_at: new Date().toISOString() }; db.turmas.push(t); save(); return t; },
+    async createTurma(nome, perguntar, expira) { const t = { id: uid(), nome: nome.trim(), codigo: genCode(), perguntar_nicho: perguntar !== false, expira_em: expira || null, created_at: new Date().toISOString() }; db.turmas.push(t); save(); return t; },
     async updateTurma(id, patch) { const t = db.turmas.find(x => x.id === id); if (t) { Object.assign(t, patch); save(); } return t; },
     async turmaResults(turmaId) {
       return db.results.filter(r => turmaId === 'todos' ? true : turmaId === 'sem' ? !r.turma_id : r.turma_id === turmaId).sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -1227,6 +1278,9 @@ function LiveStore() {
     if (/already registered/i.test(m)) return new Error('Já existe uma conta com este e-mail. Use a aba Entrar.');
     if (/Password should be at least/i.test(m)) return new Error('A senha precisa ter pelo menos 6 caracteres.');
     if (/rate limit/i.test(m)) return new Error('Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente de novo.');
+    if (/row-level security/i.test(m)) return new Error('O seu período de acesso para novos diagnósticos terminou. Fale com o facilitador para renovar.');
+    if (/meu_acesso|entrar_turma|pessoas|definir_acesso|expira_em|could not find the function/i.test(m)) return new Error('Atualize o banco de dados com a atualização 02 (controle de acesso) enviada pelo Claude.');
+    if (/not_allowed/i.test(m)) return new Error('Apenas o facilitador pode fazer esta alteração.');
     return new Error(m || 'Não foi possível concluir. Verifique a conexão e tente de novo.');
   };
   async function profile() {
@@ -1264,6 +1318,21 @@ function LiveStore() {
     async updatePassword(senha) { const { error } = await sb.auth.updateUser({ password: senha }); if (error) throw errPt(error); },
     async signOut() { await sb.auth.signOut(); profileCache = null; },
     async findTurma(codigo) { const { data, error } = await sb.rpc('turma_por_codigo', { p_codigo: codigo.trim() }); if (error) throw errPt(error); return (data && data[0]) || null; },
+    async meuAcesso() {
+      const { data, error } = await sb.rpc('meu_acesso');
+      // Banco ainda sem a atualização 02: mantém o comportamento anterior (acesso aberto) até a atualização ser aplicada.
+      if (error && (error.code === 'PGRST202' || /could not find the function|meu_acesso/i.test(error.message || ''))) return { pode: true, motivo: 'legado' };
+      if (error) throw errPt(error);
+      return (data && data[0]) || { pode: false, motivo: 'sem_acesso' };
+    },
+    async entrarTurma(codigo) {
+      const { data, error } = await sb.rpc('entrar_turma', { p_codigo: codigo.trim() });
+      if (error && (error.code === 'PGRST202' || /could not find the function/i.test(error.message || ''))) { const t = await this.findTurma(codigo); return t ? { status: 'ok', ...t } : { status: 'nao_encontrada' }; }
+      if (error) throw errPt(error);
+      return (data && data[0]) || { status: 'nao_encontrada' };
+    },
+    async pessoas() { const { data, error } = await sb.rpc('pessoas'); if (error) throw errPt(error); return data || []; },
+    async definirAcesso(userId, ate, bloqueado) { const { error } = await sb.rpc('definir_acesso', { p_user: userId, p_ate: ate || null, p_bloqueado: Boolean(bloqueado) }); if (error) throw errPt(error); },
     async saveResult({ turma_id, respostas, resultado }) {
       const p = await profile();
       const { data, error } = await sb.from('resultados').insert({ user_id: p.id, turma_id: turma_id || null, respostas, resultado, indice: resultado.indice, nivel: resultado.nivel, perfil: resultado.perfil }).select('*, profiles(nome)').single();
@@ -1278,13 +1347,15 @@ function LiveStore() {
     async getResult(id) { const { data, error } = await sb.from('resultados').select('*, profiles(nome)').eq('id', id).maybeSingle(); if (error) throw errPt(error); return data ? toRec(data) : null; },
     async updateTurma(id, patch) { const { data, error } = await sb.from('turmas').update(patch).eq('id', id).select().single(); if (error) throw new Error(/perguntar_nicho/i.test(error.message) ? 'Atualize o banco de dados com o complemento enviado pelo Claude para usar esta opção.' : errPt(error).message); return data; },
     async listTurmas() { const { data, error } = await sb.from('turmas').select('*').order('created_at', { ascending: false }); if (error) throw errPt(error); return data; },
-    async createTurma(nome, perguntar) {
+    async createTurma(nome, perguntar, expira) {
       let comNicho = true;
       for (let i = 0; i < 5; i++) {
         const row = { nome: nome.trim(), codigo: genCode() };
+        if (expira) row.expira_em = expira;
         if (comNicho) row.perguntar_nicho = perguntar !== false;
         const { data, error } = await sb.from('turmas').insert(row).select().single();
         if (!error) return data;
+        if (/expira_em/i.test(error.message)) throw errPt(error);
         if (/perguntar_nicho/i.test(error.message)) { comNicho = false; continue; }
         if (!/duplicate/i.test(error.message)) throw errPt(error);
       }
@@ -1311,7 +1382,8 @@ const S = {
   quiz: null,
   result: null,
   myResults: null,
-  fac: { turmas: null, sel: null, results: null, newCode: null },
+  fac: { turmas: null, sel: null, results: null, newCode: null, tab: 'resultados', pessoas: null, filtro: 'todos', busca: '' },
+  acesso: null,
   installEvt: null,
   installHidden: false,
   leitura: {},
@@ -1336,11 +1408,27 @@ async function route_() {
   if (r === 'entrar' && S.session) r = 'painel';
   if (r === 'nova-senha' && !LIVE) r = 'entrar';
   S.route = r;
-  if (r === 'painel') { S.myResults = null; render(); try { S.myResults = await store.myResults(); } catch (e) { S.myResults = []; } }
+  if (r === 'painel') { S.myResults = null; render(); try { S.myResults = await store.myResults(); } catch (e) { S.myResults = []; } await loadAcesso(); }
+  if (r === 'diagnostico') await loadAcesso();
   if (r === 'facilitador') { await loadFac(); }
   if (r === 'diagnostico' && !S.quiz) startQuiz();
   render();
   window.scrollTo(0, 0);
+}
+
+async function loadAcesso() {
+  try { S.acesso = await store.meuAcesso(); } catch (e) { S.acesso = { pode: false, motivo: 'erro', erro: e.message }; }
+}
+// Texto da situação de acesso para a própria pessoa.
+function acessoLinha(a) {
+  if (!a) return '';
+  if (a.motivo === 'legado') return '';
+  if (a.motivo === 'facilitador') return 'Acesso de facilitador, sem prazo.';
+  if (a.pode) return (a.turma_nome && (!a.acesso_ate || a.acesso_ate < hojeBR()) ? 'Turma ' + a.turma_nome + ' · ' : '') + (a.valido_ate ? 'acesso para novos diagnósticos até ' + fmtDia(a.valido_ate) + '.' : 'acesso para novos diagnósticos sem prazo definido.');
+  if (a.motivo === 'encerrado') return 'O seu acesso para novos diagnósticos foi encerrado.';
+  if (a.motivo === 'expirado') return 'O seu período para novos diagnósticos terminou' + (a.valido_ate ? ' em ' + fmtDia(a.valido_ate) : '') + '.';
+  if (a.motivo === 'erro') return a.erro || 'Não foi possível verificar o seu acesso agora.';
+  return 'O seu acesso para novos diagnósticos ainda não foi liberado.';
 }
 
 /* ============================ COMPONENTES ================================ */
@@ -1473,12 +1561,20 @@ function viewPainel() {
   const s = S.session;
   const list = S.myResults;
   const rows = list === null ? '<p class="muted">Carregando seus diagnósticos…</p>'
-    : list.length === 0 ? `<div class="empty"><strong>Você ainda não fez nenhum diagnóstico</strong><span class="small">O primeiro leva cerca de 15 minutos. O resultado aparece aqui e fica salvo para você comparar depois.</span><button class="btn btn-primary btn-sm" data-go="diagnostico">Iniciar diagnóstico</button></div>`
+    : list.length === 0 ? `<div class="empty"><strong>Você ainda não fez nenhum diagnóstico</strong><span class="small">O primeiro leva cerca de 15 minutos. O resultado aparece aqui e fica salvo para você comparar depois.</span>${!S.acesso || S.acesso.pode ? '<button class="btn btn-primary btn-sm" data-go="diagnostico">Iniciar diagnóstico</button>' : ''}</div>`
     : `<div class="list">${list.map(r => `<button class="row-btn" data-open="${esc(r.id)}"><span><strong>Índice ${r.resultado.indice} · ${esc(r.resultado.nivel)}</strong><br><span class="row-meta">${fmtDate(r.created_at)} · perfil ${esc(PROFILES[r.resultado.perfil].nome)}</span></span><span aria-hidden="true" class="muted">→</span></button>`).join('')}</div>`;
   const draft = LS.get(DRAFT_KEY);
+  const a = S.acesso;
+  const acessoCard = !a || a.motivo === 'legado' ? '' : a.pode
+    ? `<p class="small muted acesso-ok"><i class="swatch" style="background:var(--good)"></i>${esc(acessoLinha(a))}</p>`
+    : `<div class="card stack" style="gap:12px"><strong>${esc(acessoLinha(a))}</strong>
+        <span class="muted small">Se você recebeu um código de turma, informe abaixo para liberar novos diagnósticos. Para renovar o acesso, fale com ${esc(AUTOR)}.${(S.myResults || []).length ? ' Os seus relatórios anteriores continuam disponíveis abaixo, para consulta e download.' : ''}</span>
+        <form id="f-codigo" class="inline-form" novalidate><div class="field"><label for="pn-code">Código da turma</label><input id="pn-code" type="text" autocomplete="off" placeholder="OQG-XXXX" style="text-transform:uppercase"></div><button class="btn btn-primary btn-sm" type="submit" ${S.busy ? 'disabled' : ''}>Liberar acesso</button></form>
+        <div id="pn-msg"></div></div>`;
   return `<main class="page"><div class="wrap narrow stack-lg">
     <div class="hello"><div class="stack" style="gap:6px"><span class="eyebrow">Meu painel</span><h1 style="font-size:clamp(28px,5vw,40px)">Olá${s.nome ? ', ' + esc(s.nome.split(' ')[0]) : ''}</h1></div>
-    <button class="btn btn-primary" data-go="diagnostico">${draft ? 'Continuar diagnóstico' : 'Iniciar diagnóstico'} <span aria-hidden="true">→</span></button></div>
+    ${!a || a.pode ? `<button class="btn btn-primary" data-go="diagnostico">${draft ? 'Continuar diagnóstico' : 'Iniciar diagnóstico'} <span aria-hidden="true">→</span></button>` : ''}</div>
+    ${acessoCard}
     ${s.role === 'facilitador' ? `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><strong>Painel do facilitador</strong><br><span class="muted small">Turmas, códigos de acesso e resultados dos grupos.</span></span><button class="btn btn-ghost btn-sm" data-go="facilitador">Abrir</button></div>` : ''}
     <div class="stack"><h2 class="h-sec" style="margin:0">Meus diagnósticos</h2>${rows}</div>
   </div></main>`;
@@ -1553,7 +1649,10 @@ function viewDiagnostico() {
       <div class="stack" style="gap:10px"><span class="eyebrow">Antes de começar</span><h1 style="font-size:clamp(28px,5vw,38px)">Responda pela sua prática de hoje</h1>
       <p class="muted">Muitas afirmações descrevem práticas comuns e bem-intencionadas. Responda pelo que você faz hoje, sem pensar no que seria o ideal: o diagnóstico é mais útil quando reflete a sua prática real.</p></div>
       <div class="card stack">
-        <div class="field"><label for="qz-code">Código da turma <span class="muted">(opcional)</span></label><input id="qz-code" type="text" autocomplete="off" placeholder="OQG-XXXX" value="${esc(q.code)}" style="text-transform:uppercase"><span class="muted small">Se você está num workshop ou numa equipe, use o código que o facilitador passou.${store.mode === 'demo' ? ' Na prévia, o código OQG-DEMO entra na turma de exemplo.' : ''}</span></div>
+        ${S.acesso && S.acesso.pode
+          ? `${S.acesso.motivo === 'legado' ? '' : `<p class="small muted acesso-ok"><i class="swatch" style="background:var(--good)"></i>${esc(acessoLinha(S.acesso))}</p>`}
+             <div class="field"><label for="qz-code">Novo código de turma <span class="muted">(opcional)</span></label><input id="qz-code" type="text" autocomplete="off" placeholder="OQG-XXXX" value="${esc(q.code)}" style="text-transform:uppercase"><span class="muted small">Use só se você recebeu o código de uma nova turma.</span></div>`
+          : `<div class="field"><label for="qz-code">Código da turma</label><input id="qz-code" type="text" autocomplete="off" placeholder="OQG-XXXX" value="${esc(q.code)}" style="text-transform:uppercase"><span class="muted small">${esc(acessoLinha(S.acesso))} Use o código que o facilitador passou.${store.mode === 'demo' ? ' Na prévia, o código OQG-DEMO entra na turma de exemplo.' : ''}</span></div>`}
         <div id="qz-msg"></div>
         <button class="btn btn-primary" data-act="qz-start" ${S.busy ? 'disabled' : ''}>Começar <span aria-hidden="true">→</span></button>
       </div>
@@ -1594,6 +1693,11 @@ function viewDiagnostico() {
 }
 
 document.addEventListener('input', (ev) => {
+  if (ev.target.id === 'ps-busca') {
+    S.fac.busca = ev.target.value; const pos = ev.target.selectionStart; render();
+    const el = $('#ps-busca'); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) { /* */ } }
+    return;
+  }
   if (ev.target.id !== 'qz-hist' || !S.quiz) return;
   S.quiz.historia = ev.target.value;
   const n = S.quiz.historia.trim().length;
@@ -1604,19 +1708,26 @@ document.addEventListener('input', (ev) => {
   clearTimeout(saveDraft._t); saveDraft._t = setTimeout(saveDraft, 400);
 });
 
+// Mensagens de retorno ao informar um código de turma.
+function msgCodigo(r) {
+  if (r.status === 'nao_encontrada') return 'Não encontramos uma turma com esse código. Confira com o facilitador.';
+  if (r.status === 'expirada') return `A turma ${r.nome || ''} encerrou o período de diagnósticos${r.expira_em ? ' em ' + fmtDia(r.expira_em) : ''}. Fale com o facilitador para renovar.`;
+  return '';
+}
 async function quizStart() {
   const q = S.quiz;
   const code = ($('#qz-code')?.value || '').trim();
-  q.code = code; q.turma = null;
-  if (code) {
-    S.busy = true; render();
-    try {
-      const t = await store.findTurma(code);
-      S.busy = false;
-      if (!t) { render(); $('#qz-msg').innerHTML = '<div class="msg msg-err" role="alert">Não encontramos uma turma com esse código. Confira com o facilitador ou deixe o campo em branco.</div>'; return; }
-      q.turma = t;
-    } catch (e) { S.busy = false; render(); $('#qz-msg').innerHTML = `<div class="msg msg-err" role="alert">${esc(e.message)}</div>`; return; }
-  }
+  const fail = t => { S.busy = false; render(); $('#qz-msg').innerHTML = `<div class="msg msg-err" role="alert">${esc(t)}</div>`; };
+  q.code = code;
+  if (!code && !(S.acesso && S.acesso.pode)) return fail('Informe o código da turma para começar.');
+  S.busy = true; render();
+  try {
+    if (code) { const r = await store.entrarTurma(code); if (r.status !== 'ok') return fail(msgCodigo(r)); }
+    await loadAcesso();
+  } catch (e) { return fail(e.message); }
+  S.busy = false;
+  if (!S.acesso.pode) return fail(acessoLinha(S.acesso));
+  q.turma = S.acesso.turma_id ? { id: S.acesso.turma_id, nome: S.acesso.turma_nome, perguntar_nicho: S.acesso.perguntar_nicho } : null;
   if (!q.turma || q.turma.perguntar_nicho !== false) { q.phase = 'negocio'; saveDraft(); render(); if (q.turma) toast('Turma: ' + q.turma.nome); return; }
   q.negocio = null; q.step = 1; saveDraft(); render();
   if (q.turma) toast('Turma: ' + q.turma.nome);
@@ -2229,7 +2340,11 @@ function afterRenderResultado() {
 }
 
 /* ============================== FACILITADOR =============================== */
+async function loadPessoas() {
+  try { S.fac.pessoas = await store.pessoas(); } catch (e) { S.fac.pessoas = []; S.fac.pessoasErro = e.message; }
+}
 async function loadFac() {
+  if (S.fac.tab === 'pessoas') await loadPessoas();
   try {
     S.fac.turmas = await store.listTurmas();
     if (!S.fac.sel) S.fac.sel = S.fac.turmas[0]?.id || 'todos';
@@ -2242,6 +2357,41 @@ function csvOf(results) {
   const q = v => /[",;\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
   const rows = results.map(x => { const r = x.resultado; return [x.nome || '', x.created_at.slice(0, 10), r.indice, r.nivel, PROFILES[r.perfil].nome, r.aprox, r.afast, ...DIMS.map(d => r.dims[d.id]), r.postura.assertiva, r.postura.passiva, r.postura.agressiva, r.alerts.map(a => a.t).join(' | '), r.sinais ? r.sinais.hesitacoes.length : '', r.sinais ? r.sinais.trocas.length : '', x.respostas?.historia || '', SEG[x.respostas?.negocio?.segmento]?.nome || '', x.respostas?.negocio?.oferta || '', x.respostas?.negocio ? (modoDe(x.respostas.negocio) === 'contato' ? 'pontos de contato' : 'conversa') : '', r.confiab ? r.confiab.score : ''].map(q).join(','); });
   return [head.map(q).join(','), ...rows].join('\n');
+}
+
+const SIT = {
+  ativo: ['Ativo', 'var(--good)'], facilitador: ['Facilitador', 'var(--c-cool)'], expirado: ['Expirado', 'var(--warn)'],
+  encerrado: ['Encerrado', 'var(--crit)'], sem_acesso: ['Sem acesso', 'var(--ink-3)']
+};
+function viewPessoas() {
+  const F = S.fac; const all = F.pessoas;
+  if (all === null) return '<p class="muted">Carregando pessoas…</p>';
+  if (F.pessoasErro && !all.length) return `<div class="msg msg-err" role="alert">${esc(F.pessoasErro)}</div>`;
+  const conta = k => all.filter(x => k === 'todos' || x.motivo === k).length;
+  const busca = (F.busca || '').trim().toLowerCase();
+  const lista = all.filter(x => (F.filtro === 'todos' || x.motivo === F.filtro) && (!busca || (x.nome || '').toLowerCase().includes(busca) || (x.email || '').toLowerCase().includes(busca)));
+  const padrao = somaDias(hojeBR(), 90);
+  const chip = m => { const c = SIT[m] || SIT.sem_acesso; return `<span class="chip"><i class="swatch" style="background:${c[1]}"></i>${c[0]}</span>`; };
+  const linhas = lista.map(x => {
+    const fac = x.role === 'facilitador';
+    const origem = x.motivo === 'ativo' ? (x.acesso_ate && x.acesso_ate >= hojeBR() ? 'individual' : 'pela turma') : '';
+    return `<tr>
+      <td><strong>${esc(x.nome || 'Sem nome')}</strong><br><span class="muted small">${esc(x.email || '')}</span></td>
+      <td>${esc(x.turma_nome || '—')}${x.turma_expira ? `<br><span class="muted small">turma até ${fmtDia(x.turma_expira)}</span>` : ''}</td>
+      <td>${chip(x.motivo)}${origem ? `<br><span class="muted small">${origem}</span>` : ''}</td>
+      <td class="tnum">${fac ? '—' : x.valido_ate ? fmtDia(x.valido_ate) : (x.pode ? 'sem prazo' : '—')}</td>
+      <td class="num">${x.diagnosticos || 0}</td>
+      <td>${x.ultimo ? fmtDate(x.ultimo) : '—'}</td>
+      <td>${fac ? '<span class="muted small">—</span>' : `<div class="acesso-acoes"><input type="date" aria-label="Liberar até" data-ate="${esc(x.id)}" value="${esc(x.acesso_ate && x.acesso_ate >= hojeBR() ? x.acesso_ate : padrao)}" min="${hojeBR()}"><button type="button" class="btn btn-quiet btn-sm" data-act="acesso-liberar" data-user="${esc(x.id)}">Liberar até</button>${x.acesso_bloqueado ? `<button type="button" class="btn btn-quiet btn-sm" data-act="acesso-reativar" data-user="${esc(x.id)}">Reativar</button>` : (x.pode ? `<button type="button" class="btn btn-quiet btn-sm" data-act="acesso-encerrar" data-user="${esc(x.id)}">Encerrar</button>` : '')}</div>`}</td></tr>`;
+  }).join('');
+  return `<div class="card stack">
+    <div class="stack" style="gap:6px">
+      <p class="muted small">Todas as pessoas que criaram conta na ferramenta. Novos diagnósticos exigem acesso ativo, pela turma ou individual. Encerrar bloqueia novos diagnósticos; os relatórios já feitos continuam disponíveis para a pessoa.</p></div>
+    <div class="turma-chips">${['todos', 'ativo', 'expirado', 'encerrado', 'sem_acesso'].map(k => `<button data-fac-filtro="${k}" aria-pressed="${F.filtro === k}">${k === 'todos' ? 'Todos' : SIT[k][0]} · ${conta(k)}</button>`).join('')}</div>
+    <div class="field" style="max-width:360px"><label for="ps-busca" class="sr-only">Buscar pessoa</label><input id="ps-busca" type="search" placeholder="Buscar por nome ou e-mail" value="${esc(F.busca || '')}"></div>
+    ${lista.length ? `<div class="table-wrap"><table class="heat pessoas"><thead><tr><th>Pessoa</th><th>Turma</th><th>Situação</th><th>Válido até</th><th class="num">Diagnósticos</th><th>Último</th><th>Acesso individual</th></tr></thead><tbody>${linhas}</tbody></table></div>` : '<p class="muted">Nenhuma pessoa neste filtro.</p>'}
+    <p class="small muted">"Liberar até" dá acesso individual até a data escolhida, mesmo sem turma ou com a turma vencida. A data vale até o fim do dia, no horário de Brasília.</p>
+  </div>`;
 }
 
 function viewFacilitador() {
@@ -2283,14 +2433,17 @@ function viewFacilitador() {
       <p class="small muted" style="margin-top:10px">Cor mais intensa indica pontuação mais alta. Toque no nome para abrir o relatório da pessoa.</p>
     </div>`;
   return `<main class="page"><div class="wrap stack-lg">
-    <div class="stack" style="gap:6px"><span class="eyebrow">Painel do facilitador</span><h1 style="font-size:clamp(28px,5vw,40px)">Turmas e resultados</h1></div>
+    <div class="stack" style="gap:6px"><span class="eyebrow">Painel do facilitador</span><h1 style="font-size:clamp(28px,5vw,40px)">${F.tab === 'pessoas' ? 'Pessoas e acessos' : 'Turmas e resultados'}</h1></div>
+    <div class="tabs fac-tabs" role="tablist"><button role="tab" data-fac-tab="resultados" aria-selected="${F.tab !== 'pessoas'}">Turmas e resultados</button><button role="tab" data-fac-tab="pessoas" aria-selected="${F.tab === 'pessoas'}">Pessoas e acessos</button></div>
+    ${F.tab === 'pessoas' ? viewPessoas() : `
     <div class="card stack">
-      <form id="f-turma" class="inline-form" novalidate><div class="field"><label for="tm-nome">Nova turma</label><input id="tm-nome" type="text" placeholder="Ex.: Workshop grupo de networking · novembro" required></div><button class="btn btn-primary btn-sm" type="submit">Criar turma e gerar código</button></form>
+      <form id="f-turma" class="inline-form turma-form" novalidate><div class="field"><label for="tm-nome">Nova turma</label><input id="tm-nome" type="text" placeholder="Ex.: Workshop grupo de networking · novembro" required></div><div class="field"><label for="tm-expira">Diagnósticos até</label><input id="tm-expira" type="date" value="${somaDias(hojeBR(), 90)}" min="${hojeBR()}"></div><button class="btn btn-primary btn-sm" type="submit">Criar turma e gerar código</button></form>
       <label class="check" for="tm-nicho"><input id="tm-nicho" type="checkbox" checked><span>Perguntar o tipo de negócio de cada participante. Indicado para grupos abertos e networking; desligue para turmas de uma mesma empresa.</span></label>
       ${F.newCode ? `<div class="msg msg-ok" role="status">Turma criada. Código de acesso: <span class="code-box">${esc(F.newCode)}</span> <button type="button" class="link-btn" data-copy="${esc(F.newCode)}">Copiar</button></div>` : ''}
     </div>
-    <div class="stack" style="gap:10px"><span class="small muted">Turma selecionada${selT ? ` · código <b class="tnum" style="color:var(--ink)">${esc(selT.codigo)}</b> <button type="button" class="link-btn small" data-copy="${esc(selT.codigo)}">copiar</button> · tipo de negócio: <b style="color:var(--ink)">${selT.perguntar_nicho === false ? 'não pergunta' : 'pergunta'}</b> <button type="button" class="link-btn small" data-act="turma-nicho">alterar</button>` : ''}</span><div class="turma-chips">${chips}</div></div>
-    ${F.results === null ? '<p class="muted">Carregando…</p>' : modoChips + body}
+    <div class="stack" style="gap:10px"><span class="small muted">Turma selecionada${selT ? ` · código <b class="tnum" style="color:var(--ink)">${esc(selT.codigo)}</b> <button type="button" class="link-btn small" data-copy="${esc(selT.codigo)}">copiar</button> · tipo de negócio: <b style="color:var(--ink)">${selT.perguntar_nicho === false ? 'não pergunta' : 'pergunta'}</b> <button type="button" class="link-btn small" data-act="turma-nicho">alterar</button>` : ''}</span><div class="turma-chips">${chips}</div>
+      ${selT ? `<div class="validade-row small"><span class="muted">Diagnósticos desta turma ${selT.expira_em ? (selT.expira_em >= hojeBR() ? 'liberados até' : 'encerrados · último dia') + ` <b style="color:var(--ink)">${fmtDia(selT.expira_em)}</b>` : '<b style="color:var(--ink)">sem prazo</b>'}</span><input type="date" id="tm-expira-sel" aria-label="Nova validade da turma" value="${esc(selT.expira_em || '')}"><button type="button" class="btn btn-quiet btn-sm" data-act="turma-expira">Salvar validade</button>${!selT.expira_em || selT.expira_em >= hojeBR() ? '<button type="button" class="btn btn-quiet btn-sm" data-act="turma-encerrar">Encerrar hoje</button>' : ''}</div>` : ''}</div>
+    ${F.results === null ? '<p class="muted">Carregando…</p>' : modoChips + body}`}
   </div></main>`;
 }
 
@@ -2314,7 +2467,7 @@ function render() {
 
 /* ================================ EVENTOS ================================= */
 document.addEventListener('click', async (ev) => {
-  const t = ev.target.closest('[data-go],[data-act],[data-tab],[data-ans],[data-sjt],[data-open],[data-fac-open],[data-turma],[data-copy],[data-seg],[data-modo],[data-fac-modo]');
+  const t = ev.target.closest('[data-go],[data-act],[data-tab],[data-ans],[data-sjt],[data-open],[data-fac-open],[data-turma],[data-copy],[data-seg],[data-modo],[data-fac-modo],[data-fac-tab],[data-fac-filtro]');
   if (!t) return;
   if (t.dataset.go) { if (t.dataset.go === 'diagnostico' && !S.quiz) startQuiz(); go(t.dataset.go); return; }
   if (t.dataset.tab) { S.authTab = t.dataset.tab; S.authMsg = null; render(); return; }
@@ -2334,11 +2487,13 @@ document.addEventListener('click', async (ev) => {
   if (t.dataset.open) { const r = await store.getResult(t.dataset.open); if (r) { S.result = r; go('resultado'); } return; }
   if (t.dataset.facOpen) { const r = (S.fac.results || []).find(x => x.id === t.dataset.facOpen); if (r) { S.result = r; go('resultado'); } return; }
   if (t.dataset.facModo) { S.fac.modo = t.dataset.facModo; render(); return; }
+  if (t.dataset.facTab) { S.fac.tab = t.dataset.facTab; render(); if (S.fac.tab === 'pessoas') { S.fac.pessoas = null; render(); await loadPessoas(); render(); } return; }
+  if (t.dataset.facFiltro) { S.fac.filtro = t.dataset.facFiltro; render(); return; }
   if (t.dataset.turma) { S.fac.sel = t.dataset.turma; S.fac.results = null; S.fac.newCode = null; render(); try { S.fac.results = await store.turmaResults(S.fac.sel); } catch (e) { S.fac.results = []; toast(e.message); } render(); return; }
   const act = t.dataset.act;
   if (act === 'criar') { S.authTab = 'criar'; S.authMsg = null; go('entrar'); }
   else if (act === 'esqueci') { S.authTab = 'esqueci'; S.authMsg = null; render(); }
-  else if (act === 'sair') { await store.signOut(); S.session = null; S.result = null; S.quiz = null; S.fac = { turmas: null, sel: null, results: null, newCode: null }; go('inicio'); }
+  else if (act === 'sair') { await store.signOut(); S.session = null; S.result = null; S.quiz = null; S.fac = { turmas: null, sel: null, results: null, newCode: null, tab: 'resultados', pessoas: null, filtro: 'todos', busca: '' }; S.acesso = null; go('inicio'); }
   else if (act === 'fac-demo') { S.session = await store.signInFacilitatorDemo(); go('facilitador'); }
   else if (act === 'qz-start') { quizStart(); }
   else if (act === 'qz-back') { const q = S.quiz; if (q.step === 1 && q.negocio) { q.step = 0; q.phase = 'negocio'; } else q.step = Math.max(0, q.step - 1); saveDraft(); render(); }
@@ -2355,6 +2510,19 @@ document.addEventListener('click', async (ev) => {
     if (!q.negocio.segmento) { toast('Escolha o tipo de negócio'); return; }
     if (!q.negocio.modo) { toast('Escolha como os seus clientes compram'); return; }
     q.phase = null; q.step = 1; saveDraft(); render();
+  }
+  else if (act === 'acesso-liberar' || act === 'acesso-encerrar' || act === 'acesso-reativar') {
+    const id = t.dataset.user; const x = (S.fac.pessoas || []).find(p => p.id === id); if (!x) return;
+    let ate = x.acesso_ate, bloq = x.acesso_bloqueado;
+    if (act === 'acesso-liberar') { ate = document.querySelector(`[data-ate="${CSS.escape(id)}"]`)?.value; if (!ate) { toast('Escolha a data'); return; } bloq = false; }
+    if (act === 'acesso-encerrar') bloq = true;
+    if (act === 'acesso-reativar') bloq = false;
+    try { await store.definirAcesso(id, ate, bloq); await loadPessoas(); render(); toast(act === 'acesso-liberar' ? 'Acesso liberado até ' + fmtDia(ate) : act === 'acesso-encerrar' ? 'Acesso encerrado' : 'Acesso reativado'); } catch (e) { toast(e.message); }
+  }
+  else if (act === 'turma-expira' || act === 'turma-encerrar') {
+    const tm = (S.fac.turmas || []).find(x => x.id === S.fac.sel); if (!tm) return;
+    const v = act === 'turma-encerrar' ? somaDias(hojeBR(), -1) : ($('#tm-expira-sel')?.value || null);
+    try { await store.updateTurma(tm.id, { expira_em: v }); S.fac.turmas = await store.listTurmas(); S.fac.pessoas = null; render(); toast(act === 'turma-encerrar' ? 'Diagnósticos da turma encerrados' : v ? 'Turma liberada até ' + fmtDia(v) : 'Turma sem prazo'); } catch (e) { toast(e.message); }
   }
   else if (act === 'turma-nicho') {
     const tm = (S.fac.turmas || []).find(x => x.id === S.fac.sel); if (!tm) return;
@@ -2429,10 +2597,20 @@ document.addEventListener('submit', async (ev) => {
     const senha = val('nv-senha');
     if (senha.length < 6) return fail('A senha precisa ter pelo menos 6 caracteres.');
     try { await store.updatePassword(senha); S.session = await store.getSession(); S.authMsg = null; toast('Senha atualizada'); go('painel'); } catch (e) { fail(e.message); }
+  } else if (f.id === 'f-codigo') {
+    const code = val('pn-code').trim();
+    const msg = t => { const el = $('#pn-msg'); if (el) el.innerHTML = `<div class="msg msg-err" role="alert">${esc(t)}</div>`; };
+    if (!code) return msg('Informe o código da turma.');
+    S.busy = true; render();
+    try {
+      const r = await store.entrarTurma(code); S.busy = false;
+      if (r.status !== 'ok') { render(); return msg(msgCodigo(r)); }
+      await loadAcesso(); render(); toast('Acesso liberado · turma ' + r.nome);
+    } catch (e) { S.busy = false; render(); msg(e.message); }
   } else if (f.id === 'f-turma') {
     const nome = val('tm-nome');
     if (!nome.trim()) { toast('Dê um nome para a turma'); return; }
-    try { const t = await store.createTurma(nome, $('#tm-nicho')?.checked !== false); S.fac.newCode = t.codigo; S.fac.sel = t.id; S.fac.turmas = await store.listTurmas(); S.fac.results = await store.turmaResults(t.id); render(); }
+    try { const t = await store.createTurma(nome, $('#tm-nicho')?.checked !== false, $('#tm-expira')?.value || null); S.fac.newCode = t.codigo; S.fac.sel = t.id; S.fac.turmas = await store.listTurmas(); S.fac.results = await store.turmaResults(t.id); render(); }
     catch (e) { toast(e.message); }
   }
 });
