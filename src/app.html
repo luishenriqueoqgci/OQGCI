@@ -669,6 +669,9 @@ const LEVELS = [
   { min: 0, n: 1, nome: 'Vitrine', leitura: 'A conversa gira em torno do serviço, e o cliente decide sozinho.' }
 ];
 const levelOf = v => LEVELS.find(l => v >= l.min);
+// Nome do nível ao lado de cada dimensão: cortes em 25, 50 e 75 (o Índice segue com 40, 60 e 80).
+const CORTE_DIM = { 80: 75, 60: 50, 40: 25, 0: 0 };
+const nivelDim = v => LEVELS.find(l => v >= CORTE_DIM[l.min]);
 
 const PROFILES = {
   insistente: { nome: 'Insistente', conversa: 'Conduz com força e gera resistência. Fecha a venda e perde a indicação.', foco: 'Trabalhe a postura nas situações e o Espelho: a firmeza rende mais quando o cliente se sente ouvido e percebe a intenção de ajudar.' },
@@ -2183,7 +2186,7 @@ function viewResultado() {
     return `<details class="acc dim-acc" data-acc id="acc-${d.id}" ${S.accOpen[`acc-${d.id}`] ? 'open' : ''}>
       <summary><span class="acc-title"><span class="dim-code">${d.id}</span><strong>${d.nome}</strong>${isPrio ? '<span class="flag">prioridade</span>' : ''}</span>
         <span class="acc-meter">${levelMeter(v, eixoCor(d.eixo), d.nome)}</span>
-        <span class="acc-score"><b class="tnum">${v}</b><span class="muted small">${levelOf(v).nome}</span></span><span class="chev" aria-hidden="true"></span></summary>
+        <span class="acc-score"><b class="tnum">${v}</b><span class="muted small">${nivelDim(v).nome}</span></span><span class="chev" aria-hidden="true"></span></summary>
       <div class="acc-body">
         <span class="tag" style="border-style:solid;justify-self:start"><i class="swatch" style="background:${eixoCor(d.eixo)};margin-right:6px"></i>${eixoNome(d.eixo)}</span>
         <p>${esc(V(pk.bands[d.id][bandOf(v)], voc))}</p>
@@ -2387,7 +2390,7 @@ async function buildPDF(rec) {
     need(9); const v = r.dims[d.id];
     font(9.5, 'bold', C.ink); doc.text(pdfText(`${d.id} ${d.nome}`), M, y + 3.4);
     bar(M + 40, y + 1, CW - 72, 3.2, v, eixoRGB(d.eixo), [25, 50, 75]);
-    font(9.5, 'bold', C.ink); doc.text(String(v), M + CW - 22, y + 3.6, { align: 'right' }); font(8.5, 'normal', C.ink3); doc.text(pdfText(levelOf(v).nome), M + CW, y + 3.6, { align: 'right' });
+    font(9.5, 'bold', C.ink); doc.text(String(v), M + CW - 22, y + 3.6, { align: 'right' }); font(8.5, 'normal', C.ink3); doc.text(pdfText(nivelDim(v).nome), M + CW, y + 3.6, { align: 'right' });
     y += 7.5;
   });
   font(8, 'normal', C.ink3); doc.text(pdfText('Cor dourada: Aproximação · azul: Afastamento · cinza: linha de base.'), M, y + 2); y += 8;
@@ -2396,7 +2399,7 @@ async function buildPDF(rec) {
   const items = rec.respostas?.items;
   DIMS.forEach(d => {
     const v = r.dims[d.id]; need(30);
-    font(11, 'bold', C.ink); doc.text(pdfText(`${d.nome}`), M, y + 4); font(10, 'bold', eixoRGB(d.eixo)); doc.text(pdfText(`${v} · ${levelOf(v).nome}`), M + CW, y + 4, { align: 'right' }); y += 7;
+    font(11, 'bold', C.ink); doc.text(pdfText(`${d.nome}`), M, y + 4); font(10, 'bold', eixoRGB(d.eixo)); doc.text(pdfText(`${v} · ${nivelDim(v).nome}`), M + CW, y + 4, { align: 'right' }); y += 7;
     para(V(pk.bands[d.id][bandOf(v)], voc), 9.5, 'normal', C.ink, CW, M, 1);
     const ex = itemExtremes(d.id, items);
     if (ex && !ex.uniforme) {
