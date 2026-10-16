@@ -2338,148 +2338,313 @@ async function logoDataURL() {
   } catch (e) { return null; }
 }
 
+// Fontes do PDF (Manrope e Urbanist, as mesmas do caderno). Sem elas, o PDF usa Helvetica.
+const PDF_FONTS = [['Manrope-Regular.ttf', 'Manrope', 'normal'], ['Manrope-SemiBold.ttf', 'Manrope', 'semibold'], ['Manrope-ExtraBold.ttf', 'Manrope', 'bold'],
+  ['Urbanist-Light.ttf', 'Urbanist', 'light'], ['Urbanist-Bold.ttf', 'Urbanist', 'bold']];
+let pdfFontCache = null;
+async function pdfFontData() {
+  if (pdfFontCache) return pdfFontCache;
+  try {
+    const out = [];
+    for (const [file, fam, st] of PDF_FONTS) {
+      const res = await fetch('fonts/' + file); if (!res.ok) return null;
+      const buf = new Uint8Array(await res.arrayBuffer()); let bin = '';
+      for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+      out.push([file, fam, st, btoa(bin)]);
+    }
+    return (pdfFontCache = out);
+  } catch (e) { return null; }
+}
+// Com as fontes do caderno, acentos e pontuação tipográfica saem como no texto; o que elas não têm vira equivalente simples.
+const pdfTextRico = t => String(t ?? '').replace(/→/g, '->').replace(/[✓●]/g, '').replace(/­/g, '').replace(/[^\x00-\xFF–—‘’“”…•]/g, '');
+
 async function buildPDF(rec) {
   const { jsPDF } = await loadJsPDF();
-  const logo = await logoDataURL();
+  const [logo, fontes] = await Promise.all([logoDataURL(), pdfFontData()]);
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  if (fontes) { try { fontes.forEach(([file, fam, st, b64]) => { doc.addFileToVFS(file, b64); doc.addFont(file, fam, st); }); } catch (e) { /* segue com Helvetica */ } }
+  const RICO = Boolean(fontes) && doc.getFontList().Manrope;
+  const T = RICO ? pdfTextRico : pdfText;
   const r = rec.resultado; const lvl = levelOf(r.indice); const voc = vocabOf(rec.respostas?.negocio);
   const pk = pack(rec.respostas?.negocio); const p = pk.perfil(r.perfil);
-  const W = 210, M = 16, CW = W - 2 * M, BOTTOM = 280;
-  const C = { ink: [27, 26, 34], ink2: [88, 84, 100], ink3: [130, 126, 144], line: [222, 219, 228], warm: [194, 131, 30], cool: [74, 139, 220], third: [194, 85, 159], dark: [15, 14, 20], soft: [248, 245, 240], good: [47, 143, 98], warn: [190, 135, 20], crit: [196, 72, 86] };
+  const W = 210, H = 297, M = 18, CW = W - 2 * M, BOTTOM = 274;
+  // Paleta do caderno, econômica em tinta.
+  const C = {
+    ink: [42, 44, 51], ink2: [86, 90, 101], ink3: [138, 142, 152], line: [216, 211, 200], line2: [233, 229, 220], white: [255, 255, 255],
+    warm: [181, 112, 26], warmL: [235, 200, 143], warmT: [252, 244, 232], cool: [60, 120, 194], coolL: [169, 198, 234], coolT: [239, 245, 252],
+    base: [110, 114, 128], baseL: [207, 209, 216], baseT: [243, 243, 245], good: [59, 148, 104], goodT: [238, 247, 242],
+    crit: [191, 79, 92], critT: [251, 239, 241], warn: [176, 128, 22], warnT: [252, 246, 230], mag: [169, 84, 138], magT: [251, 241, 247],
+    ambar: [240, 179, 94], azul: [141, 184, 238]
+  };
+  const EIXO = { aprox: [C.warm, C.warmL, C.warmT, 'Aproximação'], afast: [C.cool, C.coolL, C.coolT, 'Afastamento'], base: [C.base, C.baseL, C.baseT, 'Linha de base'] };
+  const POST = { assertiva: [C.warm, C.warmT], passiva: [C.cool, C.coolT], agressiva: [C.mag, C.magT] };
   let y = 0;
   const color = (c, kind = 'text') => kind === 'text' ? doc.setTextColor(...c) : kind === 'fill' ? doc.setFillColor(...c) : doc.setDrawColor(...c);
-  const font = (size, style = 'normal', c = C.ink) => { doc.setFont('helvetica', style); doc.setFontSize(size); color(c); };
-  const lh = size => size * 0.42;
-  const footer = () => { const n = doc.getNumberOfPages(); color(C.line, 'draw'); doc.setLineWidth(0.2); doc.line(M, 285, W - M, 285); font(7.2, 'normal', C.ink3); doc.text(pdfText(COPYRIGHT), M, 289.5); doc.text(String(n), W - M, 289.5, { align: 'right' }); };
-  const newPage = () => { footer(); doc.addPage(); y = 18; };
-  const need = h => { if (y + h > BOTTOM) newPage(); };
-  const para = (t, size = 10, style = 'normal', c = C.ink, width = CW, x = M, gap = 1.5) => {
-    font(size, style, c);
-    const lines = doc.splitTextToSize(pdfText(t), width);
-    for (const ln of lines) { need(lh(size) + 1); font(size, style, c); doc.text(ln, x, y + lh(size)); y += lh(size) + 0.9; }
-    y += gap;
+  // Papéis tipográficos: título (Urbanist Bold), número (Urbanist Light), texto, semi e forte (Manrope).
+  const font = (size, role = 'body', c = C.ink) => {
+    const map = RICO ? { title: ['Urbanist', 'bold'], light: ['Urbanist', 'light'], body: ['Manrope', 'normal'], semi: ['Manrope', 'semibold'], bold: ['Manrope', 'bold'] }
+      : { title: ['helvetica', 'bold'], light: ['helvetica', 'normal'], body: ['helvetica', 'normal'], semi: ['helvetica', 'bold'], bold: ['helvetica', 'bold'] };
+    doc.setFont(...map[role]); doc.setFontSize(size); color(c);
   };
-  const h2 = t => { need(28); y += 3; font(13, 'bold', C.ink); doc.text(pdfText(t), M, y + 5); y += 8; color(C.warm, 'draw'); doc.setLineWidth(0.6); doc.line(M, y, M + 14, y); y += 5; };
-  const bar = (x, yy, w, h, v, c, marcas = [40, 60, 80]) => { color(C.line, 'fill'); doc.roundedRect(x, yy, w, h, h / 2, h / 2, 'F'); color(c, 'fill'); doc.roundedRect(x, yy, Math.max(h, w * v / 100), h, h / 2, h / 2, 'F'); color([255, 255, 255], 'draw'); doc.setLineWidth(0.3); marcas.forEach(t => doc.line(x + w * t / 100, yy, x + w * t / 100, yy + h)); };
-  const eixoRGB = e => e === 'aprox' ? C.warm : e === 'afast' ? C.cool : C.ink2;
+  const lh = size => size * 0.43;
+  const linhas = (t, size, role, width) => { font(size, role); return doc.splitTextToSize(T(t), width); };
+  const altura = (t, size, role, width) => linhas(t, size, role, width).length * (lh(size) + 0.6);
+  const escrever = (t, x, yy, size, role, c, width) => { const ls = linhas(t, size, role, width); font(size, role, c); ls.forEach((ln, i) => doc.text(ln, x, yy + lh(size) + i * (lh(size) + 0.6))); return ls.length * (lh(size) + 0.6); };
+  const eyebrow = (t, x, yy, c = C.warm, size = 6.8, align) => { font(size, 'bold', c); doc.setCharSpace(0.35); doc.text(T(t).toUpperCase(), x, yy, align ? { align } : undefined); doc.setCharSpace(0); };
+  const caixa = (x, yy, w, h, fill, stroke, lw = 0.3) => { if (fill) color(fill, 'fill'); if (stroke) { color(stroke, 'draw'); doc.setLineWidth(lw); } doc.roundedRect(x, yy, w, h, 2.6, 2.6, fill && stroke ? 'FD' : fill ? 'F' : 'S'); };
+  const barra = (x, yy, w, h, v, c, marcas) => {
+    color(C.line2, 'fill'); doc.roundedRect(x, yy, w, h, h / 2, h / 2, 'F');
+    color(c, 'fill'); doc.roundedRect(x, yy, Math.max(h, w * v / 100), h, h / 2, h / 2, 'F');
+    color(C.white, 'draw'); doc.setLineWidth(0.35); marcas.forEach(t => doc.line(x + w * t / 100, yy, x + w * t / 100, yy + h));
+  };
+  // Símbolo do método: metade âmbar (Aproximação), meia lua azul (Afastamento) e o anel da linha de base.
+  const simbolo = (cx, cy, rr) => {
+    color(C.line, 'draw'); doc.setLineWidth(rr * 0.08); doc.circle(cx, cy, rr * 12.5 / 11.5, 'S');
+    color(C.ambar, 'fill'); doc.circle(cx, cy, rr, 'F'); color(C.white, 'fill'); doc.rect(cx, cy - rr - 0.2, rr + 0.3, 2 * rr + 0.4, 'F');
+    const b = rr * 7.5 / 11.5; color(C.azul, 'fill'); doc.circle(cx, cy, b, 'F'); color(C.ambar, 'fill'); doc.rect(cx - b - 0.05, cy - b - 0.05, b + 0.05, 2 * b + 0.1, 'F');
+  };
+  const rodape = () => {
+    font(6.4, 'body', C.ink3); doc.text(T(COPYRIGHT), M, 289);
+    font(8, 'bold', C.warm); doc.text(String(doc.getNumberOfPages()), W - M, 289, { align: 'right' });
+  };
+  const cabecalho = () => {
+    simbolo(M + 2.2, 11.2, 2.2);
+    font(7.4, 'semi', C.ink3); doc.text(T('Diagnóstico OQGCI'), M + 6.6, 12.4);
+    doc.text(T(`${rec.nome ? rec.nome + ' · ' : ''}${fmtDate(rec.created_at)}`), W - M, 12.4, { align: 'right' });
+    color(C.line2, 'draw'); doc.setLineWidth(0.25); doc.line(M, 16, W - M, 16);
+  };
+  const novaPagina = () => { rodape(); doc.addPage(); cabecalho(); y = 24; };
+  const precisa = h => { if (y + h > BOTTOM) novaPagina(); };
+  const secao = (eb, titulo, lead) => {
+    const hl = lead ? altura(lead, 9, 'body', CW) + 2 : 0;
+    precisa(26 + hl + 45); y += 4;
+    eyebrow(eb, M, y + 3); font(16, 'title', C.ink); doc.text(T(titulo), M, y + 11);
+    color(C.warmL, 'fill'); doc.rect(M, y + 14, 14, 0.8, 'F'); y += 19;
+    if (lead) { y += escrever(lead, M, y, 9, 'body', C.ink2, CW) + 3; }
+  };
 
-  // Capa
-  // Capa em fundo claro, com o logo do autor na versão escura.
-  color(C.warm, 'fill'); doc.rect(0, 0, W, 2.2, 'F');
-  color(C.warm, 'fill'); doc.circle(M + 6, 17, 6, 'F'); color([255, 255, 255], 'fill'); doc.rect(M + 6, 10.8, 6.4, 12.4, 'F');
-  color(C.cool, 'fill'); doc.circle(M + 6, 17, 3.8, 'F'); color(C.warm, 'fill'); doc.rect(M + 2.1, 13.1, 3.9, 7.8, 'F');
-  if (logo) { try { doc.addImage(logo, 'PNG', W - M - 26, 7, 26, 28.7); } catch (e) { /* segue sem o logo */ } }
-  font(18, 'bold', C.ink); doc.text(pdfText('Diagnóstico OQGCI'), M + 16, 19.5);
-  font(9.5, 'normal', C.ink2); doc.text(pdfText(`Diagnóstico completo${rec.nome ? ' · ' + rec.nome : ''} · ${fmtDate(rec.created_at)}`), M, 34);
-  doc.text(pdfText(negocioLinha(rec) || 'Neurociência aplicada à venda'), M, 39.5);
-  color(C.line, 'draw'); doc.setLineWidth(0.3); doc.line(M, 46, W - M, 46);
-  y = 56;
+  /* ---------------- Capa ---------------- */
+  color(C.warmL, 'draw'); doc.setLineWidth(0.35); [74, 62, 50].forEach(rr => doc.circle(W + 18, 64, rr, 'S'));
+  color(C.coolL, 'draw'); [38, 26, 14].forEach(rr => doc.circle(W + 18, 64, rr, 'S'));
+  if (logo) { try { doc.addImage(logo, 'PNG', M, 16, 19, 21); } catch (e) { /* segue sem o logo */ } }
+  [[C.warmL, 0], [C.coolL, 1], [C.baseL, 2]].forEach(([c, i]) => { color(c, 'fill'); doc.roundedRect(M + i * 15, 64, 12, 1.4, 0.7, 0.7, 'F'); });
+  eyebrow('Venda com Neurociência · Metodologia OQGCI', M, 74);
+  font(34, 'title', C.ink); doc.text(T('Diagnóstico OQGCI'), M, 89);
+  let yc = 98;
+  if (rec.nome) { font(17, 'light', C.ink); doc.text(T(rec.nome), M, yc); yc += 8; }
+  font(9.2, 'body', C.ink2); doc.text(T(`Diagnóstico completo · ${fmtDate(rec.created_at)}`), M, yc); yc += 5;
+  doc.text(T(negocioLinha(rec) || 'Neurociência aplicada à venda'), M, yc); yc += 10;
 
   // Índice e perfil
-  font(9, 'bold', C.ink3); doc.text('INDICE OQGCI', M, y); doc.text('PERFIL', M + 92, y); y += 4;
-  font(40, 'normal', C.ink); doc.text(String(r.indice), M, y + 14); font(12, 'normal', C.ink3); doc.text('/100', M + (r.indice >= 100 ? 31 : 22), y + 14);
-  font(10.5, 'bold', C.warm); doc.text(pdfText(`Nível ${lvl.n} · ${lvl.nome}`), M, y + 22);
-  bar(M, y + 26, 76, 3.2, r.indice, C.warm);
-  font(16, 'bold', C.ink); doc.text(pdfText(p.nome), M + 92, y + 9);
-  font(9.5, 'normal', C.ink2); const pl = doc.splitTextToSize(pdfText(V(p.conversa + ' ' + p.foco, voc)), CW - 92); doc.text(pl.slice(0, 7), M + 92, y + 15);
-  y += 36;
-  font(9.5, 'normal', C.ink2); const ll = doc.splitTextToSize(pdfText(V(pk.leituraNivel(lvl.nome), voc)), 76); doc.text(ll, M, y); y += ll.length * 4.4 + 6;
+  const colA = 78, colB = CW - colA - 6;
+  const txtNivel = V(pk.leituraNivel(lvl.nome), voc);
+  const txtPerfil = V(p.conversa + ' ' + p.foco, voc);
+  const hA = 8 + 18 + 7 + 6 + altura(txtNivel, 8.4, 'body', colA - 12) + 6;
+  const hB = 8 + 10 + altura(txtPerfil, 8.4, 'body', colB - 12) + 6;
+  const hAB = Math.max(hA, hB);
+  caixa(M, yc, colA, hAB, C.white, C.line);
+  eyebrow('Índice OQGCI', M + 6, yc + 8);
+  font(40, 'light', C.ink); doc.text(String(r.indice), M + 5, yc + 24);
+  const wN = doc.getTextWidth(String(r.indice)); font(11, 'body', C.ink3); doc.text('/100', M + 6 + wN, yc + 24);
+  font(9.5, 'semi', C.warm); doc.text(T(`Nível ${lvl.n} · ${lvl.nome}`), M + 6, yc + 31);
+  barra(M + 6, yc + 34, colA - 12, 2.6, r.indice, C.warm, [40, 60, 80]);
+  escrever(txtNivel, M + 6, yc + 39, 8.4, 'body', C.ink2, colA - 12);
+  const xb = M + colA + 6;
+  caixa(xb, yc, colB, hAB, C.white, C.line);
+  eyebrow('Perfil', xb + 6, yc + 8);
+  font(15, 'title', C.ink); doc.text(T(p.nome), xb + 6, yc + 16);
+  escrever(txtPerfil, xb + 6, yc + 19, 8.4, 'body', C.ink2, colB - 12);
+  yc += hAB + 6;
 
-  // Eixos OQGCI
-  h2('Mapa OQGCI');
-  const q = quadOf(r);
-  [['Aproximação · o cliente percebe o ganho', r.aprox, C.warm], ['Afastamento · o cliente se livra do que faz mal', r.afast, C.cool]].forEach(([t, v, c]) => {
-    font(9.5, 'normal', C.ink); doc.text(pdfText(t), M, y + 3.5); font(9.5, 'bold', C.ink); doc.text(String(v), M + CW, y + 3.5, { align: 'right' });
-    bar(M, y + 5.5, CW, 3, v, c); y += 12;
+  // Mapa OQGCI em miniatura, com os dois eixos e a postura
+  const q = quadOf(r); const hMapa = 62;
+  caixa(M, yc, CW, hMapa, C.white, C.line);
+  const S = 46, mx = M + 12, my = yc + 6;
+  const X = v => mx + S * v / 100, Y = v => my + S * (100 - v) / 100;
+  [[0, 60, 60, 100, C.coolT], [60, 100, 60, 100, C.goodT], [0, 60, 0, 60, C.baseT], [60, 100, 0, 60, C.warmT]].forEach(([a, b, c2, d, f]) => { color(f, 'fill'); doc.rect(X(a), Y(d), X(b) - X(a), Y(c2) - Y(d), 'F'); });
+  color(C.line, 'draw'); doc.setLineWidth(0.25); doc.rect(mx, my, S, S, 'S');
+  color(C.ink3, 'draw'); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(X(60), my, X(60), my + S); doc.line(mx, Y(60), mx + S, Y(60)); doc.setLineDashPattern([], 0);
+  color(C.white, 'fill'); doc.circle(X(r.aprox), Y(r.afast), 2.2, 'F'); color(C.ink, 'fill'); doc.circle(X(r.aprox), Y(r.afast), 1.5, 'F');
+  font(6.2, 'semi', C.warm); doc.text(T('Aproximação'), mx + S, my + S + 4, { align: 'right' });
+  font(6.2, 'semi', C.cool); doc.text(T('Afastamento'), mx - 2.2, my + S, { angle: 90 });
+  const xm = mx + S + 12, wm = M + CW - 6 - xm;
+  eyebrow('Mapa OQGCI', xm, yc + 9);
+  font(13, 'title', C.ink); doc.text(T(QUADS[q].nome), xm, yc + 16);
+  let ym = yc + 18; ym += escrever(V(pk.quad(q), voc), xm, ym, 8.4, 'body', C.ink2, wm) + 3;
+  [['Aproximação', r.aprox, C.warm], ['Afastamento', r.afast, C.cool]].forEach(([t, v, c]) => {
+    font(8.2, 'semi', C.ink); doc.text(T(t), xm, ym + 3); font(8.2, 'bold', C.ink); doc.text(String(v), xm + wm, ym + 3, { align: 'right' });
+    barra(xm, ym + 4.6, wm, 2.2, v, c, [60]); ym += 10;
   });
-  para(`${QUADS[q].nome}. ${V(pk.quad(q), voc)}`, 10, 'normal', C.ink);
-  font(9, 'normal', C.ink3); doc.text(pdfText(`Postura nas seis situações: ${r.postura.assertiva} assertiva, ${r.postura.passiva} passiva, ${r.postura.agressiva} agressiva.`), M, y + 3); y += 8;
+  font(7.6, 'body', C.ink3); doc.text(T(`Postura nas seis situações: ${r.postura.assertiva} assertiva, ${r.postura.passiva} passiva, ${r.postura.agressiva} agressiva.`), xm, Math.min(ym + 2, yc + hMapa - 4));
+  yc += hMapa + 6;
+  // Forças: as três maiores notas fora das prioridades
+  if (r.forcas && r.forcas.length) {
+    eyebrow('Suas forças', M, yc + 3); yc += 6;
+    const cwf = (CW - 2 * 5) / 3;
+    r.forcas.slice(0, 3).forEach((k, j) => {
+      const xf = M + j * (cwf + 5); const [c, cl] = EIXO[DIM[k].eixo];
+      caixa(xf, yc, cwf, 17, C.white, C.line); color(cl, 'fill'); doc.roundedRect(xf, yc, 1.4, 17, 0.7, 0.7, 'F');
+      font(10.5, 'title', C.ink); doc.text(T(DIM[k].nome), xf + 5, yc + 7.5);
+      font(6.4, 'bold', c); doc.setCharSpace(0.3); doc.text(T(EIXO[DIM[k].eixo][3]).toUpperCase(), xf + 5, yc + 12.5); doc.setCharSpace(0);
+      font(16, 'light', c); doc.text(String(r.dims[k]), xf + cwf - 5, yc + 11.5, { align: 'right' });
+    });
+  }
+  rodape();
+
+  /* ---------------- Páginas internas ---------------- */
+  doc.addPage(); cabecalho(); y = 24;
 
   if (r.alerts.length) {
-    h2('Pontos de atenção');
-    r.alerts.forEach(a => { need(14); color(a.sev === 'crit' ? C.crit : C.warn, 'fill'); doc.circle(M + 1.6, y + 2.2, 1.6, 'F'); font(10, 'bold', C.ink); doc.text(pdfText(a.t), M + 6, y + 3.4); y += 5.5; para(a.d, 9.5, 'normal', C.ink2, CW - 6, M + 6, 2); });
+    secao('Antes de tudo', 'Pontos de atenção');
+    r.alerts.forEach(a => {
+      const [c, t] = a.sev === 'crit' ? [C.crit, C.critT] : [C.warn, C.warnT];
+      const h = 13 + altura(a.d, 8.8, 'body', CW - 14) + 4; precisa(h + 3);
+      caixa(M, y, CW, h, t, null); color(c, 'fill'); doc.roundedRect(M, y, 1.4, h, 0.7, 0.7, 'F');
+      eyebrow(a.sev === 'crit' ? 'Crítico' : 'Atenção', M + 6, y + 6, c, 6.2);
+      font(10, 'semi', C.ink); doc.text(T(a.t), M + 6, y + 11);
+      escrever(a.d, M + 6, y + 12.5, 8.8, 'body', C.ink2, CW - 14); y += h + 3;
+    });
   }
 
-  // Dimensões
-  h2('As oito dimensões');
+  secao('Visão geral', 'As oito dimensões', 'Cada dimensão vai de 0 a 100. As cores mostram o eixo: âmbar para Aproximação, azul para Afastamento e cinza para a linha de base.');
+  precisa(DIMS.length * 9 + 10);
   DIMS.forEach(d => {
-    need(9); const v = r.dims[d.id];
-    font(9.5, 'bold', C.ink); doc.text(pdfText(`${d.id} ${d.nome}`), M, y + 3.4);
-    bar(M + 40, y + 1, CW - 72, 3.2, v, eixoRGB(d.eixo), [25, 50, 75]);
-    font(9.5, 'bold', C.ink); doc.text(String(v), M + CW - 22, y + 3.6, { align: 'right' }); font(8.5, 'normal', C.ink3); doc.text(pdfText(nivelDim(v).nome), M + CW, y + 3.6, { align: 'right' });
-    y += 7.5;
+    const v = r.dims[d.id]; const [c] = EIXO[d.eixo];
+    font(9.4, 'semi', C.ink); doc.text(T(d.nome), M, y + 4.2);
+    font(6.6, 'bold', C.ink3); doc.text(T(EIXO[d.eixo][3].toUpperCase()), M, y + 7.6);
+    barra(M + 42, y + 2.2, CW - 82, 3, v, c, [25, 50, 75]);
+    font(10, 'bold', C.ink); doc.text(String(v), M + CW - 26, y + 4.6, { align: 'right' });
+    font(8, 'body', C.ink3); doc.text(T(nivelDim(v).nome), M + CW, y + 4.6, { align: 'right' });
+    color(C.line2, 'draw'); doc.setLineWidth(0.2); doc.line(M, y + 9.2, M + CW, y + 9.2); y += 10;
   });
-  font(8, 'normal', C.ink3); doc.text(pdfText('Cor dourada: Aproximação · azul: Afastamento · cinza: linha de base.'), M, y + 2); y += 8;
+  y += 2;
 
-  h2('Leitura das dimensões');
+  secao('Uma a uma', 'Leitura das dimensões');
   const items = rec.respostas?.items;
   DIMS.forEach(d => {
-    const v = r.dims[d.id]; need(30);
-    font(11, 'bold', C.ink); doc.text(pdfText(`${d.nome}`), M, y + 4); font(10, 'bold', eixoRGB(d.eixo)); doc.text(pdfText(`${v} · ${nivelDim(v).nome}`), M + CW, y + 4, { align: 'right' }); y += 7;
-    para(V(pk.bands[d.id][bandOf(v)], voc), 9.5, 'normal', C.ink, CW, M, 1);
+    const v = r.dims[d.id]; const [c, cl] = EIXO[d.eixo]; const w = CW - 12;
+    const leitura = V(pk.bands[d.id][bandOf(v)], voc);
     const ex = itemExtremes(d.id, items);
-    if (ex && !ex.uniforme) {
-      para(`Ponto forte: "${V(pk.T[ex.best.i.c], voc)}" (você marcou ${SCALE[ex.best.r - 1].toLowerCase()})`, 9, 'normal', C.ink2, CW, M, 0.5);
-      para(`Ponto de atenção: "${V(pk.T[ex.worst.i.c], voc)}" (você marcou ${SCALE[ex.worst.r - 1].toLowerCase()})`, 9, 'normal', C.ink2, CW, M, 0.5);
+    const forte = ex && !ex.uniforme ? `"${V(pk.T[ex.best.i.c], voc)}" Você marcou ${SCALE[ex.best.r - 1].toLowerCase()}.` : null;
+    const atencao = ex && !ex.uniforme ? `"${V(pk.T[ex.worst.i.c], voc)}" Você marcou ${SCALE[ex.worst.r - 1].toLowerCase()}.` : null;
+    const porque = V(d.mecanismo, voc);
+    let h = 7 + 8 + altura(leitura, 8.8, 'body', w) + 2;
+    if (forte) h += 4 + altura(forte, 8.4, 'body', w) + 1.5 + 4 + altura(atencao, 8.4, 'body', w) + 1.5;
+    h += 4 + altura(porque, 8, 'body', w) + 5;
+    precisa(h + 4);
+    caixa(M, y, CW, h, C.white, C.line); color(cl, 'fill'); doc.roundedRect(M, y, CW, 1.6, 0.8, 0.8, 'F');
+    let yy = y + 9;
+    font(12, 'title', C.ink); doc.text(T(d.nome), M + 6, yy);
+    font(8.4, 'semi', C.ink3); const wNv = doc.getTextWidth(T(nivelDim(v).nome)); doc.text(T(nivelDim(v).nome), M + CW - 6, yy, { align: 'right' });
+    font(10, 'bold', c); doc.text(T(`${v}`), M + CW - 6 - wNv - 2.5, yy, { align: 'right' });
+    eyebrow(EIXO[d.eixo][3], M + 6, yy + 4.4, c, 6.2);
+    yy += 7; yy += escrever(leitura, M + 6, yy, 8.8, 'body', C.ink, w) + 2;
+    if (forte) {
+      eyebrow('Ponto forte nas suas respostas', M + 6, yy + 3, C.good, 6.2); yy += 4; yy += escrever(forte, M + 6, yy, 8.4, 'body', C.ink2, w) + 1.5;
+      eyebrow('Ponto de atenção', M + 6, yy + 3, C.crit, 6.2); yy += 4; yy += escrever(atencao, M + 6, yy, 8.4, 'body', C.ink2, w) + 1.5;
     }
-    para(`Por que importa: ${V(d.mecanismo, voc)}`, 8.5, 'italic', C.ink3, CW, M, 4);
+    eyebrow('Por que importa', M + 6, yy + 3, C.ink3, 6.2); yy += 4; escrever(porque, M + 6, yy, 8, 'body', C.ink3, w);
+    y += h + 4;
   });
 
-  h2('Sua postura nas situações');
+  secao('Seis situações', 'Sua postura nas situações', 'A resposta assertiva sustenta o valor do seu trabalho e mantém o cliente pensando com clareza.');
   const sjt = rec.respostas?.sjt || {};
   pk.sjt.forEach((s, k) => {
     const ch = sjt[s.id]; const mine = s.ops.find(o => o.k === ch); const best = s.ops.find(o => o.k === 'assertiva');
-    need(18); font(10, 'bold', C.ink); const tl = doc.splitTextToSize(pdfText(`${k + 1}. ${V(s.t, voc)}`), CW - 30); doc.text(tl, M, y + 3.6);
-    if (ch) { color(ch === 'assertiva' ? C.warm : ch === 'passiva' ? C.cool : C.third, 'fill'); doc.roundedRect(M + CW - 26, y, 26, 5.4, 2.7, 2.7, 'F'); font(8.5, 'bold', [255, 255, 255]); doc.text(pdfText(POSTURA_NOME[ch]), M + CW - 13, y + 3.8, { align: 'center' }); }
-    y += tl.length * 4.6 + 1.5;
-    const W = pk.why[s.id];
-    if (mine) para(`Sua resposta: ${V(mine.t, voc)}`, 9, 'normal', C.ink2, CW, M, 0.5);
-    if (ch && ch !== 'assertiva') { para(`O que acontece com essa resposta: ${V(W[ch], voc)}`, 9, 'normal', C.ink2, CW, M, 0.5); para(`A resposta que sustenta o valor: ${V(best.t, voc)}`, 9, 'bold', C.ink, CW, M, 0.5); }
-    para(`Por que ela funciona: ${V(W.why, voc)}`, 9, 'normal', C.ink, CW, M, 0.5);
-    para(`O que pregamos no método: "${V(W.frase, voc)}"`, 9, 'italic', C.warm, CW, M, 0.5);
-    y += 3.5;
+    const Wy = pk.why[s.id]; const w = CW - 12;
+    const titulo = V(s.t, voc);
+    const blocos = [];
+    if (mine) blocos.push(['Sua resposta', V(mine.t, voc), 'body', C.ink]);
+    if (ch && ch !== 'assertiva') { blocos.push(['O que acontece com essa resposta', V(Wy[ch], voc), 'body', C.ink2]); blocos.push(['A resposta que sustenta o valor', V(best.t, voc), 'semi', C.ink]); }
+    blocos.push(['Por que ela funciona', V(Wy.why, voc), 'body', C.ink2]);
+    const frase = `"${V(Wy.frase, voc)}"`;
+    const hT = altura(titulo, 10, 'semi', w - 30);
+    const hF = 6 + altura(frase, 9.2, 'semi', w - 10) + 4;
+    let h = 8 + hT + 2 + blocos.reduce((a, [, t, role]) => a + 4 + altura(t, 8.6, role, w) + 1.8, 0) + hF + 6;
+    precisa(h + 4);
+    caixa(M, y, CW, h, C.white, C.line);
+    let yy = y + 6;
+    eyebrow(`Situação ${k + 1}`, M + 6, yy + 1);
+    if (ch) { const [pc, pt] = POST[ch]; const tw = 24; color(pt, 'fill'); color(pc, 'draw'); doc.setLineWidth(0.3); doc.roundedRect(M + CW - 6 - tw, yy - 3, tw, 5.6, 2.8, 2.8, 'FD'); font(7.6, 'bold', pc); doc.text(T(POSTURA_NOME[ch]), M + CW - 6 - tw / 2, yy + 0.9, { align: 'center' }); }
+    yy += 3; yy += escrever(titulo, M + 6, yy, 10, 'semi', C.ink, w - 30) + 2;
+    blocos.forEach(([rot, t, role, c]) => { eyebrow(rot, M + 6, yy + 3, C.ink3, 6.2); yy += 4; yy += escrever(t, M + 6, yy, 8.6, role, c, w) + 1.8; });
+    caixa(M + 6, yy + 1, w, hF, C.warmT, null); color(C.warmL, 'fill'); doc.rect(M + 6, yy + 1, 1.2, hF, 'F');
+    eyebrow('O que pregamos no método', M + 11, yy + 6, C.warm, 6.2);
+    escrever(frase, M + 11, yy + 7.5, 9.2, 'semi', C.ink, w - 10);
+    y += h + 4;
   });
 
   if (rec.respostas?.historia) {
-    h2(pk.hist.titulo);
-    color(C.soft, 'fill'); const hl = doc.splitTextToSize(pdfText(rec.respostas.historia), CW - 8); const hh = hl.length * 4.4 + 6;
-    need(Math.min(hh, 120)); doc.rect(M, y, CW, Math.min(hh, BOTTOM - y), 'F'); color(C.warm, 'fill'); doc.rect(M, y, 1, Math.min(hh, BOTTOM - y), 'F');
-    y += 3; para(rec.respostas.historia, 9.5, 'italic', C.ink, CW - 8, M + 5, 3);
+    secao('O seu relato', pk.hist.titulo);
+    const hist = rec.respostas.historia; const w = CW - 14;
+    const hh = altura(hist, 9, 'body', w) + 10;
+    if (hh <= BOTTOM - 24) {
+      precisa(hh + 4);
+      caixa(M, y, CW, hh, C.baseT, null); color(C.warmL, 'fill'); doc.rect(M, y, 1.4, hh, 'F');
+      escrever(hist, M + 7, y + 5, 9, 'body', C.ink, w); y += hh + 5;
+    } else { y += escrever(hist, M, y, 9, 'body', C.ink, CW) + 5; }
     const L = r.leitura;
     if (L) {
-      para(L.sintese, 10, 'normal', C.ink, CW, M, 2);
+      precisa(20); y += escrever(L.sintese, M, y, 9.6, 'body', C.ink, CW) + 3;
       (L.movimentos || []).forEach(m => {
-        need(16); const st = { presente: ['Presente', C.good], parcial: ['Parcial', C.warn], ausente: ['Não aparece', C.crit] }[m.status] || ['-', C.ink3];
-        font(10, 'bold', C.ink); doc.text(pdfText(m.nome), M, y + 3.6); color(st[1], 'fill'); doc.circle(M + 26, y + 2.4, 1.4, 'F'); font(9, 'bold', st[1]); doc.text(pdfText(st[0]), M + 29, y + 3.6); y += 6;
-        para(m.evidencia, 9, 'normal', C.ink2, CW, M, 0.5); para(`Como fortalecer: ${m.como_fortalecer}`, 9, 'normal', C.ink, CW, M, 2.5);
+        const st = { presente: ['Presente', C.good], parcial: ['Parcial', C.warn], ausente: ['Não aparece', C.crit] }[m.status] || ['-', C.ink3];
+        const hm = 6 + altura(m.evidencia, 8.6, 'body', CW) + altura(`Como fortalecer: ${m.como_fortalecer}`, 8.6, 'semi', CW) + 4; precisa(hm);
+        font(10, 'semi', C.ink); doc.text(T(m.nome), M, y + 4); color(st[1], 'fill'); doc.circle(M + 25, y + 2.8, 1.2, 'F'); font(8.4, 'bold', st[1]); doc.text(T(st[0]), M + 28, y + 4); y += 6;
+        y += escrever(m.evidencia, M, y, 8.6, 'body', C.ink2, CW); y += escrever(`Como fortalecer: ${m.como_fortalecer}`, M, y, 8.6, 'semi', C.ink, CW) + 3;
       });
-      if (L.quem_decide) para(`Quem decide: ${L.quem_decide}`, 9.5, 'normal', C.ink, CW, M, 1);
-      if (L.postura) para(`Postura: ${L.postura}`, 9.5, 'normal', C.ink, CW, M, 1);
-      if (L.ponto_chave) para(`Ponto-chave: ${L.ponto_chave}`, 10, 'bold', C.warm, CW, M, 2);
-      para('Leitura gerada por IA a partir do relato.', 8, 'italic', C.ink3, CW, M, 2);
+      [['Quem decide', L.quem_decide], ['Postura', L.postura]].forEach(([k2, t2]) => { if (t2) { precisa(10); y += escrever(`${k2}: ${t2}`, M, y, 9, 'body', C.ink, CW) + 1.5; } });
+      if (L.ponto_chave) { precisa(12); y += escrever(`Ponto-chave: ${L.ponto_chave}`, M, y, 9.6, 'semi', C.warm, CW) + 2; }
+      y += escrever('Leitura gerada por IA a partir do relato.', M, y, 7.6, 'body', C.ink3, CW) + 3;
     } else {
-      para('Releia a sua história com estas quatro perguntas:', 9.5, 'normal', C.ink2, CW, M, 0.5);
-      pk.hist.guide.forEach(([k2, t2]) => para(`${k2}: ${V(t2, voc)}`, 9.5, 'normal', C.ink2, CW - 4, M + 4, 0.5));
-      y += 2;
+      precisa(30); y += escrever('Releia a sua história com estas quatro perguntas:', M, y, 9, 'semi', C.ink2, CW) + 1.5;
+      pk.hist.guide.forEach(([k2, t2]) => { precisa(9); font(9, 'bold', C.warm); doc.text(T(k2), M, y + lh(9)); y += escrever(V(t2, voc), M + 22, y, 9, 'body', C.ink, CW - 22) + 1.5; });
+      y += 3;
     }
   }
 
-  h2('Prioridades de desenvolvimento');
+  secao('Os próximos 30 dias', 'Prioridades de desenvolvimento', 'As três dimensões que mais pedem atenção agora. Trabalhe uma por semana, na ordem.');
   r.prioridades.forEach((k, i) => {
-    need(30); font(11, 'bold', C.ink); doc.text(pdfText(`${i + 1}. ${DIM[k].nome}`), M, y + 4); font(10, 'bold', C.warm); doc.text(String(r.dims[k]), M + CW, y + 4, { align: 'right' }); y += 7;
-    para('O que está em jogo: ' + V(pk.bands[k][bandOf(r.dims[k])], voc), 9.5, 'normal', C.ink2, CW, M, 1);
-    para(`O que desenvolver: ${V(pk.dim[k].pratica, voc)}`, 9.5, 'bold', C.ink, CW, M, 1);
-    para('Como implementar:', 9.5, 'bold', C.ink, CW, M, 0.5);
-    pk.impl[k].passos.forEach((x, n) => para(`${n + 1}. ${V(x, voc)}`, 9.5, 'normal', C.ink, CW - 4, M + 4, 0.5));
-    para(`Frase pronta: "${V(pk.impl[k].frase, voc)}"`, 9.5, 'italic', C.warm, CW, M, 1);
-    para(`Como saber que está funcionando: ${V(pk.impl[k].sinal, voc)}`, 9.5, 'normal', C.ink2, CW, M, 5);
+    const w = CW - 30; const xi = M + 24;
+    const jogo = V(pk.bands[k][bandOf(r.dims[k])], voc); const pratica = V(pk.dim[k].pratica, voc);
+    const passos = pk.impl[k].passos.map(x => V(x, voc)); const frase = `"${V(pk.impl[k].frase, voc)}"`; const sinal = V(pk.impl[k].sinal, voc);
+    let h = 18 + 4 + altura(jogo, 8.6, 'body', w) + 2 + 4 + altura(pratica, 9.2, 'semi', w - 4) + 4
+      + 4.5 + passos.reduce((a, t) => a + altura(t, 8.6, 'body', w - 8) + 1.6, 0) + 2
+      + 6 + altura(frase, 9, 'semi', w - 10) + 4 + 4 + altura(sinal, 8.6, 'body', w) + 6;
+    precisa(h + 4);
+    const [c, cl] = EIXO[DIM[k].eixo];
+    caixa(M, y, CW, h, C.white, C.line);
+    font(26, 'light', C.warmL); doc.text(String(i + 1).padStart(2, '0'), M + 6, y + 14);
+    let yy = y + 8;
+    eyebrow(`Prioridade ${i + 1} · ${EIXO[DIM[k].eixo][3]}`, xi, yy, c, 6.4);
+    font(14, 'title', C.ink); doc.text(T(DIM[k].nome), xi, yy + 6.5);
+    font(11, 'bold', c); doc.text(String(r.dims[k]), M + CW - 6, yy + 6.5, { align: 'right' });
+    yy += 10;
+    eyebrow('O que está em jogo', xi, yy + 3, C.ink3, 6.2); yy += 4; yy += escrever(jogo, xi, yy, 8.6, 'body', C.ink2, w) + 2;
+    color(cl, 'fill'); doc.rect(xi, yy + 0.5, 1.1, altura(pratica, 9.2, 'semi', w - 4) + 4, 'F');
+    eyebrow('O que desenvolver', xi + 4, yy + 3, c, 6.2); yy += 4; yy += escrever(pratica, xi + 4, yy, 9.2, 'semi', C.ink, w - 4) + 4;
+    eyebrow('Como implementar', xi, yy + 3, C.ink3, 6.2); yy += 4.5;
+    passos.forEach((t, n) => {
+      color(c, 'draw'); doc.setLineWidth(0.3); doc.circle(xi + 2, yy + 2, 1.9, 'S'); font(7, 'bold', c); doc.text(String(n + 1), xi + 2, yy + 3.1, { align: 'center' });
+      yy += escrever(t, xi + 6, yy, 8.6, 'body', C.ink, w - 8) + 1.6;
+    });
+    yy += 2;
+    const hF = 6 + altura(frase, 9, 'semi', w - 10) + 4;
+    caixa(xi, yy, w, hF, C.warmT, null); eyebrow('Frase pronta', xi + 5, yy + 5, C.warm, 6.2); escrever(frase, xi + 5, yy + 6.5, 9, 'semi', C.ink, w - 10); yy += hF + 4;
+    eyebrow('Como saber que está funcionando', xi, yy + 3, C.good, 6.2); yy += 4; escrever(sinal, xi, yy, 8.6, 'body', C.ink2, w);
+    y += h + 4;
   });
 
-
-  h2(pk.perguntasTitulo);
-  pk.questions.forEach(([k, t]) => para(`${k}: ${V(t, voc)}`, 10, 'normal', C.ink, CW, M, 1.5));
-  para('O instrumento está em fase de validação. Use o resultado como ferramenta de desenvolvimento.', 8, 'italic', C.ink3, CW, M, 0);
-  footer();
+  secao('Para levar', pk.perguntasTitulo);
+  const qs = pk.questions; const cw2 = (CW - 5) / 2;
+  for (let i = 0; i < qs.length; i += 2) {
+    const par = qs.slice(i, i + 2).map(([k2, t2]) => [k2, V(t2, voc)]);
+    const hq = Math.max(...par.map(([, t2]) => altura(t2, 9, 'semi', cw2 - 12))) + 14; precisa(hq + 4);
+    par.forEach(([k2, t2], j) => { const xq = M + j * (cw2 + 5); caixa(xq, y, cw2, hq, C.white, C.line); eyebrow(k2, xq + 6, y + 7); escrever(t2, xq + 6, y + 9, 9, 'semi', C.ink, cw2 - 12); });
+    y += hq + 4;
+  }
+  precisa(10); y += 2;
+  escrever('O instrumento está em fase de validação. Use o resultado como ferramenta de desenvolvimento.', M, y, 7.6, 'body', C.ink3, CW);
+  rodape();
   return doc.output('blob');
 }
 
