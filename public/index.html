@@ -684,6 +684,75 @@ const SJT_WHY = {
         agressiva: 'Insistir que o seu serviço resolve, quando ele não é o mais indicado, é a forma mais rápida de perder credibilidade. O cliente percebe a intenção, e a confiança dificilmente volta.',
         frase: 'Pelo que você me contou, eu não sou a melhor opção para isso agora. Quem pode te ajudar melhor é [profissional ou solução indicada], e eu te passo o contato.' }
 };
+// Versões B e C das seis situações (a versão A é a de cima). Cada versão mede a mesma competência, com a mesma lógica de respostas.
+// A versão usada numa execução segue a ordem das execuções da pessoa: A, B, C e de novo A. A ordem das respostas é embaralhada.
+const SJT_NOME = { S1: 'Preço logo de cara', S2: 'Pedido de desconto', S3: 'Decisão com outra pessoa', S4: 'Cliente em silêncio', S5: 'Leitura equivocada do cliente', S6: 'Seu serviço não é o mais indicado' };
+const SJT_V = {
+  B: [
+    { id: 'S1', t: 'O cliente liga e pede: "Me manda o orçamento por e-mail, que eu vejo e te retorno."', ops: [
+      ['assertiva', '"Mando, sim. Me conta em dois minutos o que você quer resolver, que eu já te mando com o valor certo para o seu caso."'],
+      ['passiva', '"Claro! Te mando todas as opções com os valores, e você me retorna quando tiver olhado."'],
+      ['agressiva', '"Orçamento por e-mail eu não faço, porque cada caso é um caso. Vamos marcar 15 minutos amanhã para eu te passar o valor?"'] ],
+      frase: 'Mando, sim. Me conta em dois minutos o que você quer resolver, que eu já te mando o valor certo para o seu caso.' },
+    { id: 'S2', t: 'O cliente diz: "Gostei, mas o outro profissional que eu consultei cobra 30% menos."', ops: [
+      ['assertiva', '"Faz sentido comparar. O que pesa mais para você nessa escolha? Se for o valor de uma vez, consigo ajustar o formato."'],
+      ['passiva', '"Entendo. Para não te perder, consigo chegar perto desse valor."'],
+      ['agressiva', '"Cada um sabe quanto vale o próprio trabalho. O meu preço é este, e a diferença aparece no resultado."'] ],
+      frase: 'Faz sentido comparar. O que pesa mais para você nessa escolha? Se for o valor de uma vez, consigo ajustar o formato.' },
+    { id: 'S3', t: 'O cliente diz: "Preciso ver com o meu sócio antes de fechar."', ops: [
+      ['assertiva', '"Claro. O que o seu sócio vai querer saber? Te mando um resumo com isso, ou fazemos uma conversa rápida com os dois."'],
+      ['passiva', '"Claro, sem pressa. Quando vocês conversarem, me avisa."'],
+      ['agressiva', '"Entendo, mas a decisão é sua, não? Essa condição só vale se fecharmos esta semana."'] ],
+      frase: 'Claro. O que o seu sócio vai querer saber? Te mando um resumo com isso, ou fazemos uma conversa rápida com os dois.' },
+    { id: 'S4', t: 'Depois de uma conversa de apresentação, o cliente disse que ia pensar e não responde a sua última mensagem há uma semana.', ops: [
+      ['assertiva', 'Mando algo útil ligado ao que ele contou na conversa e pergunto: "Isso ajuda a pensar na decisão? Ficou alguma dúvida?"'],
+      ['passiva', 'Espero ele me procurar. Se tiver interesse, ele volta.'],
+      ['agressiva', '"Oi! Se eu não tiver resposta até amanhã, vou liberar a sua vaga para outra pessoa."'] ],
+      frase: 'Lembrei da nossa conversa ao ver isto: [conteúdo útil ligado ao que ele contou]. Isso ajuda a pensar na decisão?' },
+    { id: 'S5', t: 'O cliente diz: "Já tentei de tudo, o problema é [causa em que ele acredita]. Só preciso que você resolva isso."', ops: [
+      ['assertiva', '"Posso te fazer duas perguntas antes? Em casos parecidos, o que costuma travar é outra coisa." E mostro com um caso.'],
+      ['passiva', 'Faço o que ele pediu, afinal ele já tentou de tudo e sabe o que quer.'],
+      ['agressiva', '"Se você já tentou de tudo, é porque o problema está em outro lugar. Vou te mostrar o que está errado."'] ],
+      frase: 'Posso te fazer duas perguntas antes? Em casos parecidos, o que costuma travar é outra coisa.' },
+    { id: 'S6', t: 'No meio da conversa, você percebe que o cliente precisa resolver outra coisa antes, fora do que você oferece, para o seu serviço dar resultado.', ops: [
+      ['assertiva', 'Digo isso a ele, explico o motivo e indico quem pode ajudar nessa etapa. Fico à disposição para quando ele estiver pronto.'],
+      ['passiva', 'Fecho o serviço assim mesmo e vejo o que dá para fazer.'],
+      ['agressiva', 'Garanto que o meu serviço já resolve tudo, para ele não procurar outra pessoa.'] ],
+      frase: 'Antes do meu trabalho, vale resolver [a outra questão]. Quem ajuda nisso é [profissional indicado]. Quando estiver pronto, seguimos juntos.' }
+  ],
+  C: [
+    { id: 'S1', t: 'O cliente chega por indicação e, na primeira mensagem, diz: "Fulano me indicou você. Quanto fica {primeiro}?"', ops: [
+      ['assertiva', '"Que bom que ele indicou! O valor de {primeiro} é R$ X. Me conta o que você quer resolver, que eu te digo se faz sentido."'],
+      ['passiva', '"Que bom! Te mando a tabela com todas as opções e valores, aí você vê com calma."'],
+      ['agressiva', '"Que bom! O valor eu passo depois de entender o seu caso. Tenho um horário amanhã, posso reservar para você?"'] ],
+      frase: 'Que bom que ele indicou! O valor de {primeiro} é R$ X. Me conta o que você quer resolver, que eu te digo se faz sentido.' },
+    { id: 'S2', t: 'Na hora de fechar, o cliente pergunta: "Se eu pagar à vista, você faz um precinho melhor?"', ops: [
+      ['assertiva', '"O valor é o mesmo à vista ou dividido. O que facilita mais para você? Monto do jeito que ficar melhor."'],
+      ['passiva', '"Claro, à vista faço 10% para você."'],
+      ['agressiva', '"Não trabalho com precinho. Se for pelo preço, talvez eu não seja o profissional certo para você."'] ],
+      frase: 'O valor é o mesmo à vista ou dividido. O que facilita mais para você? Monto do jeito que ficar melhor.' },
+    { id: 'S3', t: 'A cliente diz: "Adorei, mas quem paga é a minha mãe. Vou mostrar para ela."', ops: [
+      ['assertiva', '"Que bom que vocês decidem juntas. Te mando um resumo com o que conversamos e o valor, para você mostrar. Se ela quiser, eu explico para ela também."'],
+      ['passiva', '"Mostra para ela, sim. Qualquer coisa, estou por aqui."'],
+      ['agressiva', '"Mas é você quem vai fazer, né? Melhor já garantir a vaga, porque a agenda está fechando."'] ],
+      frase: 'Que bom que vocês decidem juntas. Te mando um resumo para você mostrar, e se ela quiser, eu explico para ela também.' },
+    { id: 'S4', t: 'O cliente aprovou a proposta por mensagem, mas há quatro dias não paga o sinal nem marca a data.', ops: [
+      ['assertiva', 'Mando o link de pagamento com duas opções de data e pergunto: "Ficou alguma dúvida antes de começarmos?"'],
+      ['passiva', 'Aguardo, porque ele já aprovou e vai pagar quando puder.'],
+      ['agressiva', '"Sem o sinal até hoje, não consigo segurar o valor que combinamos."'] ],
+      frase: 'Para começarmos, falta só o agendamento. Prefere [data 1] ou [data 2]? Ficou alguma dúvida antes?' },
+    { id: 'S5', t: 'O cliente pede que você faça igual ao que um concorrente fez para outra pessoa, e na sua leitura isso não serve para o caso dele.', ops: [
+      ['assertiva', '"Posso te mostrar por que aquilo funcionou para ela e o que, no seu caso, costuma dar mais resultado?" E comparo os dois casos.'],
+      ['passiva', 'Faço igual, porque foi o que ele viu e gostou.'],
+      ['agressiva', '"Aquilo não serve para você. Quem fez não entendeu o caso, e eu sei o que funciona."'] ],
+      frase: 'Posso te mostrar por que aquilo funcionou para ela e o que costuma dar mais resultado no seu caso?' },
+    { id: 'S6', t: 'O orçamento do cliente só cobre uma versão reduzida do seu serviço, que você sabe que não entrega o resultado que ele espera.', ops: [
+      ['assertiva', 'Explico que, com esse valor, o resultado esperado não vem, e mostro o que dá para fazer bem dentro dele ou quem atende nessa faixa.'],
+      ['passiva', 'Faço a versão reduzida, porque é o que ele pode pagar.'],
+      ['agressiva', 'Digo que, sem o pacote completo, não vale a pena, e insisto para ele fazer um esforço.'] ],
+      frase: 'Com esse valor, o resultado que você espera não vem. Dá para fazer bem [o que cabe], ou [quem atende nessa faixa] pode te ajudar.' }
+  ]
+};
 // Dimensão a que cada situação mais se relaciona, usada só na leitura dos sinais de resposta.
 const SJT_DIM = { S1: 'D8', S2: 'D8', S3: 'D7', S4: 'D8', S5: 'D4', S6: 'D1' };
 
@@ -955,6 +1024,73 @@ PC.SJT_WHY = {
         agressiva: 'Garantir que vai atender, sabendo que não é o caso, é a forma mais rápida de perder credibilidade. O cliente percebe, e a confiança dificilmente volta.',
         frase: 'Isso não é o nosso forte. Quem faz muito bem é [outro negócio]. O que a gente faz de melhor é [o seu destaque], volte para experimentar.' }
 };
+PC.SJT_NOME = { S1: 'Reação ao preço', S2: 'Pedido de desconto', S3: 'Escolha em grupo', S4: 'Cliente em silêncio', S5: 'Escolha que não atende', S6: 'Não é o seu forte' };
+PC.SJT_V = {
+  B: [
+    { id: 'S1', t: 'Nos comentários de um post, um cliente pergunta: "Quanto custa isso? Achei que seria mais barato."', ops: [
+      ['assertiva', '"Oi! Sai por R$ X e inclui [o que faz diferença]. Se quiser algo mais em conta, a [opção] sai por R$ Y. Te mando os detalhes no direct?"'],
+      ['passiva', '"Oi! Te mando no direct um cupom de 15% para você experimentar."'],
+      ['agressiva', '"Os nossos preços são justos pelo que entregamos. Qualidade tem custo."'] ],
+      frase: 'Sai por R$ X e inclui [o que faz diferença]. Se quiser algo mais em conta, a [opção] sai por R$ Y.' },
+    { id: 'S2', t: 'Um cliente pergunta se, comprando em maior quantidade, você faz um preço melhor.', ops: [
+      ['assertiva', '"Para quantidades maiores, temos [vantagem: brinde, item extra ou entrega]. Quer que eu monte para você?"'],
+      ['passiva', 'Faço 15% no total, para garantir a venda.'],
+      ['agressiva', '"O preço é o mesmo, não muda com a quantidade."'] ],
+      frase: 'Para quantidades maiores, temos [vantagem]. Quer que eu monte para você?' },
+    { id: 'S3', t: 'Um cliente escolhe um presente e diz: "Vou mandar uma foto para a minha irmã, que é quem vai decidir."', ops: [
+      ['assertiva', '"Ótimo. Te passo a foto com o preço, as opções e as condições de troca, para mandar tudo junto. Se ela quiser, eu atendo ela por mensagem."'],
+      ['passiva', '"Claro, fique à vontade. Se decidirem, é só voltar."'],
+      ['agressiva', '"Esse é o último. Se não levar agora, não garanto."'] ],
+      frase: 'Te passo a foto com o preço, as opções e as condições de troca. Se ela quiser, eu atendo ela por mensagem.' },
+    { id: 'S4', t: 'Um cliente fez uma reserva para retirar e não apareceu no dia combinado.', ops: [
+      ['assertiva', 'Mando uma mensagem simples: "Separei para você. Prefere retirar amanhã ou outro dia?" E pergunto se ficou alguma dúvida.'],
+      ['passiva', 'Libero a reserva e espero ele procurar.'],
+      ['agressiva', '"Se não retirar até hoje, a reserva é cancelada."'] ],
+      frase: 'Separei para você. Prefere retirar amanhã ou outro dia? Ficou alguma dúvida?' },
+    { id: 'S5', t: 'Um cliente escolhe a opção mais simples para um uso que, pelo que ele conta, vai exigir mais do que ela entrega.', ops: [
+      ['assertiva', '"Posso te dar uma dica? Pelo uso que você contou, esta outra costuma durar mais e sair mais em conta no fim." E mostro a diferença em uma frase.'],
+      ['passiva', 'Vendo a que ele escolheu, porque ele já decidiu.'],
+      ['agressiva', '"Essa não aguenta o uso que você quer. Leve esta outra."'] ],
+      frase: 'Posso te dar uma dica? Pelo uso que você contou, esta outra costuma durar mais e sair mais em conta no fim.' },
+    { id: 'S6', t: 'Um cliente pede uma encomenda para daqui a dois dias, e você sabe que, nesse prazo, não entrega com a qualidade de sempre.', ops: [
+      ['assertiva', 'Digo com clareza que, nesse prazo, não entrego com a qualidade de sempre, e proponho uma data viável ou indico quem consegue.'],
+      ['passiva', 'Aceito o pedido e faço o possível no prazo.'],
+      ['agressiva', 'Garanto que fica pronto e perfeito, para não perder o pedido.'] ],
+      frase: 'Nesse prazo, não consigo entregar com a qualidade de sempre. Consigo para [data viável], ou [outro negócio] pode te atender.' }
+  ],
+  C: [
+    { id: 'S1', t: 'No caixa, um cliente comenta em voz alta: "Nossa, está mais caro do que eu imaginava."', ops: [
+      ['assertiva', 'Explico em uma frase o que está incluído e, se fizer sentido, aponto a opção mais em conta para a próxima vez.'],
+      ['passiva', 'Peço desculpas e dou um desconto para ele sair satisfeito.'],
+      ['agressiva', 'Respondo que os preços estão expostos e que todos os concorrentes também subiram.'] ],
+      frase: 'O valor inclui [o que faz diferença]. Para a próxima vez, a [opção] sai mais em conta.' },
+    { id: 'S2', t: 'Um cliente diz que viu algo parecido mais barato na internet e pede que você cubra o preço.', ops: [
+      ['assertiva', 'Explico o que muda comprando com a gente [garantia, troca, atendimento] e ofereço uma vantagem para a próxima compra.'],
+      ['passiva', 'Cubro o preço para não perder o cliente.'],
+      ['agressiva', 'Digo que, se está mais barato lá, ele pode comprar lá.'] ],
+      frase: 'Comprando com a gente, você tem [garantia, troca, atendimento]. E na próxima compra, [vantagem] é por nossa conta.' },
+    { id: 'S3', t: 'Uma cliente gostou e diz: "Vou ver com quem divide as despesas comigo antes de fechar."', ops: [
+      ['assertiva', '"Mando hoje um resumo com fotos, o que está incluído e os valores, para você mostrar. Posso te chamar na terça para tirar as dúvidas?"'],
+      ['passiva', '"Combinem com calma e me avisem quando decidirem."'],
+      ['agressiva', '"Só aviso que essa condição vale só para hoje."'] ],
+      frase: 'Mando hoje um resumo com fotos, o que está incluído e os valores. Posso te chamar na terça para tirar as dúvidas?' },
+    { id: 'S4', t: 'Uma cliente conheceu as opções pessoalmente, disse que ia pensar e saiu. Ela deixou o contato no cadastro.', ops: [
+      ['assertiva', 'No dia seguinte, mando uma foto ou sugestão ligada à opção de que ela mais gostou e pergunto se ficou alguma dúvida.'],
+      ['passiva', 'Espero ela voltar, para não parecer insistente.'],
+      ['agressiva', '"A opção de que você gostou está acabando. Reservo até hoje?"'] ],
+      frase: 'Lembrei de você ao ver isto: [foto ou sugestão ligada ao que ela mais gostou]. Ficou alguma dúvida que eu possa esclarecer?' },
+    { id: 'S5', t: 'Um cliente pede o mesmo de sempre, mas conta que desta vez é para uma ocasião diferente, em que outra opção atenderia melhor.', ops: [
+      ['assertiva', '"Posso te dar uma dica? Para essa ocasião, costuma funcionar melhor esta outra. Quer conhecer antes de decidir?"'],
+      ['passiva', 'Separo o de sempre, porque ele já conhece e gosta.'],
+      ['agressiva', '"O de sempre não serve para isso. Leve esta outra."'] ],
+      frase: 'Posso te dar uma dica? Para essa ocasião, costuma funcionar melhor esta outra. Quer conhecer antes de decidir?' },
+    { id: 'S6', t: 'Um cliente pede uma recomendação para alguém com uma necessidade específica que o seu negócio não atende com segurança.', ops: [
+      ['assertiva', 'Digo que não temos uma opção segura para essa necessidade e indico onde ele encontra.'],
+      ['passiva', 'Sugiro a opção mais próxima, explicando que é o que temos.'],
+      ['agressiva', 'Garanto que dá para adaptar e ofereço mesmo assim.'] ],
+      frase: 'Para essa necessidade, não temos uma opção segura. Quem faz isso muito bem é [outro negócio].' }
+  ]
+};
 PC.QUESTIONS = [
   ['Propósito', 'O que eu deixo à vista ajuda o meu cliente a escolher bem, mesmo que ele gaste menos?'],
   ['Virada', 'O que o meu cliente ainda não sabe sobre o que está escolhendo?'],
@@ -990,8 +1126,13 @@ function pack(neg) {
   const T = Object.fromEntries(ITEMS.map(i => [i.c, c ? PC.ITEMS[i.c] : i.t]));
   const dim = Object.fromEntries(DIMS.map(d => [d.id, c ? { ...d, ...PC.DIMS[d.id] } : d]));
   const sjt = c ? PC.SJT : SJT;
+  const why = c ? PC.SJT_WHY : SJT_WHY; const SV = c ? PC.SJT_V : SJT_V;
+  const versoes = { A: sjt.map(x => ({ ...x, frase: why[x.id].frase })) };
+  for (const v of ['B', 'C']) versoes[v] = SV[v].map(x => ({ ...x, ops: x.ops.map(([k, t]) => ({ k, t })) }));
+  const sjtDe = v => versoes[v] || versoes.A;
   return (PACKS[m] = {
-    modo: m, T, dim, sjt, sjtOf: id => sjt.find(s => s.id === id),
+    modo: m, T, dim, sjt, sjtOf: id => sjt.find(s => s.id === id), sjtDe, sjtRec: rec => sjtDe(rec?.respostas?.sjt_versao || 'A'),
+    nomeSit: c ? PC.SJT_NOME : SJT_NOME,
     why: c ? PC.SJT_WHY : SJT_WHY, bands: c ? PC.BANDS : BANDS, impl: c ? PC.IMPL : IMPL,
     questions: c ? PC.QUESTIONS : QUESTIONS,
     leituraNivel: nome => c ? PC.LEVELS[nome] : LEVELS.find(l => l.nome === nome).leitura,
@@ -1949,7 +2090,8 @@ function viewDiagnostico() {
       <div class="likert" role="radiogroup" aria-label="Frequência, de nunca a sempre">${SCALE_HTML.map((s, k) => `<button type="button" class="lk" role="radio" data-ans="${k + 1}" aria-checked="${cur === k + 1}" aria-pressed="${cur === k + 1}" aria-label="${k + 1}, ${SCALE[k]}"><span class="lk-n">${k + 1}</span><span class="lk-t" lang="pt-BR">${s}</span><span class="lk-sub">${SCALE_SUB[k]}</span></button>`).join('')}</div>
       `;
   } else if (idx < ITEMS.length + SJT.length) {
-    const sc = pk.sjt[idx - ITEMS.length];
+    const sc0 = pk.sjtDe(q.versao || 'A')[idx - ITEMS.length];
+    const ord = q.ordem?.[sc0.id]; const sc = ord ? { ...sc0, ops: ord.map(k => sc0.ops.find(o => o.k === k)).filter(Boolean) } : sc0;
     const cur = q.sjt[sc.id];
     answered = cur != null;
     body = `<div class="scene"><p class="eyebrow" style="margin-bottom:8px;color:var(--accent)">Pergunta ${idx + 1} de ${TOTAL} · situação ${idx - ITEMS.length + 1} de ${SJT.length}</p><p class="q-text" style="min-height:0">${esc(V(sc.t, qv))}</p></div><p class="q-hint">Escolha a resposta mais parecida com o que você faria e toque em Avançar.</p>
@@ -2002,6 +2144,13 @@ async function quizStart() {
   } catch (e) { return fail(e.message); }
   S.busy = false;
   if (!S.acesso.pode) return fail(acessoLinha(S.acesso));
+  // Versão das situações: segue a ordem das execuções da pessoa (A, B, C e de novo A); a ordem das respostas é embaralhada.
+  if (!q.versao) {
+    if (S.myResults == null) { try { S.myResults = await store.myResults(); } catch (e) { S.myResults = []; } }
+    q.versao = ['A', 'B', 'C'][(S.myResults || []).length % 3];
+    const mistura = a => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+    q.ordem = Object.fromEntries(SJT.map(x => [x.id, mistura(['assertiva', 'passiva', 'agressiva'])]));
+  }
   q.turma = S.acesso.turma_id ? { id: S.acesso.turma_id, nome: S.acesso.turma_nome, perguntar_nicho: S.acesso.perguntar_nicho } : null;
   if (!q.turma || q.turma.perguntar_nicho !== false) { q.phase = 'negocio'; saveDraft(); render(); if (q.turma) toast('Turma: ' + q.turma.nome); return; }
   q.negocio = null; q.step = 1; saveDraft(); render();
@@ -2019,7 +2168,7 @@ async function quizFinish() {
   S.busy = true; render();
   const resultado = scoreAnswers(q.items, q.sjt, q.meta);
   try {
-    const rec = await store.saveResult({ turma_id: q.turma?.id, respostas: { items: q.items, sjt: q.sjt, historia: q.historia.trim(), meta: q.meta, negocio: q.negocio || null }, resultado });
+    const rec = await store.saveResult({ turma_id: q.turma?.id, respostas: { items: q.items, sjt: q.sjt, sjt_versao: q.versao || 'A', historia: q.historia.trim(), meta: q.meta, negocio: q.negocio || null }, resultado });
     LS.del(DRAFT_KEY); S.quiz = null; S.busy = false; S.result = rec; go('resultado');
   } catch (e) { S.busy = false; render(); toast(e.message || 'Não foi possível salvar. Tente de novo.'); }
 }
@@ -2304,8 +2453,8 @@ function viewResultado() {
       </div></details>`;
   }).join('');
 
-  const situacoes = pk.sjt.map((s, k) => {
-    const ch = sjt[s.id]; const mine = s.ops.find(o => o.k === ch); const best = s.ops.find(o => o.k === 'assertiva'); const W = pk.why[s.id];
+  const situacoes = pk.sjtRec(rec).map((s, k) => {
+    const ch = sjt[s.id]; const mine = s.ops.find(o => o.k === ch); const best = s.ops.find(o => o.k === 'assertiva'); const W = { ...pk.why[s.id], frase: s.frase };
     const fraseLabel = 'O que pregamos no método';
     const body = !ch ? '' : ch === 'assertiva'
       ? `<p class="small"><span class="muted">Sua resposta:</span> ${esc(V(mine.t, voc))}</p>
@@ -2642,9 +2791,9 @@ async function buildPDF(rec) {
 
   secao('Seis situações', 'Sua postura nas situações', 'A resposta assertiva sustenta o valor do seu trabalho e mantém o cliente pensando com clareza.');
   const sjt = rec.respostas?.sjt || {};
-  pk.sjt.forEach((s, k) => {
+  pk.sjtRec(rec).forEach((s, k) => {
     const ch = sjt[s.id]; const mine = s.ops.find(o => o.k === ch); const best = s.ops.find(o => o.k === 'assertiva');
-    const Wy = pk.why[s.id]; const w = CW - 12;
+    const Wy = { ...pk.why[s.id], frase: s.frase }; const w = CW - 12;
     const titulo = V(s.t, voc);
     const blocos = [];
     if (mine) blocos.push(['Sua resposta', V(mine.t, voc), 'body', C.ink]);
@@ -2842,7 +2991,7 @@ function viewEvolucao() {
 
   const prioIni = cmp.prioIni.map((k, i) => { const x = cmp.dims[k]; return `<div class="evo-row"><span><span class="prio-n" style="display:inline-grid;margin-right:8px">${i + 1}</span><strong>${DIM[k].nome}</strong></span>${evoBars(x.antes, x.depois, eixoCorEvo(DIM[k].eixo))}<span class="tnum evo-ab">${x.antes} → <b>${x.depois}</b></span>${deltaChip(x.delta, true)}</div>`; }).join('');
   const dimRows = DIMS.map(d => { const x = cmp.dims[d.id]; return `<div class="evo-row"><strong>${d.nome}</strong>${evoBars(x.antes, x.depois, eixoCorEvo(d.eixo))}<span class="tnum evo-ab">${x.antes} → <b>${x.depois}</b></span>${deltaChip(x.delta)}</div>`; }).join('');
-  const sits = pk.sjt.map((s, k) => { const x = cmp.situacoes[k]; const mudou = x.antes !== x.depois; return `<div class="evo-sit"><span class="dim-code">S${k + 1}</span><span class="evo-sit-t">${esc(V(s.t, voc))}</span><span class="evo-sit-p">${posturaChip(x.antes)}<span class="muted" aria-hidden="true">→</span>${posturaChip(x.depois)}${mudou && x.depois === 'assertiva' ? '<span class="flag" style="background:color-mix(in srgb, var(--good) 22%, transparent);color:var(--good)">avançou</span>' : ''}</span></div>`; }).join('');
+  const sits = pk.sjt.map((s, k) => { const x = cmp.situacoes[k]; const mudou = x.antes !== x.depois; return `<div class="evo-sit"><span class="dim-code">S${k + 1}</span><span class="evo-sit-t">${esc(pk.nomeSit[s.id])}</span><span class="evo-sit-p">${posturaChip(x.antes)}<span class="muted" aria-hidden="true">→</span>${posturaChip(x.depois)}${mudou && x.depois === 'assertiva' ? '<span class="flag" style="background:color-mix(in srgb, var(--good) 22%, transparent);color:var(--good)">avançou</span>' : ''}</span></div>`; }).join('');
   const alertas = (cmp.resolvidos.length || cmp.novos.length || cmp.mantidos.length) ? `<div class="stack"><h2 class="h-sec" style="margin:0">Pontos de atenção</h2>
       ${cmp.resolvidos.map(a => `<div class="alert ok"><span class="alert-ico" aria-hidden="true">✓</span><div><strong>${esc(a.t)} · resolvido</strong><span class="muted small">Aparecia no diagnóstico inicial e não aparece mais na reavaliação.</span></div></div>`).join('')}
       ${cmp.novos.map(a => `<div class="alert ${a.sev}"><span class="alert-ico" aria-hidden="true">!</span><div><strong>${esc(a.t)} · novo</strong><span class="muted small">${esc(V(a.d, voc))}</span></div></div>`).join('')}
@@ -2985,7 +3134,7 @@ async function buildEvoPDF(ev) {
   h2('Postura em cada situação');
   pk.sjt.forEach((s, k) => {
     const x = cmp.situacoes[k];
-    para(`${k + 1}. ${V(s.t, voc)}`, 9.5, 'bold', C.ink, CW, M, 0.3);
+    para(`${k + 1}. ${pk.nomeSit[s.id]}`, 9.5, 'bold', C.ink, CW, M, 0.3);
     para(`Antes: ${x.antes ? POSTURA_NOME[x.antes] : '-'} · Agora: ${x.depois ? POSTURA_NOME[x.depois] : '-'}${x.antes !== x.depois && x.depois === 'assertiva' ? ' (avançou)' : ''}`, 9, 'normal', x.depois === 'assertiva' ? C.good : C.ink2, CW, M, 2);
   });
 
