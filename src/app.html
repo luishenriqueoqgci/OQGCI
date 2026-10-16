@@ -1968,7 +1968,7 @@ function resumoTexto(rec) {
 function leituraPrompt(rec) {
   const r = rec.resultado;
   if (modoDe(rec.respostas?.negocio) === 'contato') return leituraPromptContato(rec);
-  return `Você é um especialista no método OQGCI de vendas, que combina a lógica do livro The Challenger Sale, adaptada à venda entre pessoas, com achados de neurociência da decisão. A lente do método é o OQGCI ("O Que Eu Ganho Com Isto"): o cliente se aproxima do que lhe faz bem e se afasta do que lhe faz mal.
+  return `Você é um especialista no método OQGCI de vendas, que adapta a venda consultiva à venda entre pessoas e se apoia em achados de neurociência da decisão. A lente do método é o OQGCI ("O Que Eu Ganho Com Isto"): o cliente se aproxima do que lhe faz bem e se afasta do que lhe faz mal.
 
 Os quatro movimentos da conversa, apoiados na linha de base do interesse genuíno em ajudar o cliente:
 1. Espelho: mostrar que conhece a realidade do cliente, perguntar e aprofundar antes de apresentar o serviço.
@@ -1984,7 +1984,7 @@ História, entre as marcas <historia>:
 ${rec.respostas.historia}
 </historia>
 
-Analise a história com base apenas no que está escrito. Quando a história não mostrar um movimento, diga que ele não aparece no relato, sem inventar fatos. Escreva em português do Brasil, em tom direto, respeitoso e profissional, sem tom professoral, falando com a pessoa como "você". Não use construções de contraste como "não é X, é Y" ou "X, e não Y". Não faça avaliações de personalidade ou de saúde. Frases curtas.
+Analise a história com base apenas no que está escrito. Quando a história não mostrar um movimento, diga que ele não aparece no relato, sem inventar fatos. Escreva em português do Brasil, em tom direto, respeitoso e profissional, sem tom professoral, falando com a pessoa como "você". Não use construções de contraste como "não é X, é Y" ou "X, e não Y". Não faça avaliações de personalidade ou de saúde. Não cite livros, autores nem outros métodos. Frases curtas.
 
 Responda somente com um objeto JSON neste formato:
 {"sintese": "duas ou três frases sobre o que a história mostra da conversa de venda",
@@ -1999,7 +1999,7 @@ Responda somente com um objeto JSON neste formato:
 
 function leituraPromptContato(rec) {
   const r = rec.resultado;
-  return `Você é um especialista no método OQGCI de vendas, que combina a lógica do livro The Challenger Sale, adaptada à venda entre pessoas, com achados de neurociência da decisão. A lente do método é o OQGCI ("O Que Eu Ganho Com Isto"): o cliente se aproxima do que lhe faz bem e se afasta do que lhe faz mal.
+  return `Você é um especialista no método OQGCI de vendas, que adapta a venda consultiva à venda entre pessoas e se apoia em achados de neurociência da decisão. A lente do método é o OQGCI ("O Que Eu Ganho Com Isto"): o cliente se aproxima do que lhe faz bem e se afasta do que lhe faz mal.
 
 Neste negócio, a maioria dos clientes escolhe sozinha (autoatendimento, prateleira, cardápio, site), com pouca ou nenhuma conversa de venda. Os movimentos acontecem pelos pontos de contato: fachada, perfil no Google e redes, avaliações, ambiente, balcão, cardápio ou prateleira, embalagem, caixa e mensagens. Eles se apoiam na linha de base do interesse genuíno em ajudar o cliente a escolher bem:
 1. Espelho: conhecer o que o cliente procura, perguntando, observando e lendo avaliações, antes de decidir o que oferecer e destacar.
@@ -2015,7 +2015,7 @@ História, entre as marcas <historia>:
 ${rec.respostas.historia}
 </historia>
 
-Analise a história com base apenas no que está escrito. Quando a história não mostrar um movimento, diga que ele não aparece no relato, sem inventar fatos. As sugestões devem ser ações nos pontos de contato, que funcionem mesmo sem uma conversa de venda. Escreva em português do Brasil, em tom direto, respeitoso e profissional, sem tom professoral, falando com a pessoa como "você". Não use construções de contraste como "não é X, é Y" ou "X, e não Y". Não faça avaliações de personalidade ou de saúde. Frases curtas.
+Analise a história com base apenas no que está escrito. Quando a história não mostrar um movimento, diga que ele não aparece no relato, sem inventar fatos. As sugestões devem ser ações nos pontos de contato, que funcionem mesmo sem uma conversa de venda. Escreva em português do Brasil, em tom direto, respeitoso e profissional, sem tom professoral, falando com a pessoa como "você". Não use construções de contraste como "não é X, é Y" ou "X, e não Y". Não faça avaliações de personalidade ou de saúde. Não cite livros, autores nem outros métodos. Frases curtas.
 
 Responda somente com um objeto JSON neste formato:
 {"sintese": "duas ou três frases sobre o que a história mostra da experiência de compra do cliente",
