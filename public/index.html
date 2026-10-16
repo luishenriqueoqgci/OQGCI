@@ -364,7 +364,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .row-btn { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 16px; cursor: pointer; }
 .row-btn:hover { border-color: var(--ink-3); }
 .row-meta { color: var(--ink-3); font-size: 13px; }
-.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 16px; display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
 .kpi b { font-family: var(--font-display); font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .kpi span { font-size: 13px; color: var(--ink-3); }
@@ -405,7 +405,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .evo-num .b { font-size: 58px; font-weight: 300; line-height: 1; }
 .evo-resumo { font-size: 18px; line-height: 1.5; }
 .evo-rows { display: grid; gap: 12px; }
-.evo-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) 76px 112px; gap: 12px; align-items: center; font-size: 14px; }
+.evo-row { display: grid; grid-template-columns: minmax(96px, 160px) minmax(48px, 1fr) auto auto; gap: 12px; align-items: center; font-size: 14px; }
+.evo-row .delta { justify-self: end; white-space: nowrap; }
 .evo-row > strong, .evo-row > span:first-child { min-width: 0; }
 .evo-ab { text-align: right; color: var(--ink-2); white-space: nowrap; }
 .evo-ab b { color: var(--ink); }
@@ -413,6 +414,15 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .evo-track { display: block; height: 7px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
 .evo-track > i { display: block; height: 100%; border-radius: 4px; }
 .evo-track > i.ant { background: var(--ink-3); opacity: .5; }
+.evo-track > i.meio { opacity: .45; }
+.evo-pontos { display: grid; gap: 8px; }
+.evo-ponto { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-sm); min-width: 0; }
+.evo-ponto .eyebrow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.evo-ponto b { font-family: var(--font-display); font-size: 34px; font-weight: 300; line-height: 1.05; color: var(--ink-3); }
+.evo-ponto.on { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.evo-ponto.on b { color: var(--ink); }
+.evo-grupo { display: grid; gap: 8px; }
+.evo-grupo-h { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .evo-sits { display: grid; gap: 0; }
 .evo-sit { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
 .evo-sit:first-child { border-top: 0; padding-top: 0; }
@@ -1360,14 +1370,24 @@ function calcAcesso(u, t, results) {
     turma_expira: t ? t.expira_em || null : null, acesso_ate: u.acesso_ate || null, acesso_bloqueado: Boolean(u.acesso_bloqueado)
   };
 }
-// Mesma regra do banco (atualizacao-03): inicial = último diagnóstico da pessoa na turma antes da data de reavaliação;
-// reavaliação = último diagnóstico na turma a partir dessa data.
-function parPessoa(results, turma, userId) {
-  if (!turma || !turma.reavaliar_em) return null;
-  const rs = results.filter(r => r.user_id === userId && r.turma_id === turma.id).sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const rea = rs.find(r => diaBR(r.created_at) >= turma.reavaliar_em);
-  const ini = rs.find(r => diaBR(r.created_at) < turma.reavaliar_em);
-  return rea && ini ? { inicial_id: ini.id, reavaliacao_id: rea.id } : null;
+// Mesma regra do banco (atualizacao-07). Turma: relatório interno prévia -> workshop e relatório completo prévia -> workshop -> 45 dias,
+// com a primeira execução de cada etapa. Individual: primeira execução -> execução anterior -> execução atual.
+function paresTurmaJS(results, t, userId) {
+  if (!t) return { workshop: null, completo: null };
+  const rs = results.filter(r => r.user_id === userId && r.turma_id === t.id).sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const et = r => etapaTurma(t, diaBR(r.created_at));
+  const pv = rs.filter(r => ['previa', 'inicial'].includes(et(r))).at(-1);
+  const wk = rs.find(r => et(r) === 'workshop'); const rv = rs.find(r => et(r) === 'reavaliacao');
+  return {
+    workshop: pv && wk ? { inicial_id: pv.id, intermediario_id: null, reavaliacao_id: wk.id } : null,
+    completo: rv && (pv || wk) ? { inicial_id: (pv || wk).id, intermediario_id: pv && wk ? wk.id : null, reavaliacao_id: rv.id } : null
+  };
+}
+function parIndividualJS(results, rec) {
+  const rs = results.filter(r => r.user_id === rec.user_id && r.id !== rec.id && r.created_at <= rec.created_at).sort((a, b) => a.created_at.localeCompare(b.created_at));
+  if (!rs.length) return null;
+  const ini = rs[0], ant = rs.at(-1);
+  return { inicial_id: ini.id, intermediario_id: ant.id !== ini.id ? ant.id : null, reavaliacao_id: rec.id };
 }
 const hashStr = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return 'h' + (h >>> 0).toString(36); };
 
@@ -1385,28 +1405,42 @@ function exResult(o, means, sjtPattern, negocio) {
   SJT.forEach((s, k) => { sjt[s.id] = sjtPattern[k]; });
   return { id: o.id, user_id: o.user_id, nome: o.nome, turma_id: o.turma_id, respostas: { items, sjt, negocio: negocio || null }, resultado: scoreAnswers(items, sjt), created_at: new Date(Date.now() - o.dias * 86400000).toISOString(), exemplo: true };
 }
-// Turma de exemplo com diagnóstico inicial há 40 dias e reavaliação recente, para mostrar o relatório de evolução.
+// Turma de exemplo com prévia, workshop há 45 dias e reavaliação recente, e um exemplo de relatório individual.
 function seedEvolucao() {
   const A = 'assertiva', P = 'passiva';
   const all = v => Object.fromEntries(DIMS.map(d => [d.id, v]));
-  const turma = { id: 'turma-evolucao', nome: 'Exemplo · Turma com reavaliação', codigo: 'OQG-EVOL', perguntar_nicho: true, expira_em: somaDias(hojeBR(), 20), reavaliar_em: somaDias(hojeBR(), -3), created_at: new Date(Date.now() - 45 * 86400000).toISOString(), exemplo: true };
+  const turma = { id: 'turma-evolucao', nome: 'Exemplo · Turma com reavaliação', codigo: 'OQG-EVOL', perguntar_nicho: true, patrocinada: true, data_workshop: somaDias(hojeBR(), -45), expira_em: somaDias(hojeBR(), 20), reavaliar_em: somaDias(hojeBR(), -3), created_at: new Date(Date.now() - 50 * 86400000).toISOString(), exemplo: true };
   const loja = m => ({ segmento: 'varejo', oferta: 'loja de roupas', modo: m });
+  // [n, prévia, situações, negócio, workshop, situações, 45 dias, situações, negócio, status, comentário]
   const pessoas = [
-    [10, { D1: 4.0, D2: 3.0, D3: 2.6, D4: 2.4, D5: 2.5, D6: 3.0, D7: 2.8, D8: 2.9 }, [P, P, P, A, P, A], null, { D1: 4.2, D2: 3.3, D3: 3.8, D4: 3.4, D5: 3.2, D6: 3.6, D7: 3.1, D8: 3.4 }, [A, A, P, A, A, A], null, 'liberado', 'A pergunta antes da apresentação virou hábito: o Espelho foi o maior salto. Para os próximos 30 dias, leve a mesma disciplina para o Custo.'],
-    [11, { D1: 4.3, D2: 3.8, D3: 4.2, D4: 2.6, D5: 2.4, D6: 2.8, D7: 3.5, D8: 3.0 }, [P, P, A, P, A, A], null, { D1: 4.4, D2: 3.9, D3: 4.3, D4: 3.5, D5: 3.4, D6: 3.6, D7: 3.6, D8: 3.6 }, [A, A, A, A, A, A], null, 'liberado', 'Postura assertiva nas seis situações. O próximo passo é ter leituras novas preparadas para os três problemas mais comuns dos seus clientes.'],
-    [12, { D1: 3.6, D2: 2.8, D3: 3.0, D4: 3.1, D5: 2.7, D6: 2.9, D7: 2.5, D8: 2.8 }, [P, A, P, P, A, A], null, { D1: 3.7, D2: 2.9, D3: 3.3, D4: 3.0, D5: 2.8, D6: 3.4, D7: 2.6, D8: 2.9 }, [P, A, A, P, A, A], null, 'rascunho', ''],
-    [13, { D1: 4.1, D2: 3.2, D3: 3.4, D4: 2.9, D5: 2.6, D6: 3.1, D7: 2.7, D8: 3.0 }, [A, P, A, P, A, A], loja('conversa'), { D1: 4.0, D2: 3.9, D3: 3.6, D4: 3.2, D5: 3.0, D6: 3.8, D7: 3.0, D8: 3.3 }, [A, A, A, P, A, A], loja('contato'), 'rascunho', ''],
-    [14, { D1: 3.4, D2: 2.9, D3: 3.1, D4: 2.7, D5: 2.6, D6: 3.0, D7: 2.6, D8: 2.7 }, [P, P, A, P, A, A], null, all(5), [P, P, P, P, P, P], null, 'rascunho', ''],
-    [15, { D1: 3.9, D2: 3.1, D3: 3.5, D4: 2.8, D5: 2.9, D6: 3.2, D7: 2.9, D8: 3.1 }, [A, P, A, A, A, A], null]
+    [10, { D1: 4.0, D2: 3.0, D3: 2.6, D4: 2.4, D5: 2.5, D6: 3.0, D7: 2.8, D8: 2.9 }, [P, P, P, A, P, A], null, { D1: 4.2, D2: 3.2, D3: 3.9, D4: 3.3, D5: 3.0, D6: 3.5, D7: 3.0, D8: 3.4 }, [A, P, P, A, A, A], { D1: 4.2, D2: 3.3, D3: 3.8, D4: 3.4, D5: 3.2, D6: 3.6, D7: 3.1, D8: 3.4 }, [A, A, P, A, A, A], null, 'liberado', 'A pergunta antes da apresentação virou hábito: o Espelho foi o maior salto. Para os próximos 30 dias, leve a mesma disciplina para o Custo.'],
+    [11, { D1: 4.3, D2: 3.8, D3: 4.2, D4: 2.6, D5: 2.4, D6: 2.8, D7: 3.5, D8: 3.0 }, [P, P, A, P, A, A], null, { D1: 4.4, D2: 3.9, D3: 4.3, D4: 3.6, D5: 3.5, D6: 3.7, D7: 3.6, D8: 3.6 }, [A, A, A, P, A, A], { D1: 4.4, D2: 3.9, D3: 4.3, D4: 3.5, D5: 3.4, D6: 3.6, D7: 3.6, D8: 3.6 }, [A, A, A, A, A, A], null, 'liberado', 'Postura assertiva nas seis situações. O próximo passo é ter leituras novas preparadas para os três problemas mais comuns dos seus clientes.'],
+    [12, { D1: 3.6, D2: 2.8, D3: 3.0, D4: 3.1, D5: 2.7, D6: 2.9, D7: 2.5, D8: 2.8 }, [P, A, P, P, A, A], null, { D1: 3.9, D2: 3.0, D3: 3.6, D4: 3.4, D5: 3.3, D6: 3.5, D7: 3.1, D8: 3.3 }, [A, A, A, P, A, A], { D1: 3.7, D2: 2.9, D3: 3.3, D4: 3.0, D5: 2.8, D6: 3.4, D7: 2.6, D8: 2.9 }, [P, A, A, P, A, A], null, 'rascunho', ''],
+    [13, { D1: 4.1, D2: 3.2, D3: 3.4, D4: 2.9, D5: 2.6, D6: 3.1, D7: 2.7, D8: 3.0 }, [A, P, A, P, A, A], loja('conversa'), { D1: 4.1, D2: 3.6, D3: 3.6, D4: 3.3, D5: 3.0, D6: 3.6, D7: 3.0, D8: 3.2 }, [A, A, A, P, A, A], { D1: 4.0, D2: 3.9, D3: 3.6, D4: 3.2, D5: 3.0, D6: 3.8, D7: 3.0, D8: 3.3 }, [A, A, A, P, A, A], loja('contato'), 'rascunho', ''],
+    [14, { D1: 3.4, D2: 2.9, D3: 3.1, D4: 2.7, D5: 2.6, D6: 3.0, D7: 2.6, D8: 2.7 }, [P, P, A, P, A, A], null, all(5), [A, A, A, A, A, A], { D1: 3.5, D2: 3.0, D3: 3.2, D4: 2.8, D5: 2.7, D6: 3.1, D7: 2.7, D8: 2.8 }, [P, P, A, P, A, A], null, 'rascunho', ''],
+    [15, { D1: 3.9, D2: 3.1, D3: 3.5, D4: 2.8, D5: 2.9, D6: 3.2, D7: 2.9, D8: 3.1 }, [A, P, A, A, A, A], null, { D1: 4.0, D2: 3.4, D3: 3.8, D4: 3.3, D5: 3.2, D6: 3.5, D7: 3.2, D8: 3.4 }, [A, A, A, A, A, A]]
   ];
   const results = [], evolucoes = [];
-  for (const [n, m1, s1, neg1, m2, s2, neg2, status, comentario] of pessoas) {
+  const evo = (id, turmaId, userId, tipo, par, status, comentario, gerado) => evolucoes.push({ id, turma_id: turmaId, user_id: userId, tipo, ...par, comentario: comentario || null, status, gerado_em: gerado, liberado_em: status === 'liberado' ? new Date().toISOString() : null, exemplo: true });
+  for (const [n, m1, s1, neg1, mw, sw, m2, s2, neg2, status, comentario] of pessoas) {
     const base = { user_id: 'ex-user-' + n, nome: 'Exemplo ' + n, turma_id: turma.id };
-    const ini = exResult({ ...base, id: `ex-${n}-a`, dias: 40 + n % 3 }, m1, s1, neg1); results.push(ini);
-    if (!m2) continue;
-    const rea = exResult({ ...base, id: `ex-${n}-b`, dias: 1 + n % 2 }, m2, s2, neg2); results.push(rea);
-    evolucoes.push({ id: 'ev-' + n, turma_id: turma.id, user_id: base.user_id, inicial_id: ini.id, reavaliacao_id: rea.id, comentario: comentario || null, status, gerado_em: rea.created_at, liberado_em: status === 'liberado' ? new Date().toISOString() : null, exemplo: true });
+    results.push(exResult({ ...base, id: `ex-${n}-a`, dias: 47 }, m1, s1, neg1));
+    if (mw) { const r = exResult({ ...base, id: `ex-${n}-w`, dias: 45 }, mw, sw, neg1); r.respostas.sjt_versao = 'B'; results.push(r); }
+    if (m2) { const r = exResult({ ...base, id: `ex-${n}-b`, dias: 1 + n % 2 }, m2, s2, neg2 || neg1); r.respostas.sjt_versao = 'C'; results.push(r); }
+    const pares = paresTurmaJS(results, turma, base.user_id);
+    if (pares.workshop) evo('ev-w-' + n, turma.id, base.user_id, 'workshop', pares.workshop, 'rascunho', '', results.find(r => r.id === pares.workshop.reavaliacao_id).created_at);
+    if (pares.completo) evo('ev-' + n, turma.id, base.user_id, 'completo', pares.completo, status, comentario, results.find(r => r.id === pares.completo.reavaliacao_id).created_at);
   }
+  // Relatório individual: três execuções sem turma.
+  const ind = { user_id: 'ex-user-16', nome: 'Exemplo 16', turma_id: null };
+  const r16 = [
+    exResult({ ...ind, id: 'ex-16-a', dias: 90 }, { D1: 3.8, D2: 2.9, D3: 2.8, D4: 2.6, D5: 2.5, D6: 2.9, D7: 2.7, D8: 2.8 }, [P, P, A, P, A, A]),
+    exResult({ ...ind, id: 'ex-16-b', dias: 40 }, { D1: 4.0, D2: 3.1, D3: 3.4, D4: 3.0, D5: 2.8, D6: 3.2, D7: 2.9, D8: 3.1 }, [A, P, A, P, A, A]),
+    exResult({ ...ind, id: 'ex-16-c', dias: 2 }, { D1: 4.2, D2: 3.3, D3: 3.7, D4: 3.3, D5: 3.1, D6: 3.5, D7: 3.0, D8: 3.4 }, [A, A, A, P, A, A])
+  ];
+  r16[1].respostas.sjt_versao = 'B'; r16[2].respostas.sjt_versao = 'C';
+  results.push(...r16);
+  evo('ev-16', null, 'ex-user-16', 'individual', parIndividualJS(results, r16[2]), 'rascunho', '', r16[2].created_at);
   return { turma, results, evolucoes };
 }
 function seedExamples() {
@@ -1445,14 +1479,14 @@ function DemoStore() {
   const KEY = 'oqgci-demo-v1';
   let db = LS.get(KEY);
   if (db && db.v === 1) { db.results = [...db.results.filter(x => !x.exemplo), ...seedExamples()]; db.v = 2; }
-  if (!db || (db.v !== 2 && db.v !== 3)) {
+  if (!db || ![2, 3, 4].includes(db.v)) {
     db = { v: 2, users: [], session: null, results: seedExamples(), turmas: [{ id: 'turma-exemplo', nome: 'Exemplo · Workshop de vendas', codigo: 'OQG-DEMO', created_at: new Date().toISOString(), exemplo: true }] };
   }
-  if (db.v === 2) {
+  if (db.v === 2 || db.v === 3) {
     const ev = seedEvolucao();
     db.turmas = [...db.turmas.filter(t => t.id !== ev.turma.id), ev.turma];
-    db.results = [...db.results.filter(r => r.turma_id !== ev.turma.id || !r.exemplo), ...ev.results];
-    db.evolucoes = ev.evolucoes; db.v = 3;
+    db.results = [...db.results.filter(r => !r.exemplo || (r.turma_id !== ev.turma.id && r.user_id !== 'ex-user-16')), ...ev.results];
+    db.evolucoes = [...(db.evolucoes || []).filter(e => !e.exemplo), ...ev.evolucoes]; db.v = 4;
   }
   db.evolucoes = db.evolucoes || [];
   const save = () => LS.set(KEY, db);
@@ -1460,13 +1494,19 @@ function DemoStore() {
   const pub = u => u ? { id: u.id, nome: u.nome, email: u.email, role: u.role } : null;
   const userOf = id => db.users.find(x => x.id === id);
   const nomeDe = id => userOf(id)?.nome || db.results.find(r => r.user_id === id)?.nome || '';
-  const juntar = e => ({ ...e, nome: nomeDe(e.user_id), inicial: db.results.find(r => r.id === e.inicial_id) || null, reavaliacao: db.results.find(r => r.id === e.reavaliacao_id) || null });
-  // Gera ou atualiza o par da pessoa; um par novo volta para rascunho, um par igual mantém a revisão feita.
-  const gravarPar = (turmaId, userId, par, novo) => {
-    const e = db.evolucoes.find(x => x.turma_id === turmaId && x.user_id === userId);
-    if (!e) { db.evolucoes.push({ id: uid(), turma_id: turmaId, user_id: userId, ...par, comentario: null, status: 'rascunho', gerado_em: new Date().toISOString(), liberado_em: null }); return; }
-    if (!novo && e.inicial_id === par.inicial_id && e.reavaliacao_id === par.reavaliacao_id) return;
+  const recDe = id => (id && db.results.find(r => r.id === id)) || null;
+  const juntar = e => ({ ...e, tipo: tipoEvo(e), nome: nomeDe(e.user_id), inicial: recDe(e.inicial_id), intermediario: recDe(e.intermediario_id), reavaliacao: recDe(e.reavaliacao_id) });
+  // Grava um relatório: par igual mantém a revisão feita; par novo volta para rascunho.
+  const gravar = (turmaId, userId, tipo, par) => {
+    const e = tipo === 'individual' ? db.evolucoes.find(x => tipoEvo(x) === 'individual' && x.reavaliacao_id === par.reavaliacao_id) : db.evolucoes.find(x => x.turma_id === turmaId && x.user_id === userId && tipoEvo(x) === tipo);
+    if (!e) { db.evolucoes.push({ id: uid(), turma_id: turmaId, user_id: userId, tipo, ...par, comentario: null, status: 'rascunho', gerado_em: new Date().toISOString(), liberado_em: null }); return; }
+    if (e.inicial_id === par.inicial_id && (e.intermediario_id || null) === (par.intermediario_id || null) && e.reavaliacao_id === par.reavaliacao_id) return;
     Object.assign(e, par, { status: 'rascunho', liberado_em: null, gerado_em: new Date().toISOString() });
+  };
+  const parearPessoaTurma = (t, userId) => {
+    const p = paresTurmaJS(db.results, t, userId);
+    if (p.workshop) gravar(t.id, userId, 'workshop', p.workshop); else db.evolucoes = db.evolucoes.filter(e => !(e.turma_id === t.id && e.user_id === userId && tipoEvo(e) === 'workshop'));
+    if (p.completo) gravar(t.id, userId, 'completo', p.completo); else db.evolucoes = db.evolucoes.filter(e => !(e.turma_id === t.id && e.user_id === userId && tipoEvo(e) === 'completo' && e.status === 'rascunho'));
   };
   // Pessoa de exemplo (sem conta) guarda acesso e execuções em db.acessos.
   const ajustar = (id, patch) => { const u = userOf(id); if (u) Object.assign(u, patch); else { db.acessos = db.acessos || {}; db.acessos[id] = { ...(db.acessos[id] || {}), ...patch }; } };
@@ -1474,11 +1514,8 @@ function DemoStore() {
   const ultimoPedido = id => db.pedidos.filter(p => p.user_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at))[0] || null;
   const parearTurma = turmaId => {
     const t = db.turmas.find(x => x.id === turmaId); if (!t) return 0;
-    const users = [...new Set(db.results.filter(r => r.turma_id === turmaId).map(r => r.user_id))];
-    const pares = users.map(u => [u, parPessoa(db.results, t, u)]).filter(([, p]) => p);
-    db.evolucoes = db.evolucoes.filter(e => e.turma_id !== turmaId || e.status !== 'rascunho' || pares.some(([u]) => u === e.user_id));
-    pares.forEach(([u, p]) => gravarPar(turmaId, u, p, false));
-    save(); return pares.length;
+    [...new Set(db.results.filter(r => r.turma_id === turmaId).map(r => r.user_id))].forEach(u => parearPessoaTurma(t, u));
+    save(); return db.evolucoes.filter(e => e.turma_id === turmaId && tipoEvo(e) === 'completo').length;
   };
   return {
     mode: 'demo',
@@ -1555,27 +1592,30 @@ function DemoStore() {
       if (!calcAcesso(u, db.turmas.find(t => t.id === u.turma_id), db.results).pode) throw new Error('Não é possível executar um novo diagnóstico agora. Você pode pedir uma nova execução no seu painel.');
       const rec = { id: uid(), user_id: u.id, nome: u.nome, turma_id: turma_id || null, respostas, resultado, created_at: new Date().toISOString() };
       db.results.push(rec);
-      const par = parPessoa(db.results, db.turmas.find(t => t.id === rec.turma_id), u.id);
-      if (par) gravarPar(rec.turma_id, u.id, par, true);
+      const t = db.turmas.find(x => x.id === rec.turma_id); const et = t ? etapaTurma(t, diaBR(rec.created_at)) : null;
+      if (t && ['workshop', 'reavaliacao'].includes(et) && !db.results.some(r => r.id !== rec.id && r.user_id === u.id && r.turma_id === t.id && etapaTurma(t, diaBR(r.created_at)) === et)) parearPessoaTurma(t, u.id);
+      else { const par = parIndividualJS(db.results, rec); if (par) gravar(null, u.id, 'individual', par); }
       if (u.nova_execucao && db.results.filter(r => r.user_id === u.id).length >= (u.limite_execucoes || 1)) u.nova_execucao = false;
       save(); return rec;
     },
     async listEvolucoes(turmaId) { return db.evolucoes.filter(e => e.turma_id === turmaId).map(juntar).filter(e => e.inicial && e.reavaliacao); },
+    async listEvolucoesIndividuais() { return db.evolucoes.filter(e => tipoEvo(e) === 'individual').map(juntar).filter(e => e.inicial && e.reavaliacao); },
+    async resultadosDe(userId) { return db.results.filter(r => r.user_id === userId).sort((a, b) => a.created_at.localeCompare(b.created_at)); },
     async updateEvolucao(id, patch) { const e = db.evolucoes.find(x => x.id === id); if (e) { Object.assign(e, patch); save(); } return e ? juntar(e) : null; },
     async parearTurma(turmaId) { return parearTurma(turmaId); },
     async minhaReavaliacao() {
       const u = userOf(db.session); if (!u) return [];
       const t = db.turmas.find(x => x.id === u.turma_id); if (!t) return [];
-      const e = db.evolucoes.find(x => x.user_id === u.id && x.turma_id === t.id);
+      const e = db.evolucoes.find(x => x.user_id === u.id && x.turma_id === t.id && tipoEvo(x) === 'completo');
       return [{ turma_id: t.id, turma_nome: t.nome, reavaliar_em: t.reavaliar_em || null, status: e ? e.status : null }];
     },
-    async minhasEvolucoes() { return db.evolucoes.filter(e => e.user_id === db.session && e.status === 'liberado').map(juntar).filter(e => e.inicial && e.reavaliacao).sort((a, b) => b.reavaliacao.created_at.localeCompare(a.reavaliacao.created_at)); },
+    async minhasEvolucoes() { return db.evolucoes.filter(e => e.user_id === db.session && e.status === 'liberado' && tipoEvo(e) !== 'workshop').map(juntar).filter(e => e.inicial && e.reavaliacao).sort((a, b) => b.reavaliacao.created_at.localeCompare(a.reavaliacao.created_at)); },
     async myResults() { return db.results.filter(r => r.user_id === db.session).sort((a, b) => b.created_at.localeCompare(a.created_at)); },
     async getResult(id) { return db.results.find(r => r.id === id) || null; },
     async updateLeitura(id, leitura) { const r = db.results.find(x => x.id === id); if (r) { r.resultado.leitura = leitura; save(); } },
     async listTurmas() { return db.turmas.slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')); },
     async createTurma(nome, perguntar, expira, extra = {}) { const t = { id: uid(), nome: nome.trim(), codigo: genCode(), perguntar_nicho: perguntar !== false, expira_em: expira || null, created_at: new Date().toISOString(), ...extra }; db.turmas.push(t); save(); return t; },
-    async updateTurma(id, patch) { const t = db.turmas.find(x => x.id === id); if (t) { Object.assign(t, patch); if ('reavaliar_em' in patch) parearTurma(id); save(); } return t; },
+    async updateTurma(id, patch) { const t = db.turmas.find(x => x.id === id); if (t) { Object.assign(t, patch); if ('reavaliar_em' in patch || 'data_workshop' in patch) parearTurma(id); save(); } return t; },
     async turmaResults(turmaId) {
       return db.results.filter(r => turmaId === 'todos' ? true : turmaId === 'sem' ? !r.turma_id : r.turma_id === turmaId).sort((a, b) => b.created_at.localeCompare(a.created_at));
     }
@@ -1594,6 +1634,7 @@ function LiveStore() {
     if (/already registered/i.test(m)) return new Error('Já existe uma conta com este e-mail. Use a aba Entrar.');
     if (/Password should be at least/i.test(m)) return new Error('A senha precisa ter pelo menos 6 caracteres.');
     if (/rate limit/i.test(m)) return new Error('Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente de novo.');
+    if (/intermediario_id|evolucoes_tipo|column evolucoes\.tipo|evolucoes_turma_tipo_uq/i.test(m)) return new Error('Atualize o banco de dados com a atualização 07 (evolução por etapas) enviada pelo Claude.');
     if (/limite_baixo/i.test(m)) return new Error('O limite precisa ser maior que o número de execuções já feitas pela pessoa.');
     if (/data_invalida/i.test(m)) return new Error('Escolha uma data de hoje em diante.');
     if (/pedido_inexistente/i.test(m)) return new Error('Este pedido já foi respondido.');
@@ -1616,11 +1657,11 @@ function LiveStore() {
   // Junta a cada relatório de evolução os dois diagnósticos que ele compara.
   async function juntarEvolucoes(rows) {
     if (!rows || !rows.length) return [];
-    const ids = [...new Set(rows.flatMap(e => [e.inicial_id, e.reavaliacao_id]))];
+    const ids = [...new Set(rows.flatMap(e => [e.inicial_id, e.intermediario_id, e.reavaliacao_id]).filter(Boolean))];
     const { data, error } = await sb.from('resultados').select('*, profiles(nome)').in('id', ids);
     if (error) throw errPt(error);
     const byId = Object.fromEntries(data.map(r => [r.id, toRec(r)]));
-    return rows.map(e => ({ id: e.id, turma_id: e.turma_id, user_id: e.user_id, nome: e.profiles?.nome || byId[e.reavaliacao_id]?.nome || '', inicial_id: e.inicial_id, reavaliacao_id: e.reavaliacao_id, comentario: e.comentario, status: e.status, gerado_em: e.gerado_em, liberado_em: e.liberado_em, inicial: byId[e.inicial_id] || null, reavaliacao: byId[e.reavaliacao_id] || null })).filter(e => e.inicial && e.reavaliacao);
+    return rows.map(e => ({ id: e.id, turma_id: e.turma_id, user_id: e.user_id, tipo: tipoEvo(e), nome: e.profiles?.nome || byId[e.reavaliacao_id]?.nome || '', inicial_id: e.inicial_id, intermediario_id: e.intermediario_id || null, reavaliacao_id: e.reavaliacao_id, comentario: e.comentario, status: e.status, gerado_em: e.gerado_em, liberado_em: e.liberado_em, inicial: byId[e.inicial_id] || null, intermediario: (e.intermediario_id && byId[e.intermediario_id]) || null, reavaliacao: byId[e.reavaliacao_id] || null })).filter(e => e.inicial && e.reavaliacao);
   }
   return {
     mode: 'live',
@@ -1695,7 +1736,7 @@ function LiveStore() {
       if (error) throw errPt(error); return data.map(toRec);
     },
     async getResult(id) { const { data, error } = await sb.from('resultados').select('*, profiles(nome)').eq('id', id).maybeSingle(); if (error) throw errPt(error); return data ? toRec(data) : null; },
-    async updateTurma(id, patch) { const { data, error } = await sb.from('turmas').update(patch).eq('id', id).select().single(); if (error) throw new Error(/perguntar_nicho/i.test(error.message) ? 'Atualize o banco de dados com o complemento enviado pelo Claude para usar esta opção.' : errPt(error).message); if ('reavaliar_em' in patch) await this.parearTurma(id); return data; },
+    async updateTurma(id, patch) { const { data, error } = await sb.from('turmas').update(patch).eq('id', id).select().single(); if (error) throw new Error(/perguntar_nicho/i.test(error.message) ? 'Atualize o banco de dados com o complemento enviado pelo Claude para usar esta opção.' : errPt(error).message); if ('reavaliar_em' in patch || 'data_workshop' in patch) await this.parearTurma(id); return data; },
     async listTurmas() { const { data, error } = await sb.from('turmas').select('*').order('created_at', { ascending: false }); if (error) throw errPt(error); return data; },
     async createTurma(nome, perguntar, expira, extra = {}) {
       let comNicho = true;
@@ -1715,6 +1756,15 @@ function LiveStore() {
       const { data, error } = await sb.from('evolucoes').select('*, profiles(nome)').eq('turma_id', turmaId);
       if (error) throw errPt(error);
       return juntarEvolucoes(data);
+    },
+    async listEvolucoesIndividuais() {
+      const { data, error } = await sb.from('evolucoes').select('*, profiles(nome)').eq('tipo', 'individual');
+      if (error) { if (/tipo/i.test(error.message || '')) throw new Error('Atualize o banco de dados com a atualização 07 (evolução por etapas) enviada pelo Claude.'); throw errPt(error); }
+      return juntarEvolucoes(data);
+    },
+    async resultadosDe(userId) {
+      const { data, error } = await sb.from('resultados').select('*, profiles(nome)').eq('user_id', userId).order('created_at', { ascending: true });
+      if (error) return []; return data.map(toRec);
     },
     async updateEvolucao(id, patch) {
       const { data, error } = await sb.from('evolucoes').update(patch).eq('id', id).select('*, profiles(nome)').single();
@@ -1984,7 +2034,7 @@ function viewPainel() {
   }).filter(Boolean).sort((x, y) => x.ordem - y.ordem);
   const reavCard = cartoes.length ? cartoes[0].html : '';
   const evos = S.minhasEvos || [];
-  const evoCard = evos.length ? `<div class="stack"><h2 class="h-sec" style="margin:0">Minha evolução</h2><div class="list">${evos.map(e => { const di = e.reavaliacao.resultado.indice - e.inicial.resultado.indice; return `<button class="row-btn" data-evo-mine="${esc(e.id)}"><span><strong>Índice ${e.inicial.resultado.indice} → ${e.reavaliacao.resultado.indice}</strong> ${deltaChip(di)}<br><span class="row-meta">${fmtDate(e.inicial.created_at)} → ${fmtDate(e.reavaliacao.created_at)}${e.comentario ? ' · com comentário do facilitador' : ''}</span></span><span aria-hidden="true" class="muted">→</span></button>`; }).join('')}</div></div>` : '';
+  const evoCard = evos.length ? `<div class="stack"><h2 class="h-sec" style="margin:0">Minha evolução</h2><div class="list">${evos.map(e => { const di = e.reavaliacao.resultado.indice - e.inicial.resultado.indice; return `<button class="row-btn" data-evo-mine="${esc(e.id)}"><span><strong>Índice ${[e.inicial, e.intermediario, e.reavaliacao].filter(Boolean).map(r => r.resultado.indice).join(' → ')}</strong> ${deltaChip(di, false, EVO_CORTE.indice)}<br><span class="row-meta">${fmtDate(e.inicial.created_at)} → ${fmtDate(e.reavaliacao.created_at)}${e.comentario ? ' · com comentário do facilitador' : ''}</span></span><span aria-hidden="true" class="muted">→</span></button>`; }).join('')}</div></div>` : '';
   return `<main class="page"><div class="wrap narrow stack-lg">
     <div class="hello"><div class="stack" style="gap:6px"><span class="eyebrow">Meu painel</span><h1 style="font-size:clamp(28px,5vw,40px)">Olá${s.nome ? ', ' + esc(s.nome.split(' ')[0]) : ''}</h1></div>
     ${!a || a.pode ? `<button class="btn btn-primary" data-go="diagnostico">${draft ? 'Continuar diagnóstico' : 'Iniciar diagnóstico'} <span aria-hidden="true">→</span></button>` : ''}</div>
@@ -2931,241 +2981,447 @@ function afterRenderResultado() {
 }
 
 /* ============================== EVOLUÇÃO ================================= */
-// Classificação da variação: 10 pontos ou mais para cima ou para baixo; o que fica entre -9 e +9 é estável.
-const EVO_LIMIAR = 10;
-const CLASSE = { evoluiu: ['Evoluiu', 'var(--good)'], estavel: ['Estável', 'var(--ink-3)'], recuou: ['Recuou', 'var(--crit)'] };
-const classeDe = d => d >= EVO_LIMIAR ? 'evoluiu' : d <= -EVO_LIMIAR ? 'recuou' : 'estavel';
+// Método de evolução (validado em 16/10/2026):
+// - Turma: prévia, workshop e 45 dias. Leitura principal prévia -> 45 dias; o workshop entra como apoio.
+// - Individual: primeira execução -> execução anterior -> execução atual.
+// - Corte de 10 pontos nas dimensões e de 5 pontos no Índice.
+// - Consolidou: subiu o corte do início ao fim e manteve o nível do ponto intermediário.
+//   Avançou: subiu o corte do início ao fim (sem ponto intermediário, ou abaixo do que mostrou nele).
+//   Em construção: subiu o corte no ponto intermediário e voltou para perto do início.
+//   Estável: variação menor que o corte. Recuou: caiu o corte ou mais do início ao fim.
+const EVO_CORTE = { dim: 10, indice: 5 };
+const CLASSE = {
+  consolidou: ['Consolidou', 'var(--good)'], avancou: ['Avançou', 'var(--good)'], construcao: ['Em construção', 'var(--warn)'],
+  estavel: ['Estável', 'var(--ink-3)'], recuou: ['Recuou', 'var(--crit)']
+};
+const CLASSE_ORDEM = ['consolidou', 'avancou', 'construcao', 'estavel', 'recuou'];
+function classeEvo(a, m, b, corte) {
+  const d = b - a;
+  if (d >= corte) return m != null && b - m <= -corte ? 'avancou' : m != null ? 'consolidou' : 'avancou';
+  if (d <= -corte) return 'recuou';
+  if (m != null && m - a >= corte) return 'construcao';
+  return 'estavel';
+}
+const classeDe = (d, corte = EVO_CORTE.dim) => d >= corte ? 'avancou' : d <= -corte ? 'recuou' : 'estavel';
 const fmtDelta = d => d > 0 ? '+' + d : d < 0 ? '−' + Math.abs(d) : '0';
 const CONF_ORD = { Baixa: 0, Moderada: 1, Alta: 2 };
 const MODO_NOME = { conversa: 'conversando com o cliente', contato: 'cliente escolhendo sozinho' };
 const NUM_EXT = ['Nenhuma', 'Uma', 'Duas', 'Três'];
+const tipoEvo = ev => ev.tipo || (ev.turma_id ? 'completo' : 'individual');
+
+// Nome de cada ponto da comparação, para títulos (nome) e frases (em).
+function rotulosEvo(ev) {
+  const t = tipoEvo(ev); const meio = Boolean(ev.intermediario);
+  if (t === 'workshop') return [{ nome: 'Prévia', em: 'na prévia' }, { nome: 'Workshop', em: 'no workshop' }];
+  if (t === 'individual') return meio
+    ? [{ nome: 'Primeira', em: 'na primeira execução' }, { nome: 'Anterior', em: 'na execução anterior' }, { nome: 'Atual', em: 'na execução atual' }]
+    : [{ nome: 'Primeira', em: 'na primeira execução' }, { nome: 'Atual', em: 'na execução atual' }];
+  return meio
+    ? [{ nome: 'Prévia', em: 'na prévia' }, { nome: 'Workshop', em: 'no workshop' }, { nome: '45 dias', em: 'aos 45 dias' }]
+    : [{ nome: 'Diagnóstico inicial', em: 'no diagnóstico inicial' }, { nome: 'Reavaliação', em: 'na reavaliação' }];
+}
+
+// Parcela das afirmações respondidas no extremo favorável da escala (5, ou 1 nas invertidas).
+function fracaoMaximo(rec) {
+  const it = rec?.respostas?.items || {}; let n = 0, max = 0;
+  ITEMS.forEach(i => { const r = it[i.c]; if (r == null) return; n += 1; if ((i.inv && r === 1) || (!i.inv && r === 5)) max += 1; });
+  return n ? max / n : 0;
+}
 
 function compararEvolucao(ev) {
-  const ini = ev.inicial, rea = ev.reavaliacao; const a = ini.resultado, b = rea.resultado;
-  const linha = (antes, depois) => ({ antes, depois, delta: depois - antes, classe: classeDe(depois - antes) });
-  const dims = Object.fromEntries(DIMS.map(d => [d.id, linha(a.dims[d.id], b.dims[d.id])]));
-  const sa = ini.respostas?.sjt || {}, sb = rea.respostas?.sjt || {};
+  const ini = ev.inicial, mei = ev.intermediario || null, rea = ev.reavaliacao;
+  const a = ini.resultado, m = mei ? mei.resultado : null, b = rea.resultado;
+  const rot = rotulosEvo(ev); const fim = rot[rot.length - 1];
+  const linha = (fa, fm, fb, corte) => ({ antes: fa, meio: fm, depois: fb, delta: fb - fa, classe: classeEvo(fa, fm, fb, corte) });
+  const L = (f, corte = EVO_CORTE.dim) => linha(f(a), m ? f(m) : null, f(b), corte);
+  const dims = Object.fromEntries(DIMS.map(d => [d.id, L(r => r.dims[d.id])]));
+  const indice = L(r => r.indice, EVO_CORTE.indice);
+  const grupos = Object.fromEntries(CLASSE_ORDEM.map(k => [k, DIMS.filter(d => dims[d.id].classe === k).map(d => d.id)]));
+  const sa = ini.respostas?.sjt || {}, sm = mei?.respostas?.sjt || null, sb = rea.respostas?.sjt || {};
   const chave = x => x.k + '|' + x.d;
   const temA = new Set(a.alerts.map(chave)), temB = new Set(b.alerts.map(chave));
-  const modoA = modoDe(ini.respostas?.negocio), modoB = modoDe(rea.respostas?.negocio);
-  const ca = a.confiab, cb = b.confiab;
+  const recs = [ini, mei, rea].filter(Boolean);
   const sinais = [];
-  if (ini.respostas?.negocio && rea.respostas?.negocio && modoA !== modoB) sinais.push(`O modo de compra mudou: ${MODO_NOME[modoA]} no diagnóstico inicial, ${MODO_NOME[modoB]} na reavaliação. Leia a comparação com cautela.`);
-  if (cb && cb.nivel === 'Baixa') sinais.push(`Confiabilidade baixa na reavaliação (${cb.score})${cb.flags.length ? ': ' + cb.flags.join('; ') : ''}.`);
+  const modos = recs.filter(r => r.respostas?.negocio).map(r => modoDe(r.respostas.negocio));
+  if (new Set(modos).size > 1) sinais.push(`O modo de compra mudou entre as execuções (${[...new Set(modos)].map(x => MODO_NOME[x]).join(' e ')}). Leia a comparação com cautela.`);
+  const ca = a.confiab, cb = b.confiab;
+  if (cb && cb.nivel === 'Baixa') sinais.push(`Confiabilidade baixa ${fim.em} (${cb.score})${cb.flags.length ? ': ' + cb.flags.join('; ') : ''}.`);
   else if (ca && cb && CONF_ORD[cb.nivel] < CONF_ORD[ca.nivel]) sinais.push(`A confiabilidade caiu de ${ca.nivel} (${ca.score}) para ${cb.nivel} (${cb.score})${cb.flags.length ? ': ' + cb.flags.join('; ') : ''}.`);
+  if (m && m.indice - a.indice >= 15) {
+    const fr = fracaoMaximo(mei);
+    if (fr >= 0.6) sinais.push(`Salto de ${m.indice - a.indice} pontos ${rot[1].em}, com ${Math.round(fr * 100)}% das afirmações no máximo da escala. Dê mais peso à leitura ${fim.em}.`);
+  }
   const prioIni = a.prioridades;
-  const nEvo = prioIni.filter(k => dims[k].classe === 'evoluiu').length;
+  const nEvo = prioIni.filter(k => ['consolidou', 'avancou'].includes(dims[k].classe)).length;
   const nivelA = levelOf(a.indice), nivelB = levelOf(b.indice);
-  const resumo = `Índice de ${a.indice} para ${b.indice} (${fmtDelta(b.indice - a.indice)})${nivelA.nome !== nivelB.nome ? `, do nível ${nivelA.nome} para ${nivelB.nome}` : `, no nível ${nivelB.nome}`}. `
-    + (nEvo === prioIni.length ? `As ${prioIni.length === 3 ? 'três' : prioIni.length} prioridades do diagnóstico inicial evoluíram.` : nEvo === 0 ? 'Nenhuma das prioridades do diagnóstico inicial subiu 10 pontos ou mais.' : `${NUM_EXT[nEvo]} das ${prioIni.length === 3 ? 'três' : prioIni.length} prioridades do diagnóstico inicial ${nEvo === 1 ? 'evoluiu' : 'evoluíram'}.`);
+  const ext = n => n === 3 ? 'três' : String(n);
+  const partes = [];
+  partes.push(`Índice de ${a.indice} ${rot[0].em} para ${b.indice} ${fim.em} (${fmtDelta(b.indice - a.indice)})${m ? `, com ${m.indice} ${rot[1].em}` : ''}.`);
+  partes.push(nivelA.nome !== nivelB.nome ? `O nível passou de ${nivelA.nome} para ${nivelB.nome}.` : `O nível se manteve em ${nivelB.nome}.`);
+  if (a.perfil !== b.perfil) partes.push(`O perfil passou de ${PROFILES[a.perfil].nome} para ${PROFILES[b.perfil].nome}.`);
+  const cont = [['consolidou', 'consolidada', 'consolidadas'], ['avancou', 'em avanço', 'em avanço'], ['construcao', 'em construção', 'em construção'], ['recuou', 'em recuo', 'em recuo']]
+    .filter(([k]) => grupos[k].length).map(([k, s1, s2]) => `${grupos[k].length} ${grupos[k].length === 1 ? 'dimensão' : 'dimensões'} ${grupos[k].length === 1 ? s1 : s2}`);
+  if (cont.length) partes.push(cont.join(', ').replace(/, ([^,]*)$/, ' e $1') + '.');
+  partes.push(nEvo === prioIni.length ? `As ${ext(prioIni.length)} prioridades apontadas ${rot[0].em} avançaram.` : nEvo === 0 ? `Nenhuma das prioridades apontadas ${rot[0].em} subiu ${EVO_CORTE.dim} pontos ou mais.` : `${NUM_EXT[nEvo]} das ${ext(prioIni.length)} prioridades apontadas ${rot[0].em} ${nEvo === 1 ? 'avançou' : 'avançaram'}.`);
   return {
-    indice: linha(a.indice, b.indice), aprox: linha(a.aprox, b.aprox), afast: linha(a.afast, b.afast), dims,
-    nivelA, nivelB, perfilA: a.perfil, perfilB: b.perfil, quadA: quadOf(a), quadB: quadOf(b), posturaA: a.postura, posturaB: b.postura,
-    prioIni, prioNovas: b.prioridades, nEvo, resumo,
-    situacoes: SJT.map(s => ({ id: s.id, antes: sa[s.id] || null, depois: sb[s.id] || null })),
+    tipo: tipoEvo(ev), rot, indice, aprox: L(r => r.aprox), afast: L(r => r.afast), dims, grupos,
+    nivelA, nivelM: m ? levelOf(m.indice) : null, nivelB, perfis: [a.perfil, m ? m.perfil : null, b.perfil], perfilA: a.perfil, perfilB: b.perfil,
+    quadA: quadOf(a), quadB: quadOf(b), posturas: [a.postura, m ? m.postura : null, b.postura], posturaA: a.postura, posturaB: b.postura,
+    prioIni, prioNovas: b.prioridades, nEvo, resumo: partes.join(' '),
+    situacoes: SJT.map(s => ({ id: s.id, antes: sa[s.id] || null, meio: sm ? sm[s.id] || null : null, depois: sb[s.id] || null })),
     resolvidos: a.alerts.filter(x => !temB.has(chave(x))), novos: b.alerts.filter(x => !temA.has(chave(x))), mantidos: b.alerts.filter(x => temA.has(chave(x))),
     dias: Math.max(0, Math.round((new Date(rea.created_at) - new Date(ini.created_at)) / 86400000)),
-    sinais
+    sinais, temMeio: Boolean(m)
   };
 }
 
-const deltaChip = (d, comClasse) => { const c = CLASSE[classeDe(d)]; return `<span class="delta" style="color:${c[1]};border-color:color-mix(in srgb, ${c[1]} 50%, transparent)">${fmtDelta(d)}${comClasse ? ' · ' + c[0] : ''}</span>`; };
+const classeChip = (k, d) => { const c = CLASSE[k]; return `<span class="delta" style="color:${c[1]};border-color:color-mix(in srgb, ${c[1]} 50%, transparent)">${d != null ? fmtDelta(d) + ' · ' : ''}${c[0]}</span>`; };
+const deltaChip = (d, comClasse, corte = EVO_CORTE.dim) => { const c = CLASSE[classeDe(d, corte)]; return `<span class="delta" style="color:${c[1]};border-color:color-mix(in srgb, ${c[1]} 50%, transparent)">${fmtDelta(d)}${comClasse ? ' · ' + c[0] : ''}</span>`; };
 const posturaChip = k => k ? `<span class="chip"><i class="swatch" style="background:${POSTURA_COR[k]}"></i>${POSTURA_NOME[k]}</span>` : '<span class="muted">—</span>';
-const statusEvoChip = s => s === 'liberado' ? '<span class="chip"><i class="swatch" style="background:var(--good)"></i>Liberado</span>' : '<span class="chip"><i class="swatch" style="background:var(--warn)"></i>Rascunho</span>';
-const evoBars = (a, b, cor) => `<div class="evo-bars" role="img" aria-label="Antes ${a}, agora ${b}"><span class="evo-track"><i class="ant" style="width:${Math.max(1, a)}%"></i></span><span class="evo-track"><i style="width:${Math.max(1, b)}%;background:${cor}"></i></span></div>`;
+const statusEvoChip = (s, tipo) => tipo === 'workshop' ? '<span class="chip"><i class="swatch" style="background:var(--c-cool)"></i>Interno</span>' : s === 'liberado' ? '<span class="chip"><i class="swatch" style="background:var(--good)"></i>Liberado</span>' : '<span class="chip"><i class="swatch" style="background:var(--warn)"></i>Rascunho</span>';
+// Barras de cada ponto: o primeiro em cinza, o intermediário em tom claro e o último na cor do eixo.
+const evoBars = (vals, cor, rot) => `<div class="evo-bars" role="img" aria-label="${vals.map((v, i) => (rot ? rot[i].nome + ' ' : '') + v).join(', ')}">${vals.map((v, i) => `<span class="evo-track"><i class="${i === 0 ? 'ant' : i < vals.length - 1 ? 'meio' : ''}" style="width:${Math.max(1, v)}%;${i ? `background:${cor}` : ''}"></i></span>`).join('')}</div>`;
 const eixoCorEvo = e => e === 'aprox' ? 'var(--c-warm)' : e === 'afast' ? 'var(--c-cool)' : 'var(--ink-2)';
+const valsDe = x => x.meio != null ? [x.antes, x.meio, x.depois] : [x.antes, x.depois];
+const seq = vals => vals.map((v, i) => i === vals.length - 1 ? `<b>${v}</b>` : v).join(' → ');
+
+// Linha do Índice em todas as execuções (relatório individual).
+function serieSvg(serie) {
+  if (!serie || serie.length < 3) return '';
+  const Wd = 900, Hd = 190, L = 40, R = 30, T = 22, B = 30;
+  const n = serie.length; const X = i => L + 26 + (Wd - L - R - 26) * (n === 1 ? 0.5 : i / (n - 1)); const Y = v => T + (Hd - T - B) * (100 - v) / 100;
+  const grade = [0, 40, 60, 80, 100].map(v => `<line x1="${L}" x2="${Wd - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="10" fill="var(--ink-3)">${v}</text>`).join('');
+  const pts = serie.map((r, i) => `${X(i)},${Y(r.resultado.indice)}`).join(' ');
+  const marcas = serie.map((r, i) => `<circle cx="${X(i)}" cy="${Y(r.resultado.indice)}" r="${i === n - 1 ? 5 : 3.5}" fill="${i === n - 1 ? 'var(--accent)' : 'var(--surface)'}" stroke="var(--accent)" stroke-width="2"/><text x="${X(i)}" y="${Y(r.resultado.indice) - 9}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">${r.resultado.indice}</text><text x="${X(i)}" y="${Hd - 10}" text-anchor="middle" font-size="10" fill="var(--ink-3)">${fmtDia(diaBR(r.created_at)).slice(0, 5)}</text>`).join('');
+  return `<svg viewBox="0 0 ${Wd} ${Hd}" width="100%" role="img" aria-label="Índice OQGCI em cada execução: ${serie.map(r => r.resultado.indice).join(', ')}">${grade}<polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>${marcas}</svg>`;
+}
 
 function viewEvolucao() {
-  const ev = S.evo.ev; const ini = ev.inicial, rea = ev.reavaliacao;
-  const cmp = compararEvolucao(ev);
+  const ev = S.evo.ev; const ini = ev.inicial, mei = ev.intermediario || null, rea = ev.reavaliacao;
+  const cmp = compararEvolucao(ev); const rot = cmp.rot; const fim = rot[rot.length - 1];
   const isFac = S.session?.role === 'facilitador' && S.evo.from === 'fac';
   const isMine = ev.user_id === S.session?.id;
+  const interno = cmp.tipo === 'workshop';
   const voc = vocabOf(rea.respostas?.negocio); const pk = pack(rea.respostas?.negocio);
   const pB = pk.perfil(cmp.perfilB);
   const total = SJT.length;
+  const recs = [ini, mei, rea].filter(Boolean);
 
-  const banner = !isFac ? '' : ev.status === 'liberado'
+  const banner = !isFac ? '' : interno
+    ? `<div class="msg" role="status"><b>Relatório interno.</b> Compara a prévia com a execução do workshop e fica só com você. A pessoa recebe o relatório completo depois dos 45 dias.</div>`
+    : ev.status === 'liberado'
     ? `<div class="msg msg-ok" role="status">Liberado${ev.liberado_em ? ' em ' + fmtDate(ev.liberado_em) : ''}. A pessoa já vê este relatório no painel dela e pode baixar o PDF.</div>`
     : `<div class="msg evo-rascunho" role="status"><b>Rascunho.</b> A pessoa ainda não vê este relatório. Revise, deixe o seu comentário e libere.</div>`;
   const sinais = isFac && cmp.sinais.length ? `<div class="card stack" style="gap:10px"><div><h2 class="h-sec" style="margin:0">Sinais para a sua revisão</h2><span class="tag" style="display:inline-block;margin-top:8px">Visível só para o facilitador</span></div><ul class="guide">${cmp.sinais.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '';
 
-  const prioIni = cmp.prioIni.map((k, i) => { const x = cmp.dims[k]; return `<div class="evo-row"><span><span class="prio-n" style="display:inline-grid;margin-right:8px">${i + 1}</span><strong>${DIM[k].nome}</strong></span>${evoBars(x.antes, x.depois, eixoCorEvo(DIM[k].eixo))}<span class="tnum evo-ab">${x.antes} → <b>${x.depois}</b></span>${deltaChip(x.delta, true)}</div>`; }).join('');
-  const dimRows = DIMS.map(d => { const x = cmp.dims[d.id]; return `<div class="evo-row"><strong>${d.nome}</strong>${evoBars(x.antes, x.depois, eixoCorEvo(d.eixo))}<span class="tnum evo-ab">${x.antes} → <b>${x.depois}</b></span>${deltaChip(x.delta)}</div>`; }).join('');
-  const sits = pk.sjt.map((s, k) => { const x = cmp.situacoes[k]; const mudou = x.antes !== x.depois; return `<div class="evo-sit"><span class="dim-code">S${k + 1}</span><span class="evo-sit-t">${esc(pk.nomeSit[s.id])}</span><span class="evo-sit-p">${posturaChip(x.antes)}<span class="muted" aria-hidden="true">→</span>${posturaChip(x.depois)}${mudou && x.depois === 'assertiva' ? '<span class="flag" style="background:color-mix(in srgb, var(--good) 22%, transparent);color:var(--good)">avançou</span>' : ''}</span></div>`; }).join('');
+  const pontos = `<div class="evo-pontos" style="grid-template-columns:repeat(${recs.length}, minmax(0, 1fr))">${recs.map((r, i) => `<div class="evo-ponto${i === recs.length - 1 ? ' on' : ''}"><span class="eyebrow">${rot[i].nome}</span><b class="tnum">${r.resultado.indice}</b><span class="small muted">${fmtDia(diaBR(r.created_at))}</span></div>`).join('')}</div>`;
+  const legenda = `<div class="legend">${rot.map((r, i) => `<span><i class="swatch" style="background:${i === 0 ? 'var(--ink-3)' : 'var(--accent)'};opacity:${i === 0 ? .5 : i < rot.length - 1 ? .45 : 1}"></i>${r.nome}</span>`).join('')}</div>`;
+  const linhaDim = (nome, x, cor, extra = '') => `<div class="evo-row"><span>${extra}<strong>${nome}</strong></span>${evoBars(valsDe(x), cor, rot)}<span class="tnum evo-ab">${seq(valsDe(x))}</span>${classeChip(x.classe, x.delta)}</div>`;
+  const grupo = (k, titulo, texto) => cmp.grupos[k].length ? `<div class="evo-grupo"><div class="evo-grupo-h">${classeChip(k)}<strong>${titulo}</strong></div><p class="small muted">${texto}</p><div class="evo-rows">${cmp.grupos[k].map(id => linhaDim(DIM[id].nome, cmp.dims[id], eixoCorEvo(DIM[id].eixo))).join('')}</div></div>` : '';
+  const leitura = [
+    grupo('consolidou', 'O que se consolidou', `Subiu ${EVO_CORTE.dim} pontos ou mais e se manteve ${fim.em}. A prática entrou na rotina.`),
+    grupo('avancou', 'O que avançou', `Subiu ${EVO_CORTE.dim} pontos ou mais ${rot[0].em === 'na prévia' ? 'desde a prévia' : 'desde o início'}.${cmp.temMeio ? ` Ficou abaixo do que apareceu ${rot[1].em}, então ainda há espaço para firmar.` : ''}`),
+    grupo('construcao', 'O que ainda depende de prática', `Subiu ${rot[1] && cmp.temMeio ? rot[1].em : ''} e voltou para perto do ponto de partida ${fim.em}. O entendimento existe; falta levar para a rotina.`),
+    grupo('recuou', 'O que recuou', `Caiu ${EVO_CORTE.dim} pontos ou mais. Vale entender o que mudou nas suas conversas.`)
+  ].join('');
+  const estaveis = cmp.grupos.estavel.length ? `<p class="small muted">Estáveis, com variação menor que ${EVO_CORTE.dim} pontos: ${cmp.grupos.estavel.map(id => DIM[id].nome).join(', ')}.</p>` : '';
+  const prioIni = cmp.prioIni.map((k, i) => linhaDim(DIM[k].nome, cmp.dims[k], eixoCorEvo(DIM[k].eixo), `<span class="prio-n" style="display:inline-grid;margin-right:8px">${i + 1}</span>`)).join('');
+  const dimRows = DIMS.map(d => linhaDim(d.nome, cmp.dims[d.id], eixoCorEvo(d.eixo))).join('');
+  const sits = SJT.map((s, k) => { const x = cmp.situacoes[k]; const vs = cmp.temMeio ? [x.antes, x.meio, x.depois] : [x.antes, x.depois]; const avancou = x.antes !== 'assertiva' && x.depois === 'assertiva'; return `<div class="evo-sit"><span class="dim-code">S${k + 1}</span><span class="evo-sit-t">${esc(pk.nomeSit[s.id])}</span><span class="evo-sit-p">${vs.map(posturaChip).join('<span class="muted" aria-hidden="true">→</span>')}${avancou ? '<span class="flag" style="background:color-mix(in srgb, var(--good) 22%, transparent);color:var(--good)">avançou</span>' : ''}</span></div>`; }).join('');
   const alertas = (cmp.resolvidos.length || cmp.novos.length || cmp.mantidos.length) ? `<div class="stack"><h2 class="h-sec" style="margin:0">Pontos de atenção</h2>
-      ${cmp.resolvidos.map(a => `<div class="alert ok"><span class="alert-ico" aria-hidden="true">✓</span><div><strong>${esc(a.t)} · resolvido</strong><span class="muted small">Aparecia no diagnóstico inicial e não aparece mais na reavaliação.</span></div></div>`).join('')}
-      ${cmp.novos.map(a => `<div class="alert ${a.sev}"><span class="alert-ico" aria-hidden="true">!</span><div><strong>${esc(a.t)} · novo</strong><span class="muted small">${esc(V(a.d, voc))}</span></div></div>`).join('')}
-      ${cmp.mantidos.map(a => `<div class="alert ${a.sev}"><span class="alert-ico" aria-hidden="true">!</span><div><strong>${esc(a.t)} · continua</strong><span class="muted small">${esc(V(a.d, voc))}</span></div></div>`).join('')}</div>` : '';
+      ${cmp.resolvidos.map(a => `<div class="alert ok"><span class="alert-ico" aria-hidden="true">✓</span><div><strong>${esc(a.t)} · resolvido</strong><span class="muted small">Aparecia ${rot[0].em} e não aparece mais ${fim.em}.</span></div></div>`).join('')}
+      ${cmp.mantidos.map(a => `<div class="alert ${a.sev}"><span class="alert-ico" aria-hidden="true">!</span><div><strong>${esc(a.t)} · continua</strong><span class="muted small">${esc(V(a.d, voc))}</span></div></div>`).join('')}
+      ${cmp.novos.map(a => `<div class="alert ${a.sev}"><span class="alert-ico" aria-hidden="true">!</span><div><strong>${esc(a.t)} · novo</strong><span class="muted small">${esc(V(a.d, voc))}</span></div></div>`).join('')}</div>` : '';
   const novas = cmp.prioNovas.map((k, i) => `<div class="card prio stack" style="gap:8px"><div class="prio-head"><strong>${i + 1}. ${DIM[k].nome}</strong><b class="tnum">${rea.resultado.dims[k]}</b></div><p class="small"><b>${esc(V(pk.dim[k].pratica, voc))}</b></p><p class="small muted">${esc(V(pk.impl[k].passos[0], voc))}</p></div>`).join('');
-  const comentario = isFac
+  const comentario = isFac && !interno
     ? `<div class="card stack" style="gap:12px"><h2 class="h-sec" style="margin:0">Seu comentário</h2><div class="field"><label for="evo-com" class="sr-only">Comentário para a pessoa</label><textarea id="evo-com" placeholder="O que você observou na evolução e o que recomenda para os próximos 30 dias." style="min-height:120px">${esc(ev.comentario || '')}</textarea></div>
         <div class="actions"><button class="btn btn-quiet btn-sm" data-act="evo-salvar">Salvar comentário</button>${ev.status === 'liberado' ? '<button class="btn btn-quiet btn-sm" data-act="evo-recolher">Recolher para rascunho</button>' : '<button class="btn btn-primary btn-sm" data-act="evo-liberar">Salvar e liberar para a pessoa</button>'}</div>
         <p class="small muted">O comentário aparece no relatório e no PDF da pessoa. Liberar envia o relatório ao painel dela; recolher tira do painel até você liberar de novo.</p></div>`
-    : ev.comentario ? `<div class="card stack" style="gap:10px"><h2 class="h-sec" style="margin:0">Comentário do facilitador</h2><blockquote class="story">${esc(ev.comentario)}</blockquote></div>` : '';
+    : !interno && ev.comentario ? `<div class="card stack" style="gap:10px"><h2 class="h-sec" style="margin:0">Comentário do facilitador</h2><blockquote class="story">${esc(ev.comentario)}</blockquote></div>` : '';
+  const serie = cmp.tipo === 'individual' ? serieSvg(S.evo.serie) : '';
+  const perfis = cmp.perfis.filter((p, i) => p && (i !== 1 || cmp.temMeio)).filter((p, i, a) => i === 0 || p !== a[i - 1]);
+  const titulo = interno ? 'Prévia e workshop' : isMine ? 'Sua evolução no Diagnóstico OQGCI' : 'Evolução no Diagnóstico OQGCI';
 
   return `<main class="page"><div class="wrap stack-lg">
-    <div class="hello report-head"><div class="stack" style="gap:6px;min-width:0"><span class="eyebrow">Relatório de evolução · ${fmtDate(ini.created_at)} → ${fmtDate(rea.created_at)}${!isMine && ev.nome ? ' · ' + esc(ev.nome) : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">${isMine ? 'Sua evolução no Diagnóstico OQGCI' : 'Evolução no Diagnóstico OQGCI'}</h1>${negocioLinha(rea) ? `<p class="muted small">${esc(negocioLinha(rea))}</p>` : ''}</div><img src="${LOGO_CLARO}" alt="Logo de ${AUTOR}" class="report-logo" width="64" height="71" onerror="this.hidden=true"></div>
+    <div class="hello report-head"><div class="stack" style="gap:6px;min-width:0"><span class="eyebrow">${interno ? 'Relatório interno' : 'Relatório de evolução'}${!isMine && ev.nome ? ' · ' + esc(ev.nome) : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">${titulo}</h1>${negocioLinha(rea) ? `<p class="muted small">${esc(negocioLinha(rea))}</p>` : ''}</div><img src="${LOGO_CLARO}" alt="Logo de ${AUTOR}" class="report-logo" width="64" height="71" onerror="this.hidden=true"></div>
     ${banner}${sinais}
-    <p class="evo-resumo">${esc(cmp.resumo)} <span class="muted">${cmp.dias} dias entre os dois diagnósticos.</span></p>
+    <p class="evo-resumo">${esc(cmp.resumo)} <span class="muted">De ${fmtDate(ini.created_at)} a ${fmtDate(rea.created_at)}, ${cmp.dias} dias.</span></p>
 
     <div class="report-hero">
       <div class="card score-card stack" style="gap:12px">
         <span class="eyebrow">Índice OQGCI</span>
-        <div class="evo-num"><span class="a tnum">${cmp.indice.antes}</span><span class="evo-seta" aria-hidden="true">→</span><span class="b tnum">${cmp.indice.depois}</span>${deltaChip(cmp.indice.delta, true)}</div>
+        ${pontos}
+        <div>${classeChip(cmp.indice.classe, cmp.indice.delta)}</div>
         <div class="level-steps" aria-hidden="true">${LEVELS.slice().reverse().map(l => `<span class="${l.nome === cmp.nivelB.nome ? 'on' : ''}">${l.n} · ${l.nome}</span>`).join('')}</div>
-        ${evoBars(cmp.indice.antes, cmp.indice.depois, 'var(--accent)')}
-        <p class="small muted">Barra clara: diagnóstico inicial · barra dourada: reavaliação. Nível ${cmp.nivelA.nome !== cmp.nivelB.nome ? `${cmp.nivelA.nome} → ${cmp.nivelB.nome}` : cmp.nivelB.nome}.</p>
+        <p class="small muted">Nível ${cmp.nivelA.nome !== cmp.nivelB.nome ? `${cmp.nivelA.nome} → ${cmp.nivelB.nome}` : cmp.nivelB.nome}. No Índice, a variação conta a partir de ${EVO_CORTE.indice} pontos.</p>
       </div>
       <div class="card profile-card stack">
         <span class="eyebrow">Perfil</span>
-        <h2>${cmp.perfilA !== cmp.perfilB ? `<span class="muted" style="font-weight:400">${PROFILES[cmp.perfilA].nome} →</span> ` : ''}${PROFILES[cmp.perfilB].nome}</h2>
+        <h2>${perfis.map((p, i) => i < perfis.length - 1 ? `<span class="muted" style="font-weight:400">${PROFILES[p].nome} →</span> ` : PROFILES[p].nome).join('')}</h2>
         <p>${esc(V(pB.conversa, voc))}</p>
-        <div><p class="small muted" style="margin-bottom:8px">Postura nas seis situações · antes → agora</p>
-          <div class="legend">${['assertiva', 'passiva', 'agressiva'].map(k => `<span><i class="swatch" style="background:${POSTURA_COR[k]}"></i>${POSTURA_NOME[k]} <b class="tnum">${cmp.posturaA[k]} → ${cmp.posturaB[k]}</b></span>`).join('')}</div>
-          <p class="small muted" style="margin-top:6px">${cmp.posturaB.assertiva} de ${total} respostas assertivas na reavaliação.</p></div>
+        ${cmp.perfilB === 'conselheiro' ? '<p class="small"><b>Perfil Conselheiro:</b> leva uma leitura nova ao cliente, mostra o custo com ética e recomenda com firmeza.</p>' : ''}
+        <div><p class="small muted" style="margin-bottom:8px">Respostas assertivas nas seis situações</p>
+          <div class="legend">${rot.map((r, i) => `<span>${r.nome} <b class="tnum">${cmp.posturas[cmp.temMeio ? i : (i === 0 ? 0 : 2)].assertiva} de ${total}</b></span>`).join('')}</div></div>
       </div>
     </div>
+    ${serie ? `<div class="card stack" style="gap:8px"><h2 class="h-sec" style="margin:0">Índice em todas as execuções</h2>${serie}</div>` : ''}
+
+    ${leitura ? `<div class="card stack" style="gap:18px"><h2 class="h-sec" style="margin:0">Leitura da evolução</h2>${leitura}${estaveis}${legenda}</div>` : `<div class="card stack"><h2 class="h-sec" style="margin:0">Leitura da evolução</h2>${estaveis}</div>`}
 
     <div class="grid-2">
       <div class="card"><h2 class="h-sec">Mapa OQGCI</h2><div class="map-wrap">${oqgciMap(rea.resultado, ini.resultado)}</div>
-        <div class="legend" style="margin-top:4px"><span><i class="swatch" style="background:var(--bg);border:2px solid var(--ink-2)"></i>Diagnóstico inicial</span><span><i class="swatch" style="background:var(--accent)"></i>Reavaliação</span></div>
+        <div class="legend" style="margin-top:4px"><span><i class="swatch" style="background:var(--bg);border:2px solid var(--ink-2)"></i>${rot[0].nome}</span><span><i class="swatch" style="background:var(--accent)"></i>${fim.nome}</span></div>
         <div class="evo-rows" style="margin-top:12px">
-          <div class="evo-row evo-row-2"><span>Aproximação</span>${evoBars(cmp.aprox.antes, cmp.aprox.depois, 'var(--c-warm)')}<span class="tnum evo-ab">${cmp.aprox.antes} → <b>${cmp.aprox.depois}</b></span>${deltaChip(cmp.aprox.delta)}</div>
-          <div class="evo-row evo-row-2"><span>Afastamento</span>${evoBars(cmp.afast.antes, cmp.afast.depois, 'var(--c-cool)')}<span class="tnum evo-ab">${cmp.afast.antes} → <b>${cmp.afast.depois}</b></span>${deltaChip(cmp.afast.delta)}</div>
+          ${linhaDim('Aproximação', cmp.aprox, 'var(--c-warm)')}
+          ${linhaDim('Afastamento', cmp.afast, 'var(--c-cool)')}
         </div>
         <p class="small" style="margin-top:12px">${cmp.quadA !== cmp.quadB ? `De <b>${QUADS[cmp.quadA].nome}</b> para <b>${QUADS[cmp.quadB].nome}</b>.` : `<b>${QUADS[cmp.quadB].nome}.</b>`} <span class="muted">${esc(V(pk.quad(cmp.quadB), voc))}</span></p></div>
-      <div class="card stack"><h2 class="h-sec" style="margin:0">As prioridades do diagnóstico inicial</h2>
-        <p class="small muted">As três dimensões que você levou do treinamento como foco de desenvolvimento.</p>
-        <div class="evo-rows">${prioIni}</div>
-        <p class="small muted">Evoluiu: alta de 10 pontos ou mais. Estável: variação de até 9 pontos. Recuou: queda de 10 pontos ou mais.</p></div>
+      <div class="card stack" style="align-content:start"><h2 class="h-sec" style="margin:0">As prioridades ${rot[0].em === 'na prévia' ? 'da prévia' : 'do ponto de partida'}</h2>
+        <p class="small muted">As três dimensões apontadas como foco de desenvolvimento ${rot[0].em}.</p>
+        <div class="evo-rows">${prioIni}</div></div>
     </div>
 
     <div class="card stack"><h2 class="h-sec" style="margin:0">As oito dimensões</h2>
       <div class="evo-rows">${dimRows}</div>
-      <div class="legend"><span><i class="swatch" style="background:var(--ink-3);opacity:.5"></i>Diagnóstico inicial</span><span><i class="swatch" style="background:var(--c-warm)"></i>Aproximação</span><span><i class="swatch" style="background:var(--c-cool)"></i>Afastamento</span><span><i class="swatch" style="background:var(--ink-2)"></i>Linha de base</span></div></div>
+      ${legenda}</div>
 
-    <div class="card stack"><h2 class="h-sec" style="margin:0">Postura em cada situação</h2><div class="evo-sits">${sits}</div></div>
+    <div class="card stack"><h2 class="h-sec" style="margin:0">Postura em cada situação</h2><p class="small muted">${rot.map(r => r.nome).join(' → ')}. Em cada execução, a situação aparece num cenário diferente, com a mesma competência.</p><div class="evo-sits">${sits}</div></div>
 
     ${alertas}
     ${comentario}
 
-    <div class="stack"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Próximos 30 dias</h2><p class="muted small">As novas prioridades, a partir da reavaliação. O passo a passo completo de cada uma está no relatório da reavaliação.</p></div>
+    <div class="stack"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Próximos 30 dias</h2><p class="muted small">As novas prioridades, a partir da execução mais recente. O passo a passo completo de cada uma está no relatório dela.</p></div>
       <div class="grid-3">${novas}</div>
-      <div class="actions"><button class="btn btn-ghost btn-sm" data-open="${esc(rea.id)}">Abrir o relatório da reavaliação</button><button class="btn btn-quiet btn-sm" data-open="${esc(ini.id)}">Abrir o diagnóstico inicial</button></div></div>
+      <div class="actions"><button class="btn btn-ghost btn-sm" data-open="${esc(rea.id)}">Abrir o relatório mais recente</button><button class="btn btn-quiet btn-sm" data-open="${esc(ini.id)}">Abrir o primeiro relatório</button></div></div>
 
-    <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o relatório de evolução</h2><div class="actions"><button class="btn btn-primary btn-sm" data-act="evo-pdf" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando PDF…' : 'Baixar relatório em PDF'}</button>${LIVE && navigator.canShare ? '<button class="btn btn-quiet btn-sm" data-act="evo-compartilhar">Compartilhar</button>' : ''}</div></div>
+    <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o relatório de evolução</h2><div class="actions"><button class="btn btn-primary btn-sm" data-act="evo-pdf" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando PDF…' : 'Baixar relatório em PDF'}</button>${LIVE && navigator.canShare && !interno ? '<button class="btn btn-quiet btn-sm" data-act="evo-compartilhar">Compartilhar</button>' : ''}</div></div>
 
-    <div class="actions no-print">${isFac ? `<button class="btn btn-primary" data-go="facilitador">${ev.turma_id ? 'Voltar à evolução da turma' : 'Voltar a pessoas e acessos'}</button>` : '<button class="btn btn-primary" data-go="painel">Voltar ao meu painel</button>'}</div>
+    <div class="actions no-print">${isFac ? `<button class="btn btn-primary" data-go="facilitador">${ev.turma_id ? 'Voltar à evolução da turma' : 'Voltar aos relatórios individuais'}</button>` : '<button class="btn btn-primary" data-go="painel">Voltar ao meu painel</button>'}</div>
   </div></main>`;
 }
 
 function evoPdfName(ev) { return `evolucao-oqgci-${(ev.nome || 'relatorio').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'relatorio'}-${ev.reavaliacao.created_at.slice(0, 10)}.pdf`; }
 
+// PDF do relatório de evolução, na identidade do relatório individual.
 async function buildEvoPDF(ev) {
   const { jsPDF } = await loadJsPDF();
-  const logo = await logoDataURL();
+  const [logo, fontes] = await Promise.all([logoDataURL(), pdfFontData()]);
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const ini = ev.inicial, rea = ev.reavaliacao; const cmp = compararEvolucao(ev);
+  if (fontes) { try { fontes.forEach(([file, fam, st, b64]) => { doc.addFileToVFS(file, b64); doc.addFont(file, fam, st); }); } catch (e) { /* segue com Helvetica */ } }
+  const RICO = Boolean(fontes) && doc.getFontList().Manrope;
+  const T = RICO ? pdfTextRico : pdfText;
+  const ini = ev.inicial, mei = ev.intermediario || null, rea = ev.reavaliacao; const cmp = compararEvolucao(ev);
+  const rot = cmp.rot; const fim = rot[rot.length - 1]; const interno = cmp.tipo === 'workshop';
+  const recs = [ini, mei, rea].filter(Boolean);
   const voc = vocabOf(rea.respostas?.negocio); const pk = pack(rea.respostas?.negocio);
-  const W = 210, M = 16, CW = W - 2 * M, BOTTOM = 280;
-  const C = { ink: [27, 26, 34], ink2: [88, 84, 100], ink3: [130, 126, 144], line: [222, 219, 228], warm: [194, 131, 30], cool: [74, 139, 220], third: [194, 85, 159], soft: [248, 245, 240], good: [47, 143, 98], warn: [190, 135, 20], crit: [196, 72, 86] };
-  const CLS = { evoluiu: C.good, estavel: C.ink3, recuou: C.crit };
-  const dTxt = d => (d > 0 ? '+' : d < 0 ? '-' : '') + Math.abs(d);
+  const W = 210, M = 18, CW = W - 2 * M, BOTTOM = 274;
+  const C = {
+    ink: [42, 44, 51], ink2: [86, 90, 101], ink3: [138, 142, 152], line: [216, 211, 200], line2: [233, 229, 220], white: [255, 255, 255],
+    warm: [181, 112, 26], warmL: [235, 200, 143], warmT: [252, 244, 232], cool: [60, 120, 194], coolL: [169, 198, 234], coolT: [239, 245, 252],
+    base: [110, 114, 128], baseL: [207, 209, 216], baseT: [243, 243, 245], good: [59, 148, 104], goodT: [238, 247, 242],
+    crit: [191, 79, 92], critT: [251, 239, 241], warn: [176, 128, 22], warnT: [252, 246, 230], mag: [169, 84, 138], magT: [251, 241, 247],
+    ambar: [240, 179, 94], azul: [141, 184, 238]
+  };
+  const EIXO = { aprox: [C.warm, C.warmL, C.warmT, 'Aproximação'], afast: [C.cool, C.coolL, C.coolT, 'Afastamento'], base: [C.base, C.baseL, C.baseT, 'Linha de base'] };
+  const POST = { assertiva: [C.warm, C.warmT], passiva: [C.cool, C.coolT], agressiva: [C.mag, C.magT] };
+  const CL = { consolidou: [C.good, C.goodT], avancou: [C.good, C.goodT], construcao: [C.warn, C.warnT], estavel: [C.ink3, C.baseT], recuou: [C.crit, C.critT] };
   let y = 0;
   const color = (c, kind = 'text') => kind === 'text' ? doc.setTextColor(...c) : kind === 'fill' ? doc.setFillColor(...c) : doc.setDrawColor(...c);
-  const font = (size, style = 'normal', c = C.ink) => { doc.setFont('helvetica', style); doc.setFontSize(size); color(c); };
-  const lh = size => size * 0.42;
-  const footer = () => { const n = doc.getNumberOfPages(); color(C.line, 'draw'); doc.setLineWidth(0.2); doc.line(M, 285, W - M, 285); font(7.2, 'normal', C.ink3); doc.text(pdfText(COPYRIGHT), M, 289.5); doc.text(String(n), W - M, 289.5, { align: 'right' }); };
-  const need = h => { if (y + h > BOTTOM) { footer(); doc.addPage(); y = 18; } };
-  const para = (t, size = 10, style = 'normal', c = C.ink, width = CW, x = M, gap = 1.5) => {
-    font(size, style, c);
-    for (const ln of doc.splitTextToSize(pdfText(t), width)) { need(lh(size) + 1); font(size, style, c); doc.text(ln, x, y + lh(size)); y += lh(size) + 0.9; }
-    y += gap;
+  const font = (size, role = 'body', c = C.ink) => {
+    const map = RICO ? { title: ['Urbanist', 'bold'], light: ['Urbanist', 'light'], body: ['Manrope', 'normal'], semi: ['Manrope', 'semibold'], bold: ['Manrope', 'bold'] }
+      : { title: ['helvetica', 'bold'], light: ['helvetica', 'normal'], body: ['helvetica', 'normal'], semi: ['helvetica', 'bold'], bold: ['helvetica', 'bold'] };
+    doc.setFont(...map[role]); doc.setFontSize(size); color(c);
   };
-  const h2 = t => { need(28); y += 3; font(13, 'bold', C.ink); doc.text(pdfText(t), M, y + 5); y += 8; color(C.warm, 'draw'); doc.setLineWidth(0.6); doc.line(M, y, M + 14, y); y += 5; };
-  const bar = (x, yy, w, h, v, c) => { color(C.line, 'fill'); doc.roundedRect(x, yy, w, h, h / 2, h / 2, 'F'); color(c, 'fill'); doc.roundedRect(x, yy, Math.max(h, w * v / 100), h, h / 2, h / 2, 'F'); };
-  const bars2 = (x, yy, w, a, b, c) => { bar(x, yy, w, 2.2, a, [196, 192, 206]); bar(x, yy + 3, w, 2.6, b, c); };
-  const eixoRGB = e => e === 'aprox' ? C.warm : e === 'afast' ? C.cool : C.ink2;
-  // Linha de comparação: nome, duas barras (antes e agora), valores e variação.
-  const row = (nome, x, cor, comClasse) => {
-    need(10);
-    font(9.5, 'bold', C.ink); doc.text(pdfText(nome), M, y + 3.6);
-    bars2(M + 40, y + 0.6, CW - 92, x.antes, x.depois, cor);
-    font(9.5, 'normal', C.ink2); doc.text(pdfText(`${x.antes} -> ${x.depois}`), M + CW - 30, y + 3.6, { align: 'right' });
-    font(9, 'bold', CLS[x.classe]); doc.text(pdfText(dTxt(x.delta) + (comClasse ? ' ' + CLASSE[x.classe][0] : '')), M + CW, y + 3.6, { align: 'right' });
-    y += 8.5;
+  const lh = size => size * 0.43;
+  const linhas = (t, size, role, width) => { font(size, role); return doc.splitTextToSize(T(t), width); };
+  const altura = (t, size, role, width) => linhas(t, size, role, width).length * (lh(size) + 0.6);
+  const escrever = (t, x, yy, size, role, c, width) => { const ls = linhas(t, size, role, width); font(size, role, c); ls.forEach((ln, i) => doc.text(ln, x, yy + lh(size) + i * (lh(size) + 0.6))); return ls.length * (lh(size) + 0.6); };
+  const eyebrow = (t, x, yy, c = C.warm, size = 6.8, align) => { font(size, 'bold', c); doc.setCharSpace(0.35); doc.text(T(t).toUpperCase(), x, yy, align ? { align } : undefined); doc.setCharSpace(0); };
+  const caixa = (x, yy, w, h, fill, stroke, lw = 0.3) => { if (fill) color(fill, 'fill'); if (stroke) { color(stroke, 'draw'); doc.setLineWidth(lw); } doc.roundedRect(x, yy, w, h, 2.6, 2.6, fill && stroke ? 'FD' : fill ? 'F' : 'S'); };
+  const barra = (x, yy, w, h, v, c, marcas = []) => {
+    color(C.line2, 'fill'); doc.roundedRect(x, yy, w, h, h / 2, h / 2, 'F');
+    color(c, 'fill'); doc.roundedRect(x, yy, Math.max(h, w * v / 100), h, h / 2, h / 2, 'F');
+    color(C.white, 'draw'); doc.setLineWidth(0.35); marcas.forEach(t => doc.line(x + w * t / 100, yy, x + w * t / 100, yy + h));
+  };
+  // Barras de cada ponto: primeiro em cinza, intermediário em tom claro, último na cor do eixo.
+  const barras = (x, yy, w, vals, c, cl) => { vals.forEach((v, i) => barra(x, yy + i * 2.8, w, 2, v, i === 0 ? C.baseL : i < vals.length - 1 ? cl : c)); return vals.length * 2.8; };
+  const simbolo = (cx, cy, rr) => {
+    color(C.line, 'draw'); doc.setLineWidth(rr * 0.08); doc.circle(cx, cy, rr * 12.5 / 11.5, 'S');
+    color(C.ambar, 'fill'); doc.circle(cx, cy, rr, 'F'); color(C.white, 'fill'); doc.rect(cx, cy - rr - 0.2, rr + 0.3, 2 * rr + 0.4, 'F');
+    const b = rr * 7.5 / 11.5; color(C.azul, 'fill'); doc.circle(cx, cy, b, 'F'); color(C.ambar, 'fill'); doc.rect(cx - b - 0.05, cy - b - 0.05, b + 0.05, 2 * b + 0.1, 'F');
+  };
+  const rodape = () => { font(6.4, 'body', C.ink3); doc.text(T(COPYRIGHT), M, 289); font(8, 'bold', C.warm); doc.text(String(doc.getNumberOfPages()), W - M, 289, { align: 'right' }); };
+  const cabecalho = () => {
+    simbolo(M + 2.2, 11.2, 2.2);
+    font(7.4, 'semi', C.ink3); doc.text(T(interno ? 'Relatório interno · prévia e workshop' : 'Relatório de evolução OQGCI'), M + 6.6, 12.4);
+    doc.text(T(`${ev.nome ? ev.nome + ' · ' : ''}${fmtDate(rea.created_at)}`), W - M, 12.4, { align: 'right' });
+    color(C.line2, 'draw'); doc.setLineWidth(0.25); doc.line(M, 16, W - M, 16);
+  };
+  const novaPagina = () => { rodape(); doc.addPage(); cabecalho(); y = 24; };
+  const precisa = h => { if (y + h > BOTTOM) novaPagina(); };
+  const secao = (eb, titulo, lead, reserva = 40) => {
+    const hl = lead ? altura(lead, 9, 'body', CW) + 2 : 0;
+    precisa(26 + hl + reserva); y += 4;
+    eyebrow(eb, M, y + 3); font(16, 'title', C.ink); doc.text(T(titulo), M, y + 11);
+    color(C.warmL, 'fill'); doc.rect(M, y + 14, 14, 0.8, 'F'); y += 19;
+    if (lead) { y += escrever(lead, M, y, 9, 'body', C.ink2, CW) + 3; }
+  };
+  const chipClasse = (k, xr, yy) => { const [c, t] = CL[k]; const txt = T(CLASSE[k][0]); font(7.2, 'bold', c); const tw = doc.getTextWidth(txt) + 6; color(t, 'fill'); color(c, 'draw'); doc.setLineWidth(0.3); doc.roundedRect(xr - tw, yy - 3.4, tw, 5.2, 2.6, 2.6, 'FD'); font(7.2, 'bold', c); doc.text(txt, xr - tw / 2, yy + 0.3, { align: 'center' }); return tw; };
+  const valsDeP = x => x.meio != null ? [x.antes, x.meio, x.depois] : [x.antes, x.depois];
+  // Linha de dimensão: nome, eixo, barras de cada ponto, sequência de valores e classificação.
+  const linhaDimPDF = (nome, x, eixo) => {
+    const vals = valsDeP(x); const [c, cl] = EIXO[eixo]; const hb = vals.length * 2.8;
+    const h = Math.max(10, hb + 4.5);
+    precisa(h + 1);
+    font(9.2, 'semi', C.ink); doc.text(T(nome), M, y + 4.2);
+    font(6.4, 'bold', C.ink3); doc.text(T(EIXO[eixo][3].toUpperCase()), M, y + 7.6);
+    barras(M + 40, y + 1.2, CW - 108, vals, c, cl);
+    font(8.6, 'body', C.ink2); doc.text(T(vals.join(' -> ')), M + CW - 33, y + 4.4, { align: 'right' });
+    chipClasse(x.classe, M + CW, y + 4.2);
+    color(C.line2, 'draw'); doc.setLineWidth(0.2); doc.line(M, y + h - 0.6, M + CW, y + h - 0.6); y += h;
   };
 
-  color(C.warm, 'fill'); doc.rect(0, 0, W, 2.2, 'F');
-  color(C.warm, 'fill'); doc.circle(M + 6, 17, 6, 'F'); color([255, 255, 255], 'fill'); doc.rect(M + 6, 10.8, 6.4, 12.4, 'F');
-  color(C.cool, 'fill'); doc.circle(M + 6, 17, 3.8, 'F'); color(C.warm, 'fill'); doc.rect(M + 2.1, 13.1, 3.9, 7.8, 'F');
-  if (logo) { try { doc.addImage(logo, 'PNG', W - M - 26, 7, 26, 28.7); } catch (e) { /* segue sem o logo */ } }
-  font(18, 'bold', C.ink); doc.text(pdfText('Relatório de evolução OQGCI'), M + 16, 19.5);
-  font(9.5, 'normal', C.ink2); doc.text(pdfText(`${ev.nome ? ev.nome + ' · ' : ''}Diagnóstico inicial ${fmtDate(ini.created_at)} · reavaliação ${fmtDate(rea.created_at)} (${cmp.dias} dias)`), M, 34);
-  doc.text(pdfText(negocioLinha(rea) || 'Neurociência aplicada à venda'), M, 39.5);
-  color(C.line, 'draw'); doc.setLineWidth(0.3); doc.line(M, 46, W - M, 46);
-  y = 56;
+  /* ---------------- Capa ---------------- */
+  color(C.warmL, 'draw'); doc.setLineWidth(0.35); [74, 62, 50].forEach(rr => doc.circle(W + 18, 64, rr, 'S'));
+  color(C.coolL, 'draw'); [38, 26, 14].forEach(rr => doc.circle(W + 18, 64, rr, 'S'));
+  if (logo) { try { doc.addImage(logo, 'PNG', M, 16, 19, 21); } catch (e) { /* segue sem o logo */ } }
+  [[C.warmL, 0], [C.coolL, 1], [C.baseL, 2]].forEach(([c, i]) => { color(c, 'fill'); doc.roundedRect(M + i * 15, 64, 12, 1.4, 0.7, 0.7, 'F'); });
+  eyebrow(interno ? 'Relatório interno · Metodologia OQGCI' : 'Venda com Neurociência · Metodologia OQGCI', M, 74);
+  font(32, 'title', C.ink); doc.text(T(interno ? 'Prévia e workshop' : 'Relatório de evolução'), M, 88);
+  let yc = 97;
+  if (ev.nome) { font(17, 'light', C.ink); doc.text(T(ev.nome), M, yc); yc += 8; }
+  font(9.2, 'body', C.ink2); doc.text(T(rot.map((r, i) => `${r.nome} ${fmtDate(recs[i].created_at)}`).join('  ·  ')), M, yc); yc += 5;
+  doc.text(T(negocioLinha(rea) || 'Neurociência aplicada à venda'), M, yc); yc += 9;
 
-  font(9, 'bold', C.ink3); doc.text('INDICE OQGCI', M, y); doc.text('PERFIL', M + 92, y); y += 4;
-  font(20, 'normal', C.ink3); doc.text(String(cmp.indice.antes), M, y + 14); const wa = doc.getTextWidth(String(cmp.indice.antes));
-  font(14, 'normal', C.ink3); doc.text('->', M + wa + 3, y + 13);
-  font(40, 'normal', C.ink); doc.text(String(cmp.indice.depois), M + wa + 12, y + 14); const wb = doc.getTextWidth(String(cmp.indice.depois));
-  font(11, 'bold', CLS[cmp.indice.classe]); doc.text(pdfText(dTxt(cmp.indice.delta)), M + wa + 15 + wb, y + 14);
-  font(10.5, 'bold', C.warm); doc.text(pdfText(cmp.nivelA.nome !== cmp.nivelB.nome ? `Nível ${cmp.nivelA.nome} -> ${cmp.nivelB.nome}` : `Nível ${cmp.nivelB.n} · ${cmp.nivelB.nome}`), M, y + 22);
-  bars2(M, y + 25, 76, cmp.indice.antes, cmp.indice.depois, C.warm);
-  font(14, 'bold', C.ink); doc.text(pdfText(cmp.perfilA !== cmp.perfilB ? `${PROFILES[cmp.perfilA].nome} -> ${PROFILES[cmp.perfilB].nome}` : PROFILES[cmp.perfilB].nome), M + 92, y + 9);
-  font(9.5, 'normal', C.ink2); const pl = doc.splitTextToSize(pdfText(V(pk.perfil(cmp.perfilB).conversa, voc)), CW - 92); doc.text(pl.slice(0, 4), M + 92, y + 15);
-  font(9, 'normal', C.ink3); doc.text(pdfText(`Postura assertiva: ${cmp.posturaA.assertiva} -> ${cmp.posturaB.assertiva} de 6`), M + 92, y + 15 + Math.min(4, pl.length) * 4.4 + 1);
-  y += 36;
-  para(cmp.resumo, 10.5, 'normal', C.ink, CW, M, 2);
-  font(8, 'normal', C.ink3); doc.text(pdfText('Barra clara: diagnóstico inicial · barra colorida: reavaliação.'), M, y + 2); y += 6;
+  // Índice em cada ponto
+  const hI = 42; caixa(M, yc, CW, hI, C.white, C.line);
+  eyebrow('Índice OQGCI', M + 6, yc + 8);
+  const larg = (CW - 12) / recs.length;
+  recs.forEach((r, i) => {
+    const xi = M + 6 + i * larg; const ult = i === recs.length - 1;
+    eyebrow(rot[i].nome, xi, yc + 15, ult ? C.warm : C.ink3, 6.2);
+    font(ult ? 30 : 24, 'light', ult ? C.ink : C.ink3); doc.text(String(r.resultado.indice), xi, yc + 27);
+    font(8, 'body', C.ink3); doc.text(T(levelOf(r.resultado.indice).nome), xi, yc + 32);
+    if (!ult) { font(12, 'body', C.line); doc.text('>', xi + larg - 8, yc + 25); }
+  });
+  chipClasse(cmp.indice.classe, M + CW - 6, yc + 8);
+  font(8, 'body', C.ink3); doc.text(T(`Variação ${fmtDelta(cmp.indice.delta).replace('−', '-')} pontos. No Índice, a variação conta a partir de ${EVO_CORTE.indice} pontos.`), M + 6, yc + hI - 4);
+  yc += hI + 6;
 
-  h2('Mapa OQGCI');
-  row('Aproximação', cmp.aprox, C.warm); row('Afastamento', cmp.afast, C.cool);
-  para(`${cmp.quadA !== cmp.quadB ? `De "${QUADS[cmp.quadA].nome}" para "${QUADS[cmp.quadB].nome}". ` : QUADS[cmp.quadB].nome + '. '}${V(pk.quad(cmp.quadB), voc)}`, 9.5, 'normal', C.ink2, CW, M, 2);
+  // Perfil e postura
+  const perfisP = cmp.perfis.filter((p, i) => p && (i !== 1 || cmp.temMeio)).filter((p, i, a) => i === 0 || p !== a[i - 1]);
+  const txtPerfil = V(pk.perfil(cmp.perfilB).conversa, voc);
+  const hP = 14 + 8 + altura(txtPerfil, 8.4, 'body', CW - 12) + 14;
+  caixa(M, yc, CW, hP, C.white, C.line);
+  eyebrow('Perfil', M + 6, yc + 8);
+  font(13, 'title', C.ink); doc.text(T(perfisP.map(p => PROFILES[p].nome).join(' -> ')), M + 6, yc + 16);
+  let yp = yc + 19; yp += escrever(txtPerfil, M + 6, yp, 8.4, 'body', C.ink2, CW - 12) + 3;
+  font(8, 'semi', C.ink2); doc.text(T('Respostas assertivas nas seis situações: ' + rot.map((r, i) => `${r.nome} ${cmp.posturas[cmp.temMeio ? i : (i === 0 ? 0 : 2)].assertiva}`).join(' · ')), M + 6, yp + 3);
+  yc += hP + 6;
 
-  h2('As prioridades do diagnóstico inicial');
-  cmp.prioIni.forEach((k, i) => row(`${i + 1}. ${DIM[k].nome}`, cmp.dims[k], eixoRGB(DIM[k].eixo), true));
-  para('Evoluiu: alta de 10 pontos ou mais. Estável: variação de até 9 pontos. Recuou: queda de 10 pontos ou mais.', 8, 'normal', C.ink3, CW, M, 2);
+  // Resumo
+  const hR = altura(cmp.resumo, 9.4, 'body', CW - 14) + 14;
+  caixa(M, yc, CW, hR, C.warmT, null); color(C.warmL, 'fill'); doc.rect(M, yc, 1.4, hR, 'F');
+  eyebrow('Em resumo', M + 7, yc + 7);
+  escrever(cmp.resumo, M + 7, yc + 9, 9.4, 'body', C.ink, CW - 14);
+  rodape();
 
-  h2('As oito dimensões');
-  DIMS.forEach(d => row(d.nome, cmp.dims[d.id], eixoRGB(d.eixo)));
+  /* ---------------- Páginas internas ---------------- */
+  doc.addPage(); cabecalho(); y = 24;
+  if (interno && cmp.sinais.length) {
+    secao('Para a sua revisão', 'Sinais', null, 20);
+    cmp.sinais.forEach(t => { const h = altura(t, 8.8, 'body', CW - 14) + 8; precisa(h + 3); caixa(M, y, CW, h, C.warnT, null); color(C.warn, 'fill'); doc.roundedRect(M, y, 1.4, h, 0.7, 0.7, 'F'); escrever(t, M + 7, y + 3.5, 8.8, 'body', C.ink, CW - 14); y += h + 3; });
+  }
 
-  h2('Postura em cada situação');
-  pk.sjt.forEach((s, k) => {
-    const x = cmp.situacoes[k];
-    para(`${k + 1}. ${pk.nomeSit[s.id]}`, 9.5, 'bold', C.ink, CW, M, 0.3);
-    para(`Antes: ${x.antes ? POSTURA_NOME[x.antes] : '-'} · Agora: ${x.depois ? POSTURA_NOME[x.depois] : '-'}${x.antes !== x.depois && x.depois === 'assertiva' ? ' (avançou)' : ''}`, 9, 'normal', x.depois === 'assertiva' ? C.good : C.ink2, CW, M, 2);
+  const grupos = [
+    ['consolidou', 'O que se consolidou', `Subiu ${EVO_CORTE.dim} pontos ou mais e se manteve ${fim.em}. A prática entrou na rotina.`],
+    ['avancou', 'O que avançou', `Subiu ${EVO_CORTE.dim} pontos ou mais desde ${rot[0].nome.toLowerCase() === 'prévia' ? 'a prévia' : 'o início'}.${cmp.temMeio ? ` Ficou abaixo do que apareceu ${rot[1].em}; ainda há espaço para firmar.` : ''}`],
+    ['construcao', 'O que ainda depende de prática', `Subiu ${cmp.temMeio ? rot[1].em : ''} e voltou para perto do ponto de partida ${fim.em}. O entendimento existe; falta levar para a rotina.`],
+    ['recuou', 'O que recuou', `Caiu ${EVO_CORTE.dim} pontos ou mais. Vale entender o que mudou nas conversas.`]
+  ].filter(([k]) => cmp.grupos[k].length);
+  secao('Leitura da evolução', 'O que mudou', `Corte de ${EVO_CORTE.dim} pontos em cada dimensão. ${rot.map(r => r.nome).join(', ')}: barras de cima para baixo.`);
+  grupos.forEach(([k, titulo, texto]) => {
+    const [c, t] = CL[k]; const hT = altura(texto, 8.4, 'body', CW - 14);
+    precisa(16 + hT + 12);
+    caixa(M, y, CW, 10 + hT, t, null); color(c, 'fill'); doc.roundedRect(M, y, 1.4, 10 + hT, 0.7, 0.7, 'F');
+    font(10.5, 'title', C.ink); doc.text(T(titulo), M + 7, y + 6.5); escrever(texto, M + 7, y + 7.5, 8.4, 'body', C.ink2, CW - 14); y += 10 + hT + 3;
+    cmp.grupos[k].forEach(id => linhaDimPDF(DIM[id].nome, cmp.dims[id], DIM[id].eixo));
+    y += 3;
+  });
+  if (cmp.grupos.estavel.length) { precisa(10); y += escrever(`Estáveis, com variação menor que ${EVO_CORTE.dim} pontos: ${cmp.grupos.estavel.map(id => DIM[id].nome).join(', ')}.`, M, y, 8.6, 'body', C.ink2, CW) + 3; }
+
+  secao(rot[0].nome, rot[0].em === 'na prévia' ? 'As prioridades da prévia' : 'As prioridades do ponto de partida', `As três dimensões apontadas como foco de desenvolvimento ${rot[0].em}.`);
+  cmp.prioIni.forEach(k => linhaDimPDF(DIM[k].nome, cmp.dims[k], DIM[k].eixo));
+
+  secao('Visão geral', 'As oito dimensões', null, 60);
+  DIMS.forEach(d => linhaDimPDF(d.nome, cmp.dims[d.id], d.eixo));
+  precisa(22); y += 2;
+  linhaDimPDF('Aproximação', cmp.aprox, 'aprox'); linhaDimPDF('Afastamento', cmp.afast, 'afast');
+  y += escrever(`${cmp.quadA !== cmp.quadB ? `Mapa OQGCI: de ${QUADS[cmp.quadA].nome} para ${QUADS[cmp.quadB].nome}. ` : `Mapa OQGCI: ${QUADS[cmp.quadB].nome}. `}${V(pk.quad(cmp.quadB), voc)}`, M, y + 1, 8.6, 'body', C.ink2, CW) + 3;
+
+  secao('Seis situações', 'Postura em cada situação', `Em cada execução, a situação aparece num cenário diferente, com a mesma competência. ${rot.map(r => r.nome).join(' -> ')}.`);
+  SJT.forEach((s, k) => {
+    const x = cmp.situacoes[k]; const vs = cmp.temMeio ? [x.antes, x.meio, x.depois] : [x.antes, x.depois];
+    precisa(11);
+    font(9.2, 'semi', C.ink); doc.text(T(`${k + 1}. ${pk.nomeSit[s.id]}`), M, y + 4.6);
+    let xr = M + CW;
+    for (let i = vs.length - 1; i >= 0; i--) {
+      const ch = vs[i]; const txt = ch ? POSTURA_NOME[ch] : '-'; const [pc, pt] = ch ? POST[ch] : [C.ink3, C.baseT];
+      font(7.2, 'bold', pc); const tw = 22; color(pt, 'fill'); color(pc, 'draw'); doc.setLineWidth(0.3); doc.roundedRect(xr - tw, y + 1.2, tw, 5.2, 2.6, 2.6, 'FD'); font(7.2, 'bold', pc); doc.text(T(txt), xr - tw / 2, y + 4.8, { align: 'center' });
+      xr -= tw + (i ? 6 : 0); if (i) { font(8, 'body', C.ink3); doc.text('>', xr + 2, y + 4.8); }
+    }
+    color(C.line2, 'draw'); doc.setLineWidth(0.2); doc.line(M, y + 9, M + CW, y + 9); y += 10;
   });
 
   if (cmp.resolvidos.length || cmp.novos.length || cmp.mantidos.length) {
-    h2('Pontos de atenção');
-    cmp.resolvidos.forEach(a => para(`Resolvido · ${a.t}: aparecia no diagnóstico inicial e não aparece mais.`, 9.5, 'normal', C.good, CW, M, 1));
-    cmp.novos.forEach(a => para(`Novo · ${a.t}: ${V(a.d, voc)}`, 9.5, 'normal', a.sev === 'crit' ? C.crit : C.warn, CW, M, 1));
-    cmp.mantidos.forEach(a => para(`Continua · ${a.t}: ${V(a.d, voc)}`, 9.5, 'normal', C.ink2, CW, M, 1));
+    secao('Ao longo das execuções', 'Pontos de atenção', null, 20);
+    [...cmp.resolvidos.map(a => ['Resolvido', a.t, `Aparecia ${rot[0].em} e não aparece mais ${fim.em}.`, C.good, C.goodT]),
+     ...cmp.mantidos.map(a => ['Continua', a.t, V(a.d, voc), a.sev === 'crit' ? C.crit : C.warn, a.sev === 'crit' ? C.critT : C.warnT]),
+     ...cmp.novos.map(a => ['Novo', a.t, V(a.d, voc), a.sev === 'crit' ? C.crit : C.warn, a.sev === 'crit' ? C.critT : C.warnT])].forEach(([rotulo, t, d, c, tt]) => {
+      const h = 13 + altura(d, 8.6, 'body', CW - 14) + 3; precisa(h + 3);
+      caixa(M, y, CW, h, tt, null); color(c, 'fill'); doc.roundedRect(M, y, 1.4, h, 0.7, 0.7, 'F');
+      eyebrow(rotulo, M + 6, y + 6, c, 6.2); font(9.6, 'semi', C.ink); doc.text(T(t), M + 6, y + 11);
+      escrever(d, M + 6, y + 12.5, 8.6, 'body', C.ink2, CW - 14); y += h + 3;
+    });
   }
 
-  if (ev.comentario) {
-    h2('Comentário do facilitador');
-    para(ev.comentario, 10, 'italic', C.ink, CW, M, 2);
+  if (ev.comentario && !interno) {
+    secao('Do facilitador', 'Comentário', null, 20);
+    const h = altura(ev.comentario, 9.4, 'body', CW - 14) + 10; precisa(h + 3);
+    caixa(M, y, CW, h, C.baseT, null); color(C.warmL, 'fill'); doc.rect(M, y, 1.4, h, 'F');
+    escrever(ev.comentario, M + 7, y + 5, 9.4, 'body', C.ink, CW - 14); y += h + 4;
   }
 
-  h2('Próximos 30 dias');
+  secao('Os próximos 30 dias', 'Novas prioridades', `A partir da execução mais recente. O passo a passo completo está no relatório ${fim.em.replace(/^aos /, 'dos ').replace(/^na /, 'da ').replace(/^no /, 'do ')}.`);
   cmp.prioNovas.forEach((k, i) => {
-    need(26); font(11, 'bold', C.ink); doc.text(pdfText(`${i + 1}. ${DIM[k].nome}`), M, y + 4); font(10, 'bold', C.warm); doc.text(String(rea.resultado.dims[k]), M + CW, y + 4, { align: 'right' }); y += 7;
-    para(`O que desenvolver: ${V(pk.dim[k].pratica, voc)}`, 9.5, 'bold', C.ink, CW, M, 0.5);
-    pk.impl[k].passos.forEach((x, n) => para(`${n + 1}. ${V(x, voc)}`, 9.5, 'normal', C.ink, CW - 4, M + 4, 0.5));
-    para(`Frase pronta: "${V(pk.impl[k].frase, voc)}"`, 9.5, 'italic', C.warm, CW, M, 1);
-    para(`Como saber que está funcionando: ${V(pk.impl[k].sinal, voc)}`, 9.5, 'normal', C.ink2, CW, M, 4);
+    const w = CW - 30; const xi = M + 24; const [c, cl] = EIXO[DIM[k].eixo];
+    const pratica = V(pk.dim[k].pratica, voc); const passo = V(pk.impl[k].passos[0], voc); const frase = `"${V(pk.impl[k].frase, voc)}"`;
+    const hF = 6 + altura(frase, 8.8, 'semi', w - 10) + 4;
+    const h = 18 + altura(pratica, 9, 'semi', w - 4) + 4 + 4 + altura(passo, 8.6, 'body', w) + 3 + hF + 5;
+    precisa(h + 4);
+    caixa(M, y, CW, h, C.white, C.line);
+    font(24, 'light', C.warmL); doc.text(String(i + 1).padStart(2, '0'), M + 6, y + 13);
+    let yy = y + 8;
+    eyebrow(`Prioridade ${i + 1} · ${EIXO[DIM[k].eixo][3]}`, xi, yy, c, 6.4);
+    font(13, 'title', C.ink); doc.text(T(DIM[k].nome), xi, yy + 6.5);
+    font(11, 'bold', c); doc.text(String(rea.resultado.dims[k]), M + CW - 6, yy + 6.5, { align: 'right' });
+    yy += 10;
+    color(cl, 'fill'); doc.rect(xi, yy + 0.5, 1.1, altura(pratica, 9, 'semi', w - 4) + 3, 'F');
+    yy += escrever(pratica, xi + 4, yy, 9, 'semi', C.ink, w - 4) + 4;
+    eyebrow('Primeiro passo', xi, yy + 3, C.ink3, 6.2); yy += 4; yy += escrever(passo, xi, yy, 8.6, 'body', C.ink2, w) + 3;
+    caixa(xi, yy, w, hF, C.warmT, null); eyebrow('O que pregamos no método', xi + 5, yy + 5, C.warm, 6.2); escrever(frase, xi + 5, yy + 6.5, 8.8, 'semi', C.ink, w - 10);
+    y += h + 4;
   });
-  para('O instrumento está em fase de validação. Use a comparação como ferramenta de desenvolvimento.', 8, 'italic', C.ink3, CW, M, 0);
-  footer();
+  precisa(10); y += 2;
+  escrever('O instrumento está em fase de validação. Use a comparação como ferramenta de desenvolvimento.', M, y, 7.6, 'body', C.ink3, CW);
+  rodape();
   return doc.output('blob');
 }
 
 // Aba Evolução do painel do facilitador.
 async function loadEvos() {
   const sel = S.fac.sel;
+  if (sel === 'individuais') { try { S.fac.evos = await store.listEvolucoesIndividuais(); S.fac.evosErro = null; } catch (e) { S.fac.evos = []; S.fac.evosErro = e.message; } return; }
   if (!sel || sel === 'todos' || sel === 'sem') { S.fac.evos = []; S.fac.evosErro = null; return; }
   try { S.fac.evos = await store.listEvolucoes(sel); S.fac.evosErro = null; } catch (e) { S.fac.evos = []; S.fac.evosErro = e.message; }
 }
@@ -3173,59 +3429,81 @@ function conviteTexto(t) {
   const url = location.origin + location.pathname;
   return `Olá! Chegou a hora de refazer o seu Diagnóstico OQGCI. Ele leva cerca de 15 minutos e mostra quanto você avançou desde o treinamento.\n\n`
     + `Acesse ${url}, entre com o mesmo e-mail e senha e toque em Iniciar diagnóstico${t.reavaliar_em ? `, a partir de ${fmtDia(t.reavaliar_em)}` : ''}${t.expira_em ? ` e até ${fmtDia(t.expira_em)}` : ''}.\n\n`
-    + `Depois da minha revisão, o seu relatório de evolução aparece no seu painel, com a comparação entre os dois diagnósticos e as prioridades para os próximos 30 dias.\n\n${AUTOR}`;
+    + `Depois da minha revisão, o seu relatório de evolução aparece no seu painel, com a comparação entre as suas execuções e as prioridades para os próximos 30 dias.\n\n${AUTOR}`;
+}
+// Tabela de relatórios (turma ou individuais).
+function tabelaEvos(cmps, opts = {}) {
+  const ordem = cmps.slice().sort((x, y) => (x.e.status === 'liberado') - (y.e.status === 'liberado') || (y.e.reavaliacao.created_at || '').localeCompare(x.e.reavaliacao.created_at || ''));
+  return `<div class="table-wrap"><table class="heat"><thead><tr><th>Pessoa</th><th>Índice</th><th>Variação</th><th>Dimensões</th><th>Sinais</th><th>Situação</th><th></th></tr></thead><tbody>
+    ${ordem.map(({ e, c }) => `<tr><td><strong>${esc(e.nome || 'Sem nome')}</strong>${e.exemplo ? ' <span class="tag">exemplo</span>' : ''}<br><span class="muted small">${c.rot.map(r => r.nome).join(' → ')} · ${fmtDate(e.reavaliacao.created_at)}</span></td><td class="tnum">${seq(valsDe(c.indice))}</td><td>${classeChip(c.indice.classe, c.indice.delta)}</td><td class="small">${['consolidou', 'avancou', 'construcao', 'recuou'].filter(k => c.grupos[k].length).map(k => `${c.grupos[k].length} ${CLASSE[k][0].toLowerCase()}`).join(' · ') || '<span class="muted">estáveis</span>'}</td><td class="small">${c.sinais.length ? `<span style="color:var(--warn)">${c.sinais.length} ${c.sinais.length === 1 ? 'sinal' : 'sinais'}</span>` : '<span class="muted">—</span>'}</td><td>${statusEvoChip(e.status, c.tipo)}${e.comentario ? '<br><span class="muted small">com comentário</span>' : ''}</td><td><button type="button" class="btn btn-quiet btn-sm" data-evo-open="${esc(e.id)}">${c.tipo === 'workshop' || e.status === 'liberado' ? 'Abrir' : 'Revisar'}</button></td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+function viewEvolucoesIndividuais() {
+  const F = S.fac;
+  const intro = `<div class="card stack" style="gap:8px"><h2 class="h-sec" style="margin:0">Relatórios individuais</h2><p class="small muted">Cada nova execução de quem já tem diagnóstico anterior, fora das etapas da turma, gera um relatório: primeira execução → execução anterior → execução atual. Ele chega como rascunho para você revisar, comentar e liberar.</p></div>`;
+  if (F.evos === null) return intro + '<p class="muted">Carregando…</p>';
+  if (F.evosErro) return intro + `<div class="msg msg-err" role="alert">${esc(F.evosErro)}</div>`;
+  if (!F.evos.length) return intro + '<div class="empty"><strong>Nenhum relatório individual ainda</strong><span class="small">Ele aparece aqui assim que alguém faz uma nova execução liberada por você.</span></div>';
+  const cmps = F.evos.map(e => ({ e, c: compararEvolucao(e) }));
+  const rasc = F.evos.filter(e => e.status !== 'liberado').length;
+  return intro + `<div class="card stack"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2 class="h-sec" style="margin:0">${F.evos.length} ${F.evos.length === 1 ? 'relatório' : 'relatórios'}</h2>${rasc ? `<span class="small muted">${rasc} aguardando a sua revisão</span>` : ''}</div>${tabelaEvos(cmps)}</div>`;
 }
 function viewEvolucaoTurma() {
-  const F = S.fac; const turmas = F.turmas || []; const t = turmas.find(x => x.id === F.sel);
-  if (!t) return `<div class="empty"><strong>Escolha uma turma</strong><span class="small">A evolução compara o diagnóstico inicial e a reavaliação de cada pessoa dentro de uma turma.</span></div>`;
+  const F = S.fac; const turmas = F.turmas || [];
+  if (F.sel === 'individuais') return viewEvolucoesIndividuais();
+  const t = turmas.find(x => x.id === F.sel);
+  if (!t) return `<div class="empty"><strong>Escolha uma turma</strong><span class="small">A evolução compara a prévia, o workshop e os 45 dias de cada pessoa da turma.</span></div>`;
   const sugerida = t.reavaliar_em || (t.data_workshop ? somaDias(t.data_workshop, 45) : somaDias(hojeBR(), 30));
   const janelaFim = t.reavaliar_em ? somaDias(t.reavaliar_em, 15) : null;
   const curta = t.reavaliar_em && t.expira_em && t.expira_em < janelaFim;
   const config = `<div class="card stack" style="gap:12px">
     <div class="validade-row"><label for="tm-reavaliar" class="small"><b>Data de reavaliação (45 dias)</b></label><input type="date" id="tm-reavaliar" value="${esc(sugerida)}"><button type="button" class="btn ${t.reavaliar_em ? 'btn-quiet' : 'btn-primary'} btn-sm" data-act="turma-reavaliar">${t.reavaliar_em ? 'Alterar data' : 'Definir data'}</button>${t.reavaliar_em ? '<button type="button" class="btn btn-quiet btn-sm" data-act="turma-reavaliar-limpar">Remover</button>' : ''}</div>
-    <p class="small muted">${t.reavaliar_em ? `Desde ${fmtDia(t.reavaliar_em)}, o novo diagnóstico de cada pessoa da turma é tratado como reavaliação, e o relatório de evolução é gerado na hora, como rascunho, para a sua revisão.` : 'A partir desta data, o novo diagnóstico de cada pessoa da turma é tratado como reavaliação, e o relatório de evolução é gerado na hora, como rascunho, para a sua revisão. Sugestão: 45 dias depois do workshop, com prazo de mais 15 dias para responder.'}</p>
+    <p class="small muted">${t.data_workshop ? `Workshop em ${fmtDia(t.data_workshop)}. ` : 'Turma sem data de workshop: a comparação é entre o diagnóstico inicial e a reavaliação. '}A execução do workshop gera um relatório interno, prévia → workshop, só para você. A partir da data de reavaliação, a execução de cada pessoa gera o relatório completo, em rascunho para a sua revisão. Sugestão: 45 dias depois do workshop, com mais 15 dias para responder.</p>
     ${curta ? `<div class="msg" role="note">A validade da turma termina em ${fmtDia(t.expira_em)}, antes do fim da janela de reavaliação. <button type="button" class="link-btn" data-act="turma-estender" data-ate="${janelaFim}">Estender até ${fmtDia(janelaFim)}</button></div>` : ''}
     ${t.reavaliar_em ? `<div class="actions"><button type="button" class="btn btn-quiet btn-sm" data-copy="${esc(conviteTexto(t))}">Copiar convite para a turma</button></div>` : ''}
   </div>`;
-  if (!t.reavaliar_em) return config;
   if (F.evos === null || F.results === null) return config + '<p class="muted">Carregando…</p>';
   if (F.evosErro) return config + `<div class="msg msg-err" role="alert">${esc(F.evosErro)}</div>`;
 
-  const res = F.results || []; const evos = F.evos;
+  const res = F.results || []; const todas = F.evos;
+  const evos = todas.filter(e => tipoEvo(e) === 'completo'); const internos = todas.filter(e => tipoEvo(e) === 'workshop');
   const nomes = {}; res.forEach(r => { nomes[r.user_id] = r.nome; });
-  const comInicial = [...new Set(res.filter(r => diaBR(r.created_at) < t.reavaliar_em).map(r => r.user_id))];
+  const comInicial = [...new Set(res.filter(r => ['previa', 'inicial'].includes(etapaTurma(t, diaBR(r.created_at)))).map(r => r.user_id))];
   const pareados = new Set(evos.map(e => e.user_id));
-  const faltam = comInicial.filter(u => !pareados.has(u));
+  const faltam = t.reavaliar_em && t.reavaliar_em <= hojeBR() ? comInicial.filter(u => !pareados.has(u)) : [];
   const liberados = evos.filter(e => e.status === 'liberado').length;
   const rascunhos = evos.filter(e => e.status !== 'liberado');
   const cmps = evos.map(e => ({ e, c: compararEvolucao(e) }));
   const andamento = `<div class="kpis">
-      <div class="kpi"><b>${comInicial.length}</b><span>Com diagnóstico inicial</span></div>
-      <div class="kpi"><b>${evos.length}</b><span>Já refizeram</span></div>
+      <div class="kpi"><b>${comInicial.length}</b><span>${t.data_workshop ? 'Fizeram a prévia' : 'Com diagnóstico inicial'}</span></div>
+      ${t.data_workshop ? `<div class="kpi"><b>${internos.length}</b><span>Relatórios internos do workshop</span></div>` : ''}
+      <div class="kpi"><b>${evos.length}</b><span>Fizeram a reavaliação</span></div>
       <div class="kpi"><b>${rascunhos.length}</b><span>Aguardando a sua revisão</span></div>
       <div class="kpi"><b>${liberados}</b><span>Relatórios liberados</span></div>
     </div>
-    ${faltam.length ? `<p class="small muted">Ainda não refizeram: ${faltam.map(u => esc(nomes[u] || 'Sem nome')).join(', ')}.</p>` : comInicial.length ? '<p class="small muted">Todas as pessoas com diagnóstico inicial já refizeram.</p>' : ''}`;
-  if (!evos.length) return config + andamento + `<div class="empty"><strong>Nenhuma reavaliação ainda</strong><span class="small">Cada relatório aparece aqui assim que a pessoa termina o novo diagnóstico.</span></div>`;
+    ${faltam.length ? `<p class="small muted">Ainda não fizeram a reavaliação: ${faltam.map(u => esc(nomes[u] || 'Sem nome')).join(', ')}.</p>` : ''}`;
+  const blocoInternos = internos.length ? `<div class="card stack"><div><h2 class="h-sec" style="margin:0">Relatórios internos · prévia → workshop</h2><span class="tag" style="display:inline-block;margin-top:8px">Visível só para o facilitador</span></div>${tabelaEvos(internos.map(e => ({ e, c: compararEvolucao(e) })))}</div>` : '';
+  if (!evos.length) return config + andamento + blocoInternos + `<div class="empty"><strong>Nenhuma reavaliação ainda</strong><span class="small">Cada relatório completo aparece aqui assim que a pessoa faz a execução dos 45 dias.</span></div>`;
 
   const m = (sel) => Math.round(avg(cmps.map(x => sel(x.c))));
+  const comMeio = cmps.filter(x => x.c.temMeio);
+  const mm = sel => comMeio.length ? Math.round(avg(comMeio.map(x => sel(x.c)))) : null;
   const conta = k => cmps.filter(x => x.c.indice.classe === k).length;
-  const turmaDims = DIMS.map(d => ({ d, a: m(c => c.dims[d.id].antes), b: m(c => c.dims[d.id].depois) }));
+  const rotT = cmps[0].c.rot;
+  const turmaDims = DIMS.map(d => ({ d, a: m(c => c.dims[d.id].antes), w: mm(c => c.dims[d.id].meio), b: m(c => c.dims[d.id].depois) }));
+  const vals3 = (a, w, b) => w != null ? [a, w, b] : [a, b];
   const turmaCard = `<div class="grid-2">
-      <div class="card stack"><h2 class="h-sec" style="margin:0">A turma antes e depois</h2>
-        <div class="evo-num"><span class="a tnum">${m(c => c.indice.antes)}</span><span class="evo-seta" aria-hidden="true">→</span><span class="b tnum">${m(c => c.indice.depois)}</span>${deltaChip(m(c => c.indice.depois) - m(c => c.indice.antes), true)}</div>
-        <p class="small muted">Índice médio de quem já refez (${evos.length} ${evos.length === 1 ? 'pessoa' : 'pessoas'}).</p>
-        <div class="legend">${['evoluiu', 'estavel', 'recuou'].map(k => `<span><i class="swatch" style="background:${CLASSE[k][1]}"></i>${CLASSE[k][0]} <b class="tnum">${conta(k)}</b></span>`).join('')}</div>
-        <p class="small muted">Classificação pelo Índice OQGCI de cada pessoa.</p></div>
-      <div class="card stack"><h2 class="h-sec" style="margin:0">Média por dimensão</h2><div class="evo-rows">${turmaDims.map(({ d, a, b }) => `<div class="evo-row"><strong>${d.nome}</strong>${evoBars(a, b, eixoCorEvo(d.eixo))}<span class="tnum evo-ab">${a} → <b>${b}</b></span>${deltaChip(b - a)}</div>`).join('')}</div></div>
+      <div class="card stack"><h2 class="h-sec" style="margin:0">A turma ao longo das etapas</h2>
+        <div class="evo-num"><span class="a tnum">${m(c => c.indice.antes)}</span>${mm(c => c.indice.meio) != null ? `<span class="evo-seta" aria-hidden="true">→</span><span class="a tnum">${mm(c => c.indice.meio)}</span>` : ''}<span class="evo-seta" aria-hidden="true">→</span><span class="b tnum">${m(c => c.indice.depois)}</span>${deltaChip(m(c => c.indice.depois) - m(c => c.indice.antes), true, EVO_CORTE.indice)}</div>
+        <p class="small muted">Índice médio de quem já fez a reavaliação (${evos.length} ${evos.length === 1 ? 'pessoa' : 'pessoas'}): ${rotT.map(r => r.nome).join(' → ')}.</p>
+        <div class="legend">${CLASSE_ORDEM.map(k => `<span><i class="swatch" style="background:${CLASSE[k][1]}"></i>${CLASSE[k][0]} <b class="tnum">${conta(k)}</b></span>`).join('')}</div>
+        <p class="small muted">Classificação pelo Índice OQGCI de cada pessoa, com corte de ${EVO_CORTE.indice} pontos.</p></div>
+      <div class="card stack"><h2 class="h-sec" style="margin:0">Média por dimensão</h2><div class="evo-rows">${turmaDims.map(({ d, a, w, b }) => `<div class="evo-row"><strong>${d.nome}</strong>${evoBars(vals3(a, w, b), eixoCorEvo(d.eixo))}<span class="tnum evo-ab">${seq(vals3(a, w, b))}</span>${classeChip(classeEvo(a, w, b, EVO_CORTE.dim), b - a)}</div>`).join('')}</div></div>
     </div>`;
-  const ordem = cmps.slice().sort((x, y) => (x.e.status === 'liberado') - (y.e.status === 'liberado') || (x.e.nome || '').localeCompare(y.e.nome || ''));
   const fila = `<div class="card stack"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2 class="h-sec" style="margin:0">Relatórios de evolução</h2>${rascunhos.length ? `<button type="button" class="btn btn-primary btn-sm" data-act="evo-liberar-todos">Liberar ${rascunhos.length === 1 ? 'o rascunho' : `os ${rascunhos.length} rascunhos`}</button>` : ''}</div>
-    <div class="table-wrap"><table class="heat"><thead><tr><th>Pessoa</th><th class="num">Índice</th><th>Variação</th><th>Prioridades iniciais</th><th>Sinais</th><th>Situação</th><th></th></tr></thead><tbody>
-    ${ordem.map(({ e, c }) => `<tr><td><strong>${esc(e.nome || 'Sem nome')}</strong>${e.exemplo ? ' <span class="tag">exemplo</span>' : ''}<br><span class="muted small">reavaliação em ${fmtDate(e.reavaliacao.created_at)}</span></td><td class="num tnum">${c.indice.antes} → <b>${c.indice.depois}</b></td><td>${deltaChip(c.indice.delta, true)}</td><td class="small">${c.nEvo} de ${c.prioIni.length} evoluíram</td><td class="small">${c.sinais.length ? `<span style="color:var(--warn)">${c.sinais.length} ${c.sinais.length === 1 ? 'sinal' : 'sinais'}</span>` : '<span class="muted">—</span>'}</td><td>${statusEvoChip(e.status)}${e.comentario ? '<br><span class="muted small">com comentário</span>' : ''}</td><td><button type="button" class="btn btn-quiet btn-sm" data-evo-open="${esc(e.id)}">${e.status === 'liberado' ? 'Abrir' : 'Revisar'}</button></td></tr>`).join('')}
-    </tbody></table></div>
-    <p class="small muted">A pessoa só vê o relatório depois de liberado. Sinais indicam mudança no modo de compra ou queda de confiabilidade nas respostas; revise antes de liberar.</p></div>`;
-  return config + andamento + turmaCard + fila;
+    ${tabelaEvos(cmps)}
+    <p class="small muted">A pessoa só vê o relatório depois de liberado. Sinais indicam mudança no modo de compra, queda de confiabilidade ou salto otimista no workshop; revise antes de liberar.</p></div>`;
+  return config + andamento + turmaCard + fila + blocoInternos;
 }
 
 /* ============================== FACILITADOR =============================== */
@@ -3237,7 +3515,7 @@ async function loadFac() {
   try {
     S.fac.turmas = await store.listTurmas();
     if (!S.fac.sel) S.fac.sel = S.fac.turmas[0]?.id || 'todos';
-    S.fac.results = await store.turmaResults(S.fac.sel);
+    S.fac.results = S.fac.sel === 'individuais' ? [] : await store.turmaResults(S.fac.sel);
   } catch (e) { S.fac.turmas = S.fac.turmas || []; S.fac.results = []; toast(e.message); }
   if (S.fac.tab === 'evolucao') await loadEvos();
 }
@@ -3348,7 +3626,7 @@ function viewFacilitador() {
   return `<main class="page"><div class="wrap stack-lg">
     <div class="stack" style="gap:6px"><span class="eyebrow">Painel do facilitador</span><h1 style="font-size:clamp(28px,5vw,40px)">${F.tab === 'pessoas' ? 'Pessoas e acessos' : F.tab === 'evolucao' ? 'Evolução da turma' : 'Turmas e resultados'}</h1></div>
     <div class="tabs fac-tabs" role="tablist"><button role="tab" data-fac-tab="resultados" aria-selected="${F.tab === 'resultados'}">Turmas e resultados</button><button role="tab" data-fac-tab="evolucao" aria-selected="${F.tab === 'evolucao'}">Evolução</button><button role="tab" data-fac-tab="pessoas" aria-selected="${F.tab === 'pessoas'}">Pessoas e acessos${pedidosPendentes() ? ` · ${pedidosPendentes()}` : ''}</button></div>
-    ${F.tab === 'pessoas' ? viewPessoas() : F.tab === 'evolucao' ? `<div class="stack" style="gap:10px"><span class="small muted">Turma</span><div class="turma-chips">${turmas.map(t => `<button data-turma="${esc(t.id)}" aria-pressed="${F.sel === t.id}">${esc(t.nome)}</button>`).join('') || '<span class="muted small">Crie uma turma na aba Turmas e resultados.</span>'}</div></div>${viewEvolucaoTurma()}` : `
+    ${F.tab === 'pessoas' ? viewPessoas() : F.tab === 'evolucao' ? `<div class="stack" style="gap:10px"><span class="small muted">Turma</span><div class="turma-chips">${turmas.map(t => `<button data-turma="${esc(t.id)}" aria-pressed="${F.sel === t.id}">${esc(t.nome)}</button>`).join('')}<button data-turma="individuais" aria-pressed="${F.sel === 'individuais'}">Individuais</button></div></div>${viewEvolucaoTurma()}` : `
     <div class="card stack">
       <form id="f-turma" class="inline-form turma-form" novalidate><div class="field"><label for="tm-nome">Nova turma</label><input id="tm-nome" type="text" placeholder="Ex.: Workshop grupo de networking · novembro" required></div><div class="field"><label for="tm-workshop">Data do workshop</label><input id="tm-workshop" type="date" min="${hojeBR()}"></div><div class="field"><label for="tm-expira">Diagnósticos até</label><input id="tm-expira" type="date" value="${somaDias(hojeBR(), 90)}" min="${hojeBR()}"></div><button class="btn btn-primary btn-sm" type="submit">Criar turma e gerar código</button></form>
       <label class="check" for="tm-patro"><input id="tm-patro" type="checkbox"><span>Turma patrocinada: uma empresa contratou a avaliação e o desenvolvimento do time.</span></label>
@@ -3405,21 +3683,27 @@ document.addEventListener('click', async (ev) => {
   if (t.dataset.facOpen) { const r = (S.fac.results || []).find(x => x.id === t.dataset.facOpen); if (r) { S.result = r; go('resultado'); } return; }
   if (t.dataset.facModo) { S.fac.modo = t.dataset.facModo; render(); return; }
   if (t.dataset.facTab) {
-    S.fac.tab = t.dataset.facTab; render();
+    S.fac.tab = t.dataset.facTab;
+    if (S.fac.tab === 'resultados' && S.fac.sel === 'individuais') { S.fac.sel = (S.fac.turmas || [])[0]?.id || 'todos'; S.fac.results = null; render(); try { S.fac.results = await store.turmaResults(S.fac.sel); } catch (e) { S.fac.results = []; } }
+    render();
     if (S.fac.tab === 'pessoas') { S.fac.pessoas = null; render(); await loadPessoas(); render(); }
     if (S.fac.tab === 'evolucao') {
       const turmas = S.fac.turmas || [];
-      if (!turmas.some(x => x.id === S.fac.sel) && turmas[0]) { S.fac.sel = turmas[0].id; S.fac.results = null; }
+      if (S.fac.sel !== 'individuais' && !turmas.some(x => x.id === S.fac.sel) && turmas[0]) { S.fac.sel = turmas[0].id; S.fac.results = null; }
       S.fac.evos = null; render();
-      try { if (S.fac.results === null) S.fac.results = await store.turmaResults(S.fac.sel); } catch (e) { S.fac.results = []; }
+      try { if (S.fac.results === null) S.fac.results = S.fac.sel === 'individuais' ? [] : await store.turmaResults(S.fac.sel); } catch (e) { S.fac.results = []; }
       await loadEvos(); render();
     }
     return;
   }
-  if (t.dataset.evoOpen) { const e = (S.fac.evos || []).find(x => x.id === t.dataset.evoOpen); if (e) { S.evo = { ev: e, from: 'fac' }; go('evolucao'); } return; }
-  if (t.dataset.evoMine) { const e = (S.minhasEvos || []).find(x => x.id === t.dataset.evoMine); if (e) { S.evo = { ev: e, from: 'painel' }; go('evolucao'); } return; }
+  if (t.dataset.evoOpen) {
+    const e = (S.fac.evos || []).find(x => x.id === t.dataset.evoOpen); if (!e) return;
+    let serie = null; if (tipoEvo(e) === 'individual') { try { serie = await store.resultadosDe(e.user_id); } catch (x) { serie = null; } }
+    S.evo = { ev: e, from: 'fac', serie }; go('evolucao'); return;
+  }
+  if (t.dataset.evoMine) { const e = (S.minhasEvos || []).find(x => x.id === t.dataset.evoMine); if (e) { S.evo = { ev: e, from: 'painel', serie: tipoEvo(e) === 'individual' ? (S.myResults || []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at)) : null }; go('evolucao'); } return; }
   if (t.dataset.facFiltro) { S.fac.filtro = t.dataset.facFiltro; render(); return; }
-  if (t.dataset.turma) { S.fac.sel = t.dataset.turma; S.fac.results = null; S.fac.evos = null; S.fac.newCode = null; render(); try { S.fac.results = await store.turmaResults(S.fac.sel); } catch (e) { S.fac.results = []; toast(e.message); } if (S.fac.tab === 'evolucao') await loadEvos(); render(); return; }
+  if (t.dataset.turma) { S.fac.sel = t.dataset.turma; S.fac.results = null; S.fac.evos = null; S.fac.newCode = null; render(); try { S.fac.results = S.fac.sel === 'individuais' ? [] : await store.turmaResults(S.fac.sel); } catch (e) { S.fac.results = []; toast(e.message); } if (S.fac.tab === 'evolucao') await loadEvos(); render(); return; }
   const act = t.dataset.act;
   if (act === 'criar') { S.authTab = 'criar'; S.authMsg = null; go('entrar'); }
   else if (act === 'esqueci') { S.authTab = 'esqueci'; S.authMsg = null; render(); }
@@ -3516,7 +3800,7 @@ document.addEventListener('click', async (ev) => {
     } catch (e) { toast(e.message); }
   }
   else if (act === 'evo-liberar-todos') {
-    const rs = (S.fac.evos || []).filter(e => e.status !== 'liberado'); if (!rs.length) return;
+    const rs = (S.fac.evos || []).filter(e => e.status !== 'liberado' && tipoEvo(e) !== 'workshop'); if (!rs.length) return;
     const comSinal = rs.filter(e => compararEvolucao(e).sinais.length).length;
     if (!confirm(`Liberar ${rs.length} ${rs.length === 1 ? 'relatório' : 'relatórios'} para as pessoas?${comSinal ? `\n\n${comSinal} ${comSinal === 1 ? 'tem sinal' : 'têm sinais'} para revisão.` : ''}`)) return;
     try { const agora = new Date().toISOString(); for (const e of rs) await store.updateEvolucao(e.id, { status: 'liberado', liberado_em: agora }); await loadEvos(); render(); toast(rs.length === 1 ? 'Relatório liberado' : rs.length + ' relatórios liberados'); } catch (e) { await loadEvos(); render(); toast(e.message); }
