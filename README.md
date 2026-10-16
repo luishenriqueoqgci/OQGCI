@@ -50,6 +50,7 @@ Projetos criados com o `schema.sql` atual já têm tudo. Em projetos antigos, ro
 - `supabase/atualizacao-03-evolucao.sql` · data de reavaliação da turma e relatório de evolução (pareamento automático, revisão e liberação pelo facilitador)
 - `supabase/atualizacao-04-correcao-pareamento.sql` · correção do pareamento ao definir a data de reavaliação (necessária em quem já rodou a 03)
 - `supabase/atualizacao-05-evolucao-individual.sql` · evolução individual opcional, habilitada pessoa a pessoa em Pessoas e acessos
+- `supabase/atualizacao-06-etapas-e-pedidos.sql` · etapas da turma (prévia, workshop e 45 dias), turma patrocinada, limite de execuções por pessoa e pedidos de nova execução; retira a evolução individual por data da 05
 
 ## Observações
 - A chave anon public pode ficar no site: o acesso aos dados é protegido pelas regras de RLS do `schema.sql`.

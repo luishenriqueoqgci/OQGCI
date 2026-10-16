@@ -279,9 +279,15 @@ p { margin: 0; }
 .acesso-acoes { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
 .acesso-acoes .btn { width: auto; white-space: nowrap; }
 table.pessoas td { vertical-align: top; }
-.evoind { display: grid; gap: 6px; justify-items: start; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
-.evoind-t { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
-.evoind .acesso-acoes { flex-wrap: wrap; }
+.subbloco { display: grid; gap: 8px; justify-items: start; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.subbloco-t { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.subbloco .acesso-acoes { flex-wrap: wrap; }
+.subbloco .check { font-size: 13px; }
+.acesso-acoes input[type=number] { width: 72px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 6px 10px; font-size: 13px; }
+.pedido-box { border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); border-radius: var(--r-sm); padding: 12px; justify-items: stretch; border-top-width: 1px; }
+.pedido-box .subbloco-t { color: var(--accent); }
+.pedido-motivo { margin: 0; padding-left: 10px; border-left: 2px solid var(--accent); font-size: 14px; line-height: 1.45; }
+.pedido-box textarea { min-height: 64px; font-size: 14px; }
 .modo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .modo { display: grid; gap: 4px; text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px; cursor: pointer; color: var(--ink-2); touch-action: manipulation; }
 .modo strong { font-size: 15px; color: var(--ink); }
@@ -1183,15 +1189,31 @@ const diaBR = iso => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_P
 const somaDias = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const fmtDia = iso => iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '';
 // Mesma regra do banco (atualizacao-02): facilitador sempre; encerrado nunca; senão, acesso individual ou turma dentro da validade.
-function calcAcesso(u, t) {
+// Etapa da turma numa data (mesma regra do banco, atualizacao-06): prévia, workshop, intervalo e reavaliação (45 dias).
+// Turma sem data de workshop: inicial antes da data de reavaliação e reavaliação a partir dela.
+function etapaTurma(t, dia) {
+  if (!t) return null;
+  if (t.reavaliar_em && dia >= t.reavaliar_em) return 'reavaliacao';
+  if (!t.data_workshop) return 'inicial';
+  if (dia < t.data_workshop) return 'previa';
+  if (dia === t.data_workshop) return 'workshop';
+  return 'intervalo';
+}
+const ETAPA_NOME = { previa: 'Prévia', workshop: 'Workshop', intervalo: 'Intervalo', reavaliacao: '45 dias', inicial: 'Inicial' };
+function calcAcesso(u, t, results) {
   const hoje = hojeBR();
   if (!u) return { pode: false, motivo: 'sem_acesso' };
+  const rs = (results || []).filter(r => r.user_id === u.id);
   const ind = Boolean(u.acesso_ate && u.acesso_ate >= hoje);
   const tur = Boolean(t && (!t.expira_em || t.expira_em >= hoje));
-  const motivo = u.role === 'facilitador' ? 'facilitador' : u.acesso_bloqueado ? 'encerrado' : (ind || tur) ? 'ativo' : (t || u.acesso_ate) ? 'expirado' : 'sem_acesso';
+  const lim = u.nova_execucao ? Math.max(1, u.limite_execucoes || 1) : 1;
+  const viaInd = ind && rs.length < lim;
+  const atual = tur ? etapaTurma(t, hoje) : null;
+  const viaTur = Boolean(atual && atual !== 'intervalo' && !rs.some(r => r.turma_id === t.id && etapaTurma(t, diaBR(r.created_at)) === atual));
+  const motivo = u.role === 'facilitador' ? 'facilitador' : u.acesso_bloqueado ? 'encerrado' : (viaInd || viaTur) ? 'ativo' : (ind || tur) ? 'limite' : (t || u.acesso_ate) ? 'expirado' : 'sem_acesso';
   const datas = (ind || tur) ? [ind && u.acesso_ate, tur && t.expira_em].filter(Boolean) : [u.acesso_ate, t && t.expira_em].filter(Boolean);
   return {
-    pode: u.role === 'facilitador' || (!u.acesso_bloqueado && (ind || tur)), motivo,
+    pode: u.role === 'facilitador' || (!u.acesso_bloqueado && (viaInd || viaTur)), motivo,
     valido_ate: tur && !t.expira_em ? null : (datas.sort().at(-1) || null),
     turma_id: t ? t.id : null, turma_nome: t ? t.nome : null, perguntar_nicho: t ? t.perguntar_nicho !== false : true,
     turma_expira: t ? t.expira_em || null : null, acesso_ate: u.acesso_ate || null, acesso_bloqueado: Boolean(u.acesso_bloqueado)
@@ -1204,14 +1226,6 @@ function parPessoa(results, turma, userId) {
   const rs = results.filter(r => r.user_id === userId && r.turma_id === turma.id).sort((a, b) => b.created_at.localeCompare(a.created_at));
   const rea = rs.find(r => diaBR(r.created_at) >= turma.reavaliar_em);
   const ini = rs.find(r => diaBR(r.created_at) < turma.reavaliar_em);
-  return rea && ini ? { inicial_id: ini.id, reavaliacao_id: rea.id } : null;
-}
-// Evolução individual (atualizacao-05): mesma regra, com a data da pessoa e diagnósticos de qualquer turma.
-function parIndividual(results, userId, data) {
-  if (!data) return null;
-  const rs = results.filter(r => r.user_id === userId).sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const rea = rs.find(r => diaBR(r.created_at) >= data);
-  const ini = rs.find(r => diaBR(r.created_at) < data);
   return rea && ini ? { inicial_id: ini.id, reavaliacao_id: rea.id } : null;
 }
 const hashStr = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return 'h' + (h >>> 0).toString(36); };
@@ -1313,7 +1327,10 @@ function DemoStore() {
     if (!novo && e.inicial_id === par.inicial_id && e.reavaliacao_id === par.reavaliacao_id) return;
     Object.assign(e, par, { status: 'rascunho', liberado_em: null, gerado_em: new Date().toISOString() });
   };
-  const reavInd = id => userOf(id)?.reavaliar_em || db.acessos?.[id]?.reavaliar_em || null;
+  // Pessoa de exemplo (sem conta) guarda acesso e execuções em db.acessos.
+  const ajustar = (id, patch) => { const u = userOf(id); if (u) Object.assign(u, patch); else { db.acessos = db.acessos || {}; db.acessos[id] = { ...(db.acessos[id] || {}), ...patch }; } };
+  db.pedidos = db.pedidos || [];
+  const ultimoPedido = id => db.pedidos.filter(p => p.user_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at))[0] || null;
   const parearTurma = turmaId => {
     const t = db.turmas.find(x => x.id === turmaId); if (!t) return 0;
     const users = [...new Set(db.results.filter(r => r.turma_id === turmaId).map(r => r.user_id))];
@@ -1347,7 +1364,7 @@ function DemoStore() {
     async resetPassword() { return { demo: true }; },
     async signOut() { db.session = null; save(); },
     async findTurma(codigo) { const t = db.turmas.find(x => x.codigo.toUpperCase() === codigo.trim().toUpperCase()); return t ? { id: t.id, nome: t.nome, perguntar_nicho: t.perguntar_nicho !== false } : null; },
-    async meuAcesso() { const u = db.users.find(x => x.id === db.session); return calcAcesso(u, db.turmas.find(t => t.id === u?.turma_id)); },
+    async meuAcesso() { const u = db.users.find(x => x.id === db.session); return calcAcesso(u, db.turmas.find(t => t.id === u?.turma_id), db.results); },
     async entrarTurma(codigo) {
       const u = db.users.find(x => x.id === db.session);
       const t = db.turmas.find(x => x.codigo.toUpperCase() === codigo.trim().toUpperCase());
@@ -1360,8 +1377,9 @@ function DemoStore() {
       const exemplos = db.results.filter(r => r.exemplo).sort((a, b) => b.created_at.localeCompare(a.created_at)).filter(r => !vistos.has(r.user_id) && vistos.add(r.user_id)).map(r => ({ id: r.user_id, nome: r.nome, email: r.user_id.replace('ex-user-', 'exemplo') + '@demo', role: 'respondente', turma_id: r.turma_id, created_at: r.created_at, ...(db.acessos?.[r.user_id] || {}) }));
       return [...db.users, ...exemplos].map(u => {
         const t = db.turmas.find(x => x.id === u.turma_id); const rs = db.results.filter(r => r.user_id === u.id);
-        const ei = db.evolucoes.find(e => e.user_id === u.id && e.turma_id == null);
-        return { id: u.id, nome: u.nome, email: u.email, role: u.role, created_at: u.created_at || rs.at(-1)?.created_at || null, turma_nome: t?.nome || null, ...calcAcesso(u, t), diagnosticos: rs.length, ultimo: rs.map(r => r.created_at).sort().at(-1) || null, reavaliar_em: reavInd(u.id), evo_status: ei ? ei.status : null };
+        const pd = ultimoPedido(u.id);
+        return { id: u.id, nome: u.nome, email: u.email, role: u.role, created_at: u.created_at || rs.at(-1)?.created_at || null, turma_nome: t?.nome || null, ...calcAcesso(u, t, db.results), diagnosticos: rs.length, ultimo: rs.map(r => r.created_at).sort().at(-1) || null,
+          nova_execucao: Boolean(u.nova_execucao), limite_execucoes: u.limite_execucoes || 1, pedido_id: pd?.id || null, pedido_status: pd?.status || null, pedido_motivo: pd?.motivo || null, pedido_em: pd?.created_at || null };
       }).sort((a, b) => (b.ultimo || b.created_at || '').localeCompare(a.ultimo || a.created_at || ''));
     },
     async definirAcesso(userId, ate, bloqueado) {
@@ -1370,44 +1388,52 @@ function DemoStore() {
       else { db.acessos = db.acessos || {}; db.acessos[userId] = { ...(db.acessos[userId] || {}), acesso_ate: ate || null, acesso_bloqueado: Boolean(bloqueado) }; }
       save();
     },
-    async definirReavaliacaoIndividual(userId, data) {
-      const u = db.users.find(x => x.id === userId);
-      if (u) u.reavaliar_em = data || null;
-      else { db.acessos = db.acessos || {}; db.acessos[userId] = { ...(db.acessos[userId] || {}), reavaliar_em: data || null }; }
-      const par = parIndividual(db.results, userId, data);
-      if (par) gravarPar(null, userId, par, false);
-      else db.evolucoes = db.evolucoes.filter(e => e.user_id !== userId || e.turma_id != null || e.status !== 'rascunho');
-      save(); return par ? 1 : 0;
+    async definirExecucoes(userId, nova, limite) {
+      const n = db.results.filter(r => r.user_id === userId).length;
+      if (nova && (!limite || limite <= n)) throw new Error(`O limite precisa ser maior que o número de execuções já feitas (${n}).`);
+      ajustar(userId, nova ? { nova_execucao: true, limite_execucoes: limite } : { nova_execucao: false }); save();
+    },
+    async decidirPedido(id, aprovar, resposta, limite, ate) {
+      const p = db.pedidos.find(x => x.id === id && x.status === 'pendente'); if (!p) throw new Error('Este pedido já foi respondido.');
+      if (aprovar) {
+        const n = db.results.filter(r => r.user_id === p.user_id).length;
+        if (!limite || limite <= n) throw new Error(`O limite precisa ser maior que o número de execuções já feitas (${n}).`);
+        if (!ate || ate < hojeBR()) throw new Error('Escolha uma data de hoje em diante.');
+        ajustar(p.user_id, { nova_execucao: true, limite_execucoes: limite, acesso_ate: ate, acesso_bloqueado: false });
+      }
+      Object.assign(p, { status: aprovar ? 'aprovado' : 'recusado', resposta: (resposta || '').trim() || null, decidido_em: new Date().toISOString() }); save();
+    },
+    async meuPedido() { return ultimoPedido(db.session); },
+    async pedirExecucao(motivo) {
+      if (db.pedidos.some(p => p.user_id === db.session && p.status === 'pendente')) throw new Error('Você já tem um pedido aguardando resposta.');
+      const p = { id: uid(), user_id: db.session, motivo: motivo.trim(), status: 'pendente', resposta: null, created_at: new Date().toISOString(), decidido_em: null };
+      db.pedidos.push(p); save(); return p;
     },
     async saveResult({ turma_id, respostas, resultado }) {
       const u = db.users.find(x => x.id === db.session);
-      if (!calcAcesso(u, db.turmas.find(t => t.id === u.turma_id)).pode) throw new Error('O seu período de acesso para novos diagnósticos terminou. Fale com o facilitador para renovar.');
+      if (!calcAcesso(u, db.turmas.find(t => t.id === u.turma_id), db.results).pode) throw new Error('Não é possível executar um novo diagnóstico agora. Você pode pedir uma nova execução no seu painel.');
       const rec = { id: uid(), user_id: u.id, nome: u.nome, turma_id: turma_id || null, respostas, resultado, created_at: new Date().toISOString() };
       db.results.push(rec);
       const par = parPessoa(db.results, db.turmas.find(t => t.id === rec.turma_id), u.id);
       if (par) gravarPar(rec.turma_id, u.id, par, true);
-      const parInd = parIndividual(db.results, u.id, reavInd(u.id));
-      if (parInd && parInd.reavaliacao_id === rec.id) gravarPar(null, u.id, parInd, true);
+      if (u.nova_execucao && db.results.filter(r => r.user_id === u.id).length >= (u.limite_execucoes || 1)) u.nova_execucao = false;
       save(); return rec;
     },
     async listEvolucoes(turmaId) { return db.evolucoes.filter(e => e.turma_id === turmaId).map(juntar).filter(e => e.inicial && e.reavaliacao); },
-    async listEvolucoesIndividuais() { return db.evolucoes.filter(e => e.turma_id == null).map(juntar).filter(e => e.inicial && e.reavaliacao); },
     async updateEvolucao(id, patch) { const e = db.evolucoes.find(x => x.id === id); if (e) { Object.assign(e, patch); save(); } return e ? juntar(e) : null; },
     async parearTurma(turmaId) { return parearTurma(turmaId); },
     async minhaReavaliacao() {
       const u = userOf(db.session); if (!u) return [];
-      const t = db.turmas.find(x => x.id === u.turma_id); const out = [];
-      const st = tid => db.evolucoes.find(x => x.user_id === u.id && x.turma_id == tid)?.status || null;
-      if (t) out.push({ turma_id: t.id, turma_nome: t.nome, reavaliar_em: t.reavaliar_em || null, status: st(t.id) });
-      if (u.reavaliar_em) out.push({ turma_id: null, turma_nome: null, reavaliar_em: u.reavaliar_em, status: st(null) });
-      return out;
+      const t = db.turmas.find(x => x.id === u.turma_id); if (!t) return [];
+      const e = db.evolucoes.find(x => x.user_id === u.id && x.turma_id === t.id);
+      return [{ turma_id: t.id, turma_nome: t.nome, reavaliar_em: t.reavaliar_em || null, status: e ? e.status : null }];
     },
     async minhasEvolucoes() { return db.evolucoes.filter(e => e.user_id === db.session && e.status === 'liberado').map(juntar).filter(e => e.inicial && e.reavaliacao).sort((a, b) => b.reavaliacao.created_at.localeCompare(a.reavaliacao.created_at)); },
     async myResults() { return db.results.filter(r => r.user_id === db.session).sort((a, b) => b.created_at.localeCompare(a.created_at)); },
     async getResult(id) { return db.results.find(r => r.id === id) || null; },
     async updateLeitura(id, leitura) { const r = db.results.find(x => x.id === id); if (r) { r.resultado.leitura = leitura; save(); } },
     async listTurmas() { return db.turmas.slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')); },
-    async createTurma(nome, perguntar, expira) { const t = { id: uid(), nome: nome.trim(), codigo: genCode(), perguntar_nicho: perguntar !== false, expira_em: expira || null, created_at: new Date().toISOString() }; db.turmas.push(t); save(); return t; },
+    async createTurma(nome, perguntar, expira, extra = {}) { const t = { id: uid(), nome: nome.trim(), codigo: genCode(), perguntar_nicho: perguntar !== false, expira_em: expira || null, created_at: new Date().toISOString(), ...extra }; db.turmas.push(t); save(); return t; },
     async updateTurma(id, patch) { const t = db.turmas.find(x => x.id === id); if (t) { Object.assign(t, patch); if ('reavaliar_em' in patch) parearTurma(id); save(); } return t; },
     async turmaResults(turmaId) {
       return db.results.filter(r => turmaId === 'todos' ? true : turmaId === 'sem' ? !r.turma_id : r.turma_id === turmaId).sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -1427,9 +1453,13 @@ function LiveStore() {
     if (/already registered/i.test(m)) return new Error('Já existe uma conta com este e-mail. Use a aba Entrar.');
     if (/Password should be at least/i.test(m)) return new Error('A senha precisa ter pelo menos 6 caracteres.');
     if (/rate limit/i.test(m)) return new Error('Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente de novo.');
-    if (/reavaliacao_individual|evolucoes_individual|evo_status/i.test(m)) return new Error('Atualize o banco de dados com a atualização 05 (evolução individual) enviada pelo Claude.');
+    if (/limite_baixo/i.test(m)) return new Error('O limite precisa ser maior que o número de execuções já feitas pela pessoa.');
+    if (/data_invalida/i.test(m)) return new Error('Escolha uma data de hoje em diante.');
+    if (/pedido_inexistente/i.test(m)) return new Error('Este pedido já foi respondido.');
+    if (/pedidos_execucao_pendente_uq|duplicate key.*pedidos/i.test(m)) return new Error('Você já tem um pedido aguardando resposta.');
+    if (/pedidos_execucao|nova_execucao|limite_execucoes|data_workshop|patrocinada|decidir_pedido|definir_execucoes/i.test(m)) return new Error('Atualize o banco de dados com a atualização 06 (etapas e pedidos) enviada pelo Claude.');
     if (/evolucoes|reavaliar_em|parear_turma|minha_reavaliacao/i.test(m)) return new Error('Atualize o banco de dados com a atualização 03 (relatório de evolução) enviada pelo Claude.');
-    if (/row-level security/i.test(m)) return new Error('O seu período de acesso para novos diagnósticos terminou. Fale com o facilitador para renovar.');
+    if (/row-level security/i.test(m)) return new Error('Não é possível executar um novo diagnóstico agora. Você pode pedir uma nova execução no seu painel.');
     if (/meu_acesso|entrar_turma|pessoas|definir_acesso|expira_em|could not find the function/i.test(m)) return new Error('Atualize o banco de dados com a atualização 02 (controle de acesso) enviada pelo Claude.');
     if (/not_allowed/i.test(m)) return new Error('Apenas o facilitador pode fazer esta alteração.');
     return new Error(m || 'Não foi possível concluir. Verifique a conexão e tente de novo.');
@@ -1493,10 +1523,24 @@ function LiveStore() {
     },
     async pessoas() { const { data, error } = await sb.rpc('pessoas'); if (error) throw errPt(error); return data || []; },
     async definirAcesso(userId, ate, bloqueado) { const { error } = await sb.rpc('definir_acesso', { p_user: userId, p_ate: ate || null, p_bloqueado: Boolean(bloqueado) }); if (error) throw errPt(error); },
-    async definirReavaliacaoIndividual(userId, data) {
-      const { data: n, error } = await sb.rpc('definir_reavaliacao_individual', { p_user: userId, p_data: data || null });
-      if (error) throw (error.code === 'PGRST202' || /could not find the function/i.test(error.message || '')) ? new Error('Atualize o banco de dados com a atualização 05 (evolução individual) enviada pelo Claude.') : errPt(error);
-      return n;
+    async definirExecucoes(userId, nova, limite) {
+      const { error } = await sb.rpc('definir_execucoes', { p_user: userId, p_nova: Boolean(nova), p_limite: limite || null });
+      if (error) throw errPt(error);
+    },
+    async decidirPedido(id, aprovar, resposta, limite, ate) {
+      const { error } = await sb.rpc('decidir_pedido', { p_pedido: id, p_aprovar: Boolean(aprovar), p_resposta: resposta || null, p_limite: limite || null, p_ate: ate || null });
+      if (error) throw errPt(error);
+    },
+    async meuPedido() {
+      const p = await profile(); if (!p) return null;
+      const { data, error } = await sb.from('pedidos_execucao').select('*').eq('user_id', p.id).order('created_at', { ascending: false }).limit(1);
+      if (error) return null; // banco ainda sem a atualização 06
+      return (data && data[0]) || null;
+    },
+    async pedirExecucao(motivo) {
+      const { data, error } = await sb.from('pedidos_execucao').insert({ motivo: motivo.trim() }).select().single();
+      if (error) throw errPt(error);
+      return data;
     },
     async saveResult({ turma_id, respostas, resultado }) {
       const p = await profile();
@@ -1512,15 +1556,15 @@ function LiveStore() {
     async getResult(id) { const { data, error } = await sb.from('resultados').select('*, profiles(nome)').eq('id', id).maybeSingle(); if (error) throw errPt(error); return data ? toRec(data) : null; },
     async updateTurma(id, patch) { const { data, error } = await sb.from('turmas').update(patch).eq('id', id).select().single(); if (error) throw new Error(/perguntar_nicho/i.test(error.message) ? 'Atualize o banco de dados com o complemento enviado pelo Claude para usar esta opção.' : errPt(error).message); if ('reavaliar_em' in patch) await this.parearTurma(id); return data; },
     async listTurmas() { const { data, error } = await sb.from('turmas').select('*').order('created_at', { ascending: false }); if (error) throw errPt(error); return data; },
-    async createTurma(nome, perguntar, expira) {
+    async createTurma(nome, perguntar, expira, extra = {}) {
       let comNicho = true;
       for (let i = 0; i < 5; i++) {
-        const row = { nome: nome.trim(), codigo: genCode() };
+        const row = { nome: nome.trim(), codigo: genCode(), ...extra };
         if (expira) row.expira_em = expira;
         if (comNicho) row.perguntar_nicho = perguntar !== false;
         const { data, error } = await sb.from('turmas').insert(row).select().single();
         if (!error) return data;
-        if (/expira_em/i.test(error.message)) throw errPt(error);
+        if (/expira_em|data_workshop|patrocinada|reavaliar_em/i.test(error.message)) throw errPt(error);
         if (/perguntar_nicho/i.test(error.message)) { comNicho = false; continue; }
         if (!/duplicate/i.test(error.message)) throw errPt(error);
       }
@@ -1529,11 +1573,6 @@ function LiveStore() {
     async listEvolucoes(turmaId) {
       const { data, error } = await sb.from('evolucoes').select('*, profiles(nome)').eq('turma_id', turmaId);
       if (error) throw errPt(error);
-      return juntarEvolucoes(data);
-    },
-    async listEvolucoesIndividuais() {
-      const { data, error } = await sb.from('evolucoes').select('*, profiles(nome)').is('turma_id', null);
-      if (error) return [];
       return juntarEvolucoes(data);
     },
     async updateEvolucao(id, patch) {
@@ -1579,6 +1618,8 @@ const S = {
   evo: null,
   reav: null,
   minhasEvos: null,
+  pedido: null,
+  pedidoRascunho: '',
   installEvt: null,
   installHidden: false,
   leitura: {},
@@ -1609,6 +1650,7 @@ async function route_() {
     try { S.myResults = await store.myResults(); } catch (e) { S.myResults = []; }
     await loadAcesso();
     try { [S.reav, S.minhasEvos] = await Promise.all([store.minhaReavaliacao(), store.minhasEvolucoes()]); } catch (e) { S.reav = null; S.minhasEvos = []; }
+    try { S.pedido = await store.meuPedido(); } catch (e) { S.pedido = null; }
   }
   if (r === 'diagnostico') await loadAcesso();
   if (r === 'facilitador') { await loadFac(); }
@@ -1627,6 +1669,7 @@ function acessoLinha(a) {
   if (a.motivo === 'facilitador') return 'Acesso de facilitador, sem prazo.';
   if (a.pode) return (a.turma_nome && (!a.acesso_ate || a.acesso_ate < hojeBR()) ? 'Turma ' + a.turma_nome + ' · ' : '') + (a.valido_ate ? 'acesso para novos diagnósticos até ' + fmtDia(a.valido_ate) + '.' : 'acesso para novos diagnósticos sem prazo definido.');
   if (a.motivo === 'encerrado') return 'O seu acesso para novos diagnósticos foi encerrado.';
+  if (a.motivo === 'limite') return 'Não é possível executar um novo diagnóstico agora.';
   if (a.motivo === 'expirado') return 'O seu período para novos diagnósticos terminou' + (a.valido_ate ? ' em ' + fmtDia(a.valido_ate) : '') + '.';
   if (a.motivo === 'erro') return a.erro || 'Não foi possível verificar o seu acesso agora.';
   return 'O seu acesso para novos diagnósticos ainda não foi liberado.';
@@ -1766,12 +1809,24 @@ function viewPainel() {
     : `<div class="list">${list.map(r => `<button class="row-btn" data-open="${esc(r.id)}"><span><strong>Índice ${r.resultado.indice} · ${esc(r.resultado.nivel)}</strong><br><span class="row-meta">${fmtDate(r.created_at)} · perfil ${esc(PROFILES[r.resultado.perfil].nome)}</span></span><span aria-hidden="true" class="muted">→</span></button>`).join('')}</div>`;
   const draft = LS.get(DRAFT_KEY);
   const a = S.acesso;
+  // Pedido de nova execução: a pessoa explica o motivo; a resposta do facilitador aparece aqui.
+  const pd = S.pedido; const ultimaExec = (S.myResults || [])[0]?.created_at || '';
+  const respostaPedido = pd && pd.status !== 'pendente' && (pd.status === 'recusado' || (pd.decidido_em || '') > ultimaExec)
+    ? `<div class="msg ${pd.status === 'aprovado' ? 'msg-ok' : ''}" role="status"><b>${pd.status === 'aprovado' ? 'Pedido de nova execução liberado' : 'Pedido de nova execução recusado'}</b> · ${fmtDate(pd.decidido_em || pd.created_at)}${pd.resposta ? `<br>${esc(AUTOR)}: ${esc(pd.resposta)}` : ''}</div>` : '';
+  const podePedir = a && !a.pode && !['encerrado', 'erro', 'legado'].includes(a.motivo) && (S.myResults || []).length > 0;
+  const pedidoCard = !podePedir ? '' : pd && pd.status === 'pendente'
+    ? `<div class="msg" role="status"><b>Pedido enviado em ${fmtDate(pd.created_at)}.</b> Aguardando a resposta de ${esc(AUTOR)}.<br><span class="muted small">Motivo: ${esc(pd.motivo)}</span></div>`
+    : `<form id="f-pedido" class="stack" style="gap:10px" novalidate><div class="field"><label for="pd-motivo">Pedir uma nova execução</label><textarea id="pd-motivo" maxlength="1000" placeholder="Conte por que você quer fazer um novo diagnóstico." style="min-height:90px">${esc(S.pedidoRascunho || '')}</textarea></div><div class="actions"><button class="btn btn-primary btn-sm" type="submit" ${S.busy ? 'disabled' : ''}>Enviar pedido</button></div><div id="pd-msg"></div></form>`;
   const acessoCard = !a || a.motivo === 'legado' ? '' : a.pode
-    ? `<p class="small muted acesso-ok"><i class="swatch" style="background:var(--good)"></i>${esc(acessoLinha(a))}</p>`
+    ? `<p class="small muted acesso-ok"><i class="swatch" style="background:var(--good)"></i>${esc(acessoLinha(a))}</p>${respostaPedido}`
+    : a.motivo === 'limite'
+    ? `<div class="card stack" style="gap:12px"><strong>${esc(acessoLinha(a))}</strong>
+        <span class="muted small">Os seus relatórios anteriores continuam disponíveis abaixo, para consulta e download. Para fazer um novo diagnóstico, envie um pedido para ${esc(AUTOR)}.</span>
+        ${respostaPedido}${pedidoCard}</div>`
     : `<div class="card stack" style="gap:12px"><strong>${esc(acessoLinha(a))}</strong>
         <span class="muted small">Se você recebeu um código de turma, informe abaixo para liberar novos diagnósticos. Para renovar o acesso, fale com ${esc(AUTOR)}.${(S.myResults || []).length ? ' Os seus relatórios anteriores continuam disponíveis abaixo, para consulta e download.' : ''}</span>
         <form id="f-codigo" class="inline-form" novalidate><div class="field"><label for="pn-code">Código da turma</label><input id="pn-code" type="text" autocomplete="off" placeholder="OQG-XXXX" style="text-transform:uppercase"></div><button class="btn btn-primary btn-sm" type="submit" ${S.busy ? 'disabled' : ''}>Liberar acesso</button></form>
-        <div id="pn-msg"></div></div>`;
+        <div id="pn-msg"></div>${respostaPedido}${pedidoCard}</div>`;
   // Reavaliação (da turma ou individual): aviso a partir da data, nota enquanto o relatório está em revisão e cartão quando é liberado.
   const meus = S.myResults || [];
   const cartoes = (Array.isArray(S.reav) ? S.reav : S.reav ? [S.reav] : []).filter(rv => rv.reavaliar_em).map(rv => {
@@ -1872,7 +1927,7 @@ function viewDiagnostico() {
         ${S.acesso && S.acesso.pode
           ? `${S.acesso.motivo === 'legado' ? '' : `<p class="small muted acesso-ok"><i class="swatch" style="background:var(--good)"></i>${esc(acessoLinha(S.acesso))}</p>`}
              <div class="field"><label for="qz-code">Novo código de turma <span class="muted">(opcional)</span></label><input id="qz-code" type="text" autocomplete="off" placeholder="OQG-XXXX" value="${esc(q.code)}" style="text-transform:uppercase"><span class="muted small">Use só se você recebeu o código de uma nova turma.</span></div>`
-          : `<div class="field"><label for="qz-code">Código da turma</label><input id="qz-code" type="text" autocomplete="off" placeholder="OQG-XXXX" value="${esc(q.code)}" style="text-transform:uppercase"><span class="muted small">${esc(acessoLinha(S.acesso))} Use o código que o facilitador passou.${store.mode === 'demo' ? ' Na prévia, o código OQG-DEMO entra na turma de exemplo.' : ''}</span></div>`}
+          : `<div class="field"><label for="qz-code">Código da turma</label><input id="qz-code" type="text" autocomplete="off" placeholder="OQG-XXXX" value="${esc(q.code)}" style="text-transform:uppercase"><span class="muted small">${esc(acessoLinha(S.acesso))}${S.acesso?.motivo === 'limite' ? ' Você pode pedir uma nova execução no seu painel. Se recebeu o código de uma nova turma, informe aqui.' : ' Use o código que o facilitador passou.'}${store.mode === 'demo' ? ' Na prévia, o código OQG-DEMO entra na turma de exemplo.' : ''}</span></div>`}
         <div id="qz-msg"></div>
         <button class="btn btn-primary" data-act="qz-start" ${S.busy ? 'disabled' : ''}>Começar <span aria-hidden="true">→</span></button>
       </div>
@@ -2965,21 +3020,21 @@ async function loadEvos() {
   if (!sel || sel === 'todos' || sel === 'sem') { S.fac.evos = []; S.fac.evosErro = null; return; }
   try { S.fac.evos = await store.listEvolucoes(sel); S.fac.evosErro = null; } catch (e) { S.fac.evos = []; S.fac.evosErro = e.message; }
 }
-function conviteTexto(t, individual) {
+function conviteTexto(t) {
   const url = location.origin + location.pathname;
-  return `Olá! Chegou a hora de refazer o seu Diagnóstico OQGCI. Ele leva cerca de 15 minutos e mostra quanto você avançou desde ${individual ? 'o seu diagnóstico inicial' : 'o treinamento'}.\n\n`
+  return `Olá! Chegou a hora de refazer o seu Diagnóstico OQGCI. Ele leva cerca de 15 minutos e mostra quanto você avançou desde o treinamento.\n\n`
     + `Acesse ${url}, entre com o mesmo e-mail e senha e toque em Iniciar diagnóstico${t.reavaliar_em ? `, a partir de ${fmtDia(t.reavaliar_em)}` : ''}${t.expira_em ? ` e até ${fmtDia(t.expira_em)}` : ''}.\n\n`
     + `Depois da minha revisão, o seu relatório de evolução aparece no seu painel, com a comparação entre os dois diagnósticos e as prioridades para os próximos 30 dias.\n\n${AUTOR}`;
 }
 function viewEvolucaoTurma() {
   const F = S.fac; const turmas = F.turmas || []; const t = turmas.find(x => x.id === F.sel);
   if (!t) return `<div class="empty"><strong>Escolha uma turma</strong><span class="small">A evolução compara o diagnóstico inicial e a reavaliação de cada pessoa dentro de uma turma.</span></div>`;
-  const sugerida = t.reavaliar_em || somaDias(hojeBR(), 30);
+  const sugerida = t.reavaliar_em || (t.data_workshop ? somaDias(t.data_workshop, 45) : somaDias(hojeBR(), 30));
   const janelaFim = t.reavaliar_em ? somaDias(t.reavaliar_em, 15) : null;
   const curta = t.reavaliar_em && t.expira_em && t.expira_em < janelaFim;
   const config = `<div class="card stack" style="gap:12px">
-    <div class="validade-row"><label for="tm-reavaliar" class="small"><b>Data de reavaliação</b></label><input type="date" id="tm-reavaliar" value="${esc(sugerida)}"><button type="button" class="btn ${t.reavaliar_em ? 'btn-quiet' : 'btn-primary'} btn-sm" data-act="turma-reavaliar">${t.reavaliar_em ? 'Alterar data' : 'Definir data'}</button>${t.reavaliar_em ? '<button type="button" class="btn btn-quiet btn-sm" data-act="turma-reavaliar-limpar">Remover</button>' : ''}</div>
-    <p class="small muted">${t.reavaliar_em ? `Desde ${fmtDia(t.reavaliar_em)}, o novo diagnóstico de cada pessoa da turma é tratado como reavaliação, e o relatório de evolução é gerado na hora, como rascunho, para a sua revisão.` : 'A partir desta data, o novo diagnóstico de cada pessoa da turma é tratado como reavaliação, e o relatório de evolução é gerado na hora, como rascunho, para a sua revisão. Sugestão: 30 dias depois do treinamento, com prazo de mais 15 dias para responder.'}</p>
+    <div class="validade-row"><label for="tm-reavaliar" class="small"><b>Data de reavaliação (45 dias)</b></label><input type="date" id="tm-reavaliar" value="${esc(sugerida)}"><button type="button" class="btn ${t.reavaliar_em ? 'btn-quiet' : 'btn-primary'} btn-sm" data-act="turma-reavaliar">${t.reavaliar_em ? 'Alterar data' : 'Definir data'}</button>${t.reavaliar_em ? '<button type="button" class="btn btn-quiet btn-sm" data-act="turma-reavaliar-limpar">Remover</button>' : ''}</div>
+    <p class="small muted">${t.reavaliar_em ? `Desde ${fmtDia(t.reavaliar_em)}, o novo diagnóstico de cada pessoa da turma é tratado como reavaliação, e o relatório de evolução é gerado na hora, como rascunho, para a sua revisão.` : 'A partir desta data, o novo diagnóstico de cada pessoa da turma é tratado como reavaliação, e o relatório de evolução é gerado na hora, como rascunho, para a sua revisão. Sugestão: 45 dias depois do workshop, com prazo de mais 15 dias para responder.'}</p>
     ${curta ? `<div class="msg" role="note">A validade da turma termina em ${fmtDia(t.expira_em)}, antes do fim da janela de reavaliação. <button type="button" class="link-btn" data-act="turma-estender" data-ate="${janelaFim}">Estender até ${fmtDia(janelaFim)}</button></div>` : ''}
     ${t.reavaliar_em ? `<div class="actions"><button type="button" class="btn btn-quiet btn-sm" data-copy="${esc(conviteTexto(t))}">Copiar convite para a turma</button></div>` : ''}
   </div>`;
@@ -3027,10 +3082,9 @@ function viewEvolucaoTurma() {
 /* ============================== FACILITADOR =============================== */
 async function loadPessoas() {
   try { S.fac.pessoas = await store.pessoas(); } catch (e) { S.fac.pessoas = []; S.fac.pessoasErro = e.message; }
-  try { S.fac.evosInd = await store.listEvolucoesIndividuais(); } catch (e) { S.fac.evosInd = []; }
 }
 async function loadFac() {
-  if (S.fac.tab === 'pessoas') await loadPessoas();
+  await loadPessoas();
   try {
     S.fac.turmas = await store.listTurmas();
     if (!S.fac.sel) S.fac.sel = S.fac.turmas[0]?.id || 'todos';
@@ -3047,54 +3101,60 @@ function csvOf(results) {
 }
 
 const SIT = {
-  ativo: ['Ativo', 'var(--good)'], facilitador: ['Facilitador', 'var(--c-cool)'], expirado: ['Expirado', 'var(--warn)'],
+  ativo: ['Ativo', 'var(--good)'], facilitador: ['Facilitador', 'var(--c-cool)'], limite: ['Sem execução', 'var(--warn)'], expirado: ['Expirado', 'var(--warn)'],
   encerrado: ['Encerrado', 'var(--crit)'], sem_acesso: ['Sem acesso', 'var(--ink-3)']
 };
+const pedidosPendentes = () => (S.fac.pessoas || []).filter(x => x.pedido_status === 'pendente').length;
 function viewPessoas() {
   const F = S.fac; const all = F.pessoas;
-  if (all === null) return '<p class="muted">Carregando pessoas…</p>';
+  if (all === null || all === undefined) return '<p class="muted">Carregando pessoas…</p>';
   if (F.pessoasErro && !all.length) return `<div class="msg msg-err" role="alert">${esc(F.pessoasErro)}</div>`;
-  const noFiltro = (x, k) => k === 'todos' || (k === 'evoind' ? Boolean(x.reavaliar_em) : x.motivo === k);
+  const noFiltro = (x, k) => k === 'todos' || (k === 'pedidos' ? x.pedido_status === 'pendente' : x.motivo === k);
   const conta = k => all.filter(x => noFiltro(x, k)).length;
   const busca = (F.busca || '').trim().toLowerCase();
-  const lista = all.filter(x => noFiltro(x, F.filtro) && (!busca || (x.nome || '').toLowerCase().includes(busca) || (x.email || '').toLowerCase().includes(busca)));
+  const lista = all.filter(x => noFiltro(x, F.filtro) && (!busca || (x.nome || '').toLowerCase().includes(busca) || (x.email || '').toLowerCase().includes(busca)))
+    .sort((a, b) => (b.pedido_status === 'pendente') - (a.pedido_status === 'pendente'));
   const padrao = somaDias(hojeBR(), 90);
   const chip = m => { const c = SIT[m] || SIT.sem_acesso; return `<span class="chip"><i class="swatch" style="background:${c[1]}"></i>${c[0]}</span>`; };
-  // Evolução individual: opcional, pessoa a pessoa, com data de reavaliação só dela.
-  const evoInd = x => {
-    const evo = (F.evosInd || []).find(e => e.user_id === x.id);
-    const abrir = evo ? `<button type="button" class="btn btn-quiet btn-sm" data-evo-open="${esc(evo.id)}">${evo.status === 'liberado' ? 'Abrir relatório' : 'Revisar relatório'}</button>` : '';
-    if (F.evoIndEdit === x.id) return `<div class="evoind"><span class="evoind-t">Evolução individual</span><label class="small" for="reav-${esc(x.id)}">Reavaliação a partir de</label><div class="acesso-acoes"><input type="date" id="reav-${esc(x.id)}" data-reav="${esc(x.id)}" value="${esc(x.reavaliar_em || somaDias(hojeBR(), 30))}"><button type="button" class="btn btn-primary btn-sm" data-act="evoind-salvar" data-user="${esc(x.id)}">Salvar</button><button type="button" class="btn btn-quiet btn-sm" data-act="evoind-cancelar">Cancelar</button></div></div>`;
-    if (!x.reavaliar_em) return `<div class="evoind"><span class="evoind-t">Evolução individual</span><span class="small muted">${evo ? (evo.status === 'liberado' ? 'Desativada · relatório liberado' : 'Desativada · relatório em rascunho') : 'Desativada'}</span><div class="acesso-acoes"><button type="button" class="btn btn-quiet btn-sm" data-act="evoind-editar" data-user="${esc(x.id)}">Habilitar</button>${abrir}</div></div>`;
-    const fim = somaDias(x.reavaliar_em, 15);
-    const situacao = evo ? statusEvoChip(evo.status) : `<span class="small muted">${x.reavaliar_em > hojeBR() ? 'Aguardando a data' : 'Aguardando o novo diagnóstico'}</span>`;
-    const avisos = [];
-    if (!x.diagnosticos) avisos.push('<span class="small" style="color:var(--warn)">Ainda sem diagnóstico inicial.</span>');
-    if (x.acesso_bloqueado) avisos.push('<span class="small" style="color:var(--warn)">Acesso encerrado: a pessoa não consegue refazer o diagnóstico.</span>');
-    else if (!evo && (!x.pode || (x.valido_ate && x.valido_ate < fim))) avisos.push(`<span class="small" style="color:var(--warn)">O acesso termina antes do fim da janela de reavaliação. <button type="button" class="link-btn" data-act="acesso-estender" data-user="${esc(x.id)}" data-ate="${fim}">Liberar até ${fmtDia(fim)}</button></span>`);
-    return `<div class="evoind"><span class="evoind-t">Evolução individual</span><span class="small">A partir de <b>${fmtDia(x.reavaliar_em)}</b></span>${situacao}${avisos.join('')}
-      <div class="acesso-acoes">${abrir}${!evo ? `<button type="button" class="btn btn-quiet btn-sm" data-copy="${esc(conviteTexto({ reavaliar_em: x.reavaliar_em, expira_em: x.valido_ate }, true))}">Copiar convite</button>` : ''}<button type="button" class="btn btn-quiet btn-sm" data-act="evoind-editar" data-user="${esc(x.id)}">Alterar data</button><button type="button" class="btn btn-quiet btn-sm" data-act="evoind-limpar" data-user="${esc(x.id)}">Desativar</button></div></div>`;
+  // Execuções: limite total por pessoa e pedido de nova execução.
+  const execucoes = x => {
+    const n = x.diagnosticos || 0; const id = esc(x.id);
+    const lim = x.nova_execucao ? (x.limite_execucoes || 1) : Math.max(n + 1, 2);
+    const semData = x.nova_execucao && !(x.acesso_ate && x.acesso_ate >= hojeBR());
+    const pedido = x.pedido_status === 'pendente' ? `<div class="subbloco pedido-box"><span class="subbloco-t">Pedido de nova execução · ${fmtDate(x.pedido_em)}</span>
+        <p class="pedido-motivo">${esc(x.pedido_motivo || '')}</p>
+        <div class="field" style="width:100%"><label class="small" for="resp-${id}">Resposta para a pessoa</label><textarea id="resp-${id}" data-resp="${id}" placeholder="Aparece para a pessoa no painel dela."></textarea></div>
+        <div class="acesso-acoes"><label class="small" for="plim-${id}">Limite total</label><input type="number" id="plim-${id}" data-plim="${id}" min="${n + 1}" max="50" value="${n + 1}"><label class="small" for="pate-${id}">até</label><input type="date" id="pate-${id}" data-pate="${id}" min="${hojeBR()}" value="${esc(x.acesso_ate && x.acesso_ate > somaDias(hojeBR(), 30) ? x.acesso_ate : somaDias(hojeBR(), 30))}"></div>
+        <div class="acesso-acoes"><button type="button" class="btn btn-primary btn-sm" data-act="pedido-liberar" data-pedido="${esc(x.pedido_id)}" data-user="${id}">Liberar</button><button type="button" class="btn btn-quiet btn-sm" data-act="pedido-recusar" data-pedido="${esc(x.pedido_id)}" data-user="${id}">Recusar</button></div></div>` : '';
+    const ultimo = x.pedido_status && x.pedido_status !== 'pendente' ? `<span class="small muted">Último pedido, de ${fmtDate(x.pedido_em)}: ${x.pedido_status === 'aprovado' ? 'liberado' : 'recusado'}.</span>` : '';
+    return `${pedido}<div class="subbloco"><span class="subbloco-t">Nova execução</span>
+      <label class="check"><input type="checkbox" data-nova="${id}" ${x.nova_execucao ? 'checked' : ''}><span>Permitir nova execução</span></label>
+      <div class="acesso-acoes"><label class="small" for="lim-${id}">Limite total de execuções</label><input type="number" id="lim-${id}" data-lim="${id}" min="${n + 1}" max="50" value="${lim}"><button type="button" class="btn btn-quiet btn-sm" data-act="exec-salvar" data-user="${id}">Salvar</button></div>
+      ${semData ? '<span class="small" style="color:var(--warn)">Defina também a data em "Liberar até" para a pessoa conseguir executar.</span>' : ''}${ultimo}</div>`;
   };
   const linhas = lista.map(x => {
     const fac = x.role === 'facilitador';
     const origem = x.motivo === 'ativo' ? (x.acesso_ate && x.acesso_ate >= hojeBR() ? 'individual' : 'pela turma') : '';
+    const n = x.diagnosticos || 0;
     return `<tr>
-      <td><strong>${esc(x.nome || 'Sem nome')}</strong><br><span class="muted small">${esc(x.email || '')}</span></td>
+      <td><strong>${esc(x.nome || 'Sem nome')}</strong><br><span class="muted small">${esc(x.email || '')}</span>${x.pedido_status === 'pendente' ? '<br><span class="flag" style="background:color-mix(in srgb, var(--accent) 22%, transparent);color:var(--accent)">pedido pendente</span>' : ''}</td>
       <td>${esc(x.turma_nome || '—')}${x.turma_expira ? `<br><span class="muted small">turma até ${fmtDia(x.turma_expira)}</span>` : ''}</td>
       <td>${chip(x.motivo)}${origem ? `<br><span class="muted small">${origem}</span>` : ''}</td>
       <td class="tnum">${fac ? '—' : x.valido_ate ? fmtDia(x.valido_ate) : (x.pode ? 'sem prazo' : '—')}</td>
-      <td class="num">${x.diagnosticos || 0}</td>
+      <td class="num">${n}${!fac && x.nova_execucao ? `<br><span class="muted small">limite ${x.limite_execucoes}</span>` : ''}</td>
       <td>${x.ultimo ? fmtDate(x.ultimo) : '—'}</td>
-      <td>${fac ? '<span class="muted small">—</span>' : `<div class="acesso-acoes"><input type="date" aria-label="Liberar até" data-ate="${esc(x.id)}" value="${esc(x.acesso_ate && x.acesso_ate >= hojeBR() ? x.acesso_ate : padrao)}" min="${hojeBR()}"><button type="button" class="btn btn-quiet btn-sm" data-act="acesso-liberar" data-user="${esc(x.id)}">Liberar até</button>${x.acesso_bloqueado ? `<button type="button" class="btn btn-quiet btn-sm" data-act="acesso-reativar" data-user="${esc(x.id)}">Reativar</button>` : (x.pode ? `<button type="button" class="btn btn-quiet btn-sm" data-act="acesso-encerrar" data-user="${esc(x.id)}">Encerrar</button>` : '')}</div>${evoInd(x)}`}</td></tr>`;
+      <td>${fac ? '<span class="muted small">—</span>' : `<div class="acesso-acoes"><input type="date" aria-label="Liberar até" data-ate="${esc(x.id)}" value="${esc(x.acesso_ate && x.acesso_ate >= hojeBR() ? x.acesso_ate : padrao)}" min="${hojeBR()}"><button type="button" class="btn btn-quiet btn-sm" data-act="acesso-liberar" data-user="${esc(x.id)}">Liberar até</button>${x.acesso_bloqueado ? `<button type="button" class="btn btn-quiet btn-sm" data-act="acesso-reativar" data-user="${esc(x.id)}">Reativar</button>` : (x.pode ? `<button type="button" class="btn btn-quiet btn-sm" data-act="acesso-encerrar" data-user="${esc(x.id)}">Encerrar</button>` : '')}</div>${execucoes(x)}`}</td></tr>`;
   }).join('');
+  const pend = pedidosPendentes();
   return `<div class="card stack">
     <div class="stack" style="gap:6px">
       <p class="muted small">Todas as pessoas que criaram conta na ferramenta. Novos diagnósticos exigem acesso ativo, pela turma ou individual. Encerrar bloqueia novos diagnósticos; os relatórios já feitos continuam disponíveis para a pessoa.</p></div>
-    <div class="turma-chips">${['todos', 'ativo', 'expirado', 'encerrado', 'sem_acesso', 'evoind'].map(k => `<button data-fac-filtro="${k}" aria-pressed="${F.filtro === k}">${k === 'todos' ? 'Todos' : k === 'evoind' ? 'Evolução individual' : SIT[k][0]} · ${conta(k)}</button>`).join('')}</div>
+    ${pend ? `<div class="msg" role="status"><b>${pend === 1 ? '1 pedido de nova execução' : pend + ' pedidos de nova execução'}</b> ${pend === 1 ? 'aguarda' : 'aguardam'} a sua resposta. ${F.filtro !== 'pedidos' ? '<button type="button" class="link-btn" data-fac-filtro="pedidos">Ver pedidos</button>' : ''}</div>` : ''}
+    <div class="turma-chips">${['todos', 'pedidos', 'ativo', 'limite', 'expirado', 'encerrado', 'sem_acesso'].map(k => `<button data-fac-filtro="${k}" aria-pressed="${F.filtro === k}">${k === 'todos' ? 'Todos' : k === 'pedidos' ? 'Pedidos pendentes' : SIT[k][0]} · ${conta(k)}</button>`).join('')}</div>
     <div class="field" style="max-width:360px"><label for="ps-busca" class="sr-only">Buscar pessoa</label><input id="ps-busca" type="search" placeholder="Buscar por nome ou e-mail" value="${esc(F.busca || '')}"></div>
-    ${lista.length ? `<div class="table-wrap"><table class="heat pessoas"><thead><tr><th>Pessoa</th><th>Turma</th><th>Situação</th><th>Válido até</th><th class="num">Diagnósticos</th><th>Último</th><th>Acesso e evolução individual</th></tr></thead><tbody>${linhas}</tbody></table></div>` : '<p class="muted">Nenhuma pessoa neste filtro.</p>'}
+    ${lista.length ? `<div class="table-wrap"><table class="heat pessoas"><thead><tr><th>Pessoa</th><th>Turma</th><th>Situação</th><th>Válido até</th><th class="num">Execuções</th><th>Última</th><th>Acesso e execuções</th></tr></thead><tbody>${linhas}</tbody></table></div>` : '<p class="muted">Nenhuma pessoa neste filtro.</p>'}
     <p class="small muted">"Liberar até" dá acesso individual até a data escolhida, mesmo sem turma ou com a turma vencida. A data vale até o fim do dia, no horário de Brasília.</p>
-    <p class="small muted">Evolução individual é opcional, para pessoas específicas; a evolução automática segue pela turma, na aba Evolução. Com a evolução individual habilitada, o novo diagnóstico feito a partir da data escolhida é comparado com o último diagnóstico anterior a ela, com ou sem turma. O relatório chega como rascunho, para você revisar, comentar e liberar.</p>
+    <p class="small muted">Cada pessoa tem uma execução. Na turma, uma por etapa: prévia, workshop e 45 dias; entre o workshop e os 45 dias, ninguém executa. Para liberar execuções extras, marque "Permitir nova execução" e defina o limite total. Ao atingir o limite, a permissão é desligada sozinha, e a pessoa pode fazer um novo pedido pelo painel dela.</p>
   </div>`;
 }
 
@@ -3138,15 +3198,19 @@ function viewFacilitador() {
     </div>`;
   return `<main class="page"><div class="wrap stack-lg">
     <div class="stack" style="gap:6px"><span class="eyebrow">Painel do facilitador</span><h1 style="font-size:clamp(28px,5vw,40px)">${F.tab === 'pessoas' ? 'Pessoas e acessos' : F.tab === 'evolucao' ? 'Evolução da turma' : 'Turmas e resultados'}</h1></div>
-    <div class="tabs fac-tabs" role="tablist"><button role="tab" data-fac-tab="resultados" aria-selected="${F.tab === 'resultados'}">Turmas e resultados</button><button role="tab" data-fac-tab="evolucao" aria-selected="${F.tab === 'evolucao'}">Evolução</button><button role="tab" data-fac-tab="pessoas" aria-selected="${F.tab === 'pessoas'}">Pessoas e acessos</button></div>
+    <div class="tabs fac-tabs" role="tablist"><button role="tab" data-fac-tab="resultados" aria-selected="${F.tab === 'resultados'}">Turmas e resultados</button><button role="tab" data-fac-tab="evolucao" aria-selected="${F.tab === 'evolucao'}">Evolução</button><button role="tab" data-fac-tab="pessoas" aria-selected="${F.tab === 'pessoas'}">Pessoas e acessos${pedidosPendentes() ? ` · ${pedidosPendentes()}` : ''}</button></div>
     ${F.tab === 'pessoas' ? viewPessoas() : F.tab === 'evolucao' ? `<div class="stack" style="gap:10px"><span class="small muted">Turma</span><div class="turma-chips">${turmas.map(t => `<button data-turma="${esc(t.id)}" aria-pressed="${F.sel === t.id}">${esc(t.nome)}</button>`).join('') || '<span class="muted small">Crie uma turma na aba Turmas e resultados.</span>'}</div></div>${viewEvolucaoTurma()}` : `
     <div class="card stack">
-      <form id="f-turma" class="inline-form turma-form" novalidate><div class="field"><label for="tm-nome">Nova turma</label><input id="tm-nome" type="text" placeholder="Ex.: Workshop grupo de networking · novembro" required></div><div class="field"><label for="tm-expira">Diagnósticos até</label><input id="tm-expira" type="date" value="${somaDias(hojeBR(), 90)}" min="${hojeBR()}"></div><button class="btn btn-primary btn-sm" type="submit">Criar turma e gerar código</button></form>
+      <form id="f-turma" class="inline-form turma-form" novalidate><div class="field"><label for="tm-nome">Nova turma</label><input id="tm-nome" type="text" placeholder="Ex.: Workshop grupo de networking · novembro" required></div><div class="field"><label for="tm-workshop">Data do workshop</label><input id="tm-workshop" type="date" min="${hojeBR()}"></div><div class="field"><label for="tm-expira">Diagnósticos até</label><input id="tm-expira" type="date" value="${somaDias(hojeBR(), 90)}" min="${hojeBR()}"></div><button class="btn btn-primary btn-sm" type="submit">Criar turma e gerar código</button></form>
+      <label class="check" for="tm-patro"><input id="tm-patro" type="checkbox"><span>Turma patrocinada: uma empresa contratou a avaliação e o desenvolvimento do time.</span></label>
       <label class="check" for="tm-nicho"><input id="tm-nicho" type="checkbox" checked><span>Perguntar o tipo de negócio de cada participante. Indicado para grupos abertos e networking; desligue para turmas de uma mesma empresa.</span></label>
+      <p class="small muted">Etapas da turma: prévia antes do workshop, uma execução no dia do workshop e a reavaliação a partir de 45 dias depois. Entre o workshop e os 45 dias, ninguém executa.</p>
       ${F.newCode ? `<div class="msg msg-ok" role="status">Turma criada. Código de acesso: <span class="code-box">${esc(F.newCode)}</span> <button type="button" class="link-btn" data-copy="${esc(F.newCode)}">Copiar</button></div>` : ''}
     </div>
     <div class="stack" style="gap:10px"><span class="small muted">Turma selecionada${selT ? ` · código <b class="tnum" style="color:var(--ink)">${esc(selT.codigo)}</b> <button type="button" class="link-btn small" data-copy="${esc(selT.codigo)}">copiar</button> · tipo de negócio: <b style="color:var(--ink)">${selT.perguntar_nicho === false ? 'não pergunta' : 'pergunta'}</b> <button type="button" class="link-btn small" data-act="turma-nicho">alterar</button>` : ''}</span><div class="turma-chips">${chips}</div>
-      ${selT ? `<div class="validade-row small"><span class="muted">Diagnósticos desta turma ${selT.expira_em ? (selT.expira_em >= hojeBR() ? 'liberados até' : 'encerrados · último dia') + ` <b style="color:var(--ink)">${fmtDia(selT.expira_em)}</b>` : '<b style="color:var(--ink)">sem prazo</b>'}</span><input type="date" id="tm-expira-sel" aria-label="Nova validade da turma" value="${esc(selT.expira_em || '')}"><button type="button" class="btn btn-quiet btn-sm" data-act="turma-expira">Salvar validade</button>${!selT.expira_em || selT.expira_em >= hojeBR() ? '<button type="button" class="btn btn-quiet btn-sm" data-act="turma-encerrar">Encerrar hoje</button>' : ''}</div>` : ''}</div>
+      ${selT ? `<div class="validade-row small"><span class="muted">Diagnósticos desta turma ${selT.expira_em ? (selT.expira_em >= hojeBR() ? 'liberados até' : 'encerrados · último dia') + ` <b style="color:var(--ink)">${fmtDia(selT.expira_em)}</b>` : '<b style="color:var(--ink)">sem prazo</b>'}</span><input type="date" id="tm-expira-sel" aria-label="Nova validade da turma" value="${esc(selT.expira_em || '')}"><button type="button" class="btn btn-quiet btn-sm" data-act="turma-expira">Salvar validade</button>${!selT.expira_em || selT.expira_em >= hojeBR() ? '<button type="button" class="btn btn-quiet btn-sm" data-act="turma-encerrar">Encerrar hoje</button>' : ''}</div>` : ''}
+      ${selT ? `<div class="validade-row small"><span class="muted">Workshop ${selT.data_workshop ? `em <b style="color:var(--ink)">${fmtDia(selT.data_workshop)}</b>` : '<b style="color:var(--ink)">sem data</b>'}${selT.reavaliar_em ? ` · 45 dias a partir de <b style="color:var(--ink)">${fmtDia(selT.reavaliar_em)}</b>` : ''} · etapa de hoje: <b style="color:var(--ink)">${ETAPA_NOME[etapaTurma(selT, hojeBR())]}</b></span><input type="date" id="tm-workshop-sel" aria-label="Data do workshop" value="${esc(selT.data_workshop || '')}"><button type="button" class="btn btn-quiet btn-sm" data-act="turma-workshop">Salvar data do workshop</button></div>
+      <div class="validade-row small"><span class="muted">Turma <b style="color:var(--ink)">${selT.patrocinada ? 'patrocinada' : 'sem patrocinador'}</b></span><button type="button" class="link-btn small" data-act="turma-patrocinada">${selT.patrocinada ? 'marcar como sem patrocinador' : 'marcar como patrocinada'}</button></div>` : ''}</div>
     ${F.results === null ? '<p class="muted">Carregando…</p>' : modoChips + body}`}
   </div></main>`;
 }
@@ -3203,14 +3267,14 @@ document.addEventListener('click', async (ev) => {
     }
     return;
   }
-  if (t.dataset.evoOpen) { const e = [...(S.fac.evos || []), ...(S.fac.evosInd || [])].find(x => x.id === t.dataset.evoOpen); if (e) { S.evo = { ev: e, from: 'fac' }; go('evolucao'); } return; }
+  if (t.dataset.evoOpen) { const e = (S.fac.evos || []).find(x => x.id === t.dataset.evoOpen); if (e) { S.evo = { ev: e, from: 'fac' }; go('evolucao'); } return; }
   if (t.dataset.evoMine) { const e = (S.minhasEvos || []).find(x => x.id === t.dataset.evoMine); if (e) { S.evo = { ev: e, from: 'painel' }; go('evolucao'); } return; }
   if (t.dataset.facFiltro) { S.fac.filtro = t.dataset.facFiltro; render(); return; }
   if (t.dataset.turma) { S.fac.sel = t.dataset.turma; S.fac.results = null; S.fac.evos = null; S.fac.newCode = null; render(); try { S.fac.results = await store.turmaResults(S.fac.sel); } catch (e) { S.fac.results = []; toast(e.message); } if (S.fac.tab === 'evolucao') await loadEvos(); render(); return; }
   const act = t.dataset.act;
   if (act === 'criar') { S.authTab = 'criar'; S.authMsg = null; go('entrar'); }
   else if (act === 'esqueci') { S.authTab = 'esqueci'; S.authMsg = null; render(); }
-  else if (act === 'sair') { await store.signOut(); S.session = null; S.result = null; S.quiz = null; S.fac = { turmas: null, sel: null, results: null, newCode: null, tab: 'resultados', pessoas: null, filtro: 'todos', busca: '', evos: null }; S.acesso = null; S.evo = null; S.reav = null; S.minhasEvos = null; go('inicio'); }
+  else if (act === 'sair') { await store.signOut(); S.session = null; S.result = null; S.quiz = null; S.fac = { turmas: null, sel: null, results: null, newCode: null, tab: 'resultados', pessoas: null, filtro: 'todos', busca: '', evos: null }; S.acesso = null; S.evo = null; S.reav = null; S.minhasEvos = null; S.pedido = null; go('inicio'); }
   else if (act === 'fac-demo') { S.session = await store.signInFacilitatorDemo(); go('facilitador'); }
   else if (act === 'qz-start') { quizStart(); }
   else if (act === 'qz-back') { const q = S.quiz; if (q.step === 1 && q.negocio) { q.step = 0; q.phase = 'negocio'; } else q.step = Math.max(0, q.step - 1); saveDraft(); render(); }
@@ -3240,24 +3304,40 @@ document.addEventListener('click', async (ev) => {
     const id = t.dataset.user; const x = (S.fac.pessoas || []).find(p => p.id === id); if (!x) return;
     try { await store.definirAcesso(id, t.dataset.ate, x.acesso_bloqueado); await loadPessoas(); render(); toast('Acesso liberado até ' + fmtDia(t.dataset.ate)); } catch (e) { toast(e.message); }
   }
-  else if (act === 'evoind-editar') { S.fac.evoIndEdit = t.dataset.user; render(); document.querySelector(`[data-reav="${CSS.escape(t.dataset.user)}"]`)?.focus(); }
-  else if (act === 'evoind-cancelar') { S.fac.evoIndEdit = null; render(); }
-  else if (act === 'evoind-salvar' || act === 'evoind-limpar') {
-    const id = t.dataset.user;
-    const data = act === 'evoind-limpar' ? null : (document.querySelector(`[data-reav="${CSS.escape(id)}"]`)?.value || null);
-    if (act === 'evoind-salvar' && !data) { toast('Escolha a data de reavaliação'); return; }
-    const evo = (S.fac.evosInd || []).find(e => e.user_id === id);
-    if (act === 'evoind-limpar' && !confirm(evo && evo.status === 'liberado' ? 'Desativar a evolução individual? O relatório já liberado continua com a pessoa.' : 'Desativar a evolução individual desta pessoa?' + (evo ? ' O rascunho do relatório é descartado.' : ''))) return;
-    try {
-      const n = await store.definirReavaliacaoIndividual(id, data);
-      S.fac.evoIndEdit = null; await loadPessoas(); render();
-      toast(!data ? 'Evolução individual desativada' : n ? 'Evolução individual habilitada. O relatório está pronto para a sua revisão' : 'Evolução individual a partir de ' + fmtDia(data));
-    } catch (e) { toast(e.message); }
+  else if (act === 'exec-salvar') {
+    const id = t.dataset.user; const x = (S.fac.pessoas || []).find(p => p.id === id); if (!x) return;
+    const nova = Boolean(document.querySelector(`[data-nova="${CSS.escape(id)}"]`)?.checked);
+    const lim = parseInt(document.querySelector(`[data-lim="${CSS.escape(id)}"]`)?.value || '0', 10);
+    if (nova && !(lim > (x.diagnosticos || 0))) { toast(`O limite precisa ser maior que ${x.diagnosticos || 0}, o número de execuções já feitas.`); return; }
+    try { await store.definirExecucoes(id, nova, nova ? lim : null); await loadPessoas(); render(); toast(nova ? `Nova execução liberada · limite total ${lim}` + (x.acesso_ate && x.acesso_ate >= hojeBR() ? '' : '. Defina também a data em "Liberar até"') : 'Nova execução desligada'); } catch (e) { toast(e.message); }
+  }
+  else if (act === 'pedido-liberar' || act === 'pedido-recusar') {
+    const id = t.dataset.user; const x = (S.fac.pessoas || []).find(p => p.id === id); if (!x) return;
+    const q = sel => document.querySelector(`[${sel}="${CSS.escape(id)}"]`);
+    const resposta = (q('data-resp')?.value || '').trim();
+    const aprovar = act === 'pedido-liberar';
+    const lim = parseInt(q('data-plim')?.value || '0', 10); const ate = q('data-pate')?.value || null;
+    if (aprovar && !(lim > (x.diagnosticos || 0))) { toast(`O limite precisa ser maior que ${x.diagnosticos || 0}, o número de execuções já feitas.`); return; }
+    if (aprovar && (!ate || ate < hojeBR())) { toast('Escolha uma data de hoje em diante'); return; }
+    if (!aprovar && !resposta && !confirm('Recusar sem resposta? A pessoa vê apenas que o pedido foi recusado.')) return;
+    try { await store.decidirPedido(t.dataset.pedido, aprovar, resposta, aprovar ? lim : null, aprovar ? ate : null); await loadPessoas(); render(); toast(aprovar ? `Nova execução liberada para ${x.nome || 'a pessoa'}` : 'Pedido recusado'); } catch (e) { toast(e.message); }
   }
   else if (act === 'turma-expira' || act === 'turma-encerrar') {
     const tm = (S.fac.turmas || []).find(x => x.id === S.fac.sel); if (!tm) return;
     const v = act === 'turma-encerrar' ? somaDias(hojeBR(), -1) : ($('#tm-expira-sel')?.value || null);
     try { await store.updateTurma(tm.id, { expira_em: v }); S.fac.turmas = await store.listTurmas(); S.fac.pessoas = null; render(); toast(act === 'turma-encerrar' ? 'Diagnósticos da turma encerrados' : v ? 'Turma liberada até ' + fmtDia(v) : 'Turma sem prazo'); } catch (e) { toast(e.message); }
+  }
+  else if (act === 'turma-workshop') {
+    const tm = (S.fac.turmas || []).find(x => x.id === S.fac.sel); if (!tm) return;
+    const w = $('#tm-workshop-sel')?.value || null;
+    const patch = { data_workshop: w };
+    if (w && (!tm.reavaliar_em || (tm.data_workshop && tm.reavaliar_em === somaDias(tm.data_workshop, 45)))) patch.reavaliar_em = somaDias(w, 45);
+    if (w && tm.expira_em && tm.expira_em < somaDias(w, 60)) patch.expira_em = somaDias(w, 60);
+    try { await store.updateTurma(tm.id, patch); S.fac.turmas = await store.listTurmas(); await loadPessoas(); render(); toast(w ? 'Workshop em ' + fmtDia(w) + (patch.reavaliar_em ? ' · 45 dias a partir de ' + fmtDia(patch.reavaliar_em) : '') : 'Data do workshop removida'); } catch (e) { toast(e.message); }
+  }
+  else if (act === 'turma-patrocinada') {
+    const tm = (S.fac.turmas || []).find(x => x.id === S.fac.sel); if (!tm) return;
+    try { await store.updateTurma(tm.id, { patrocinada: !tm.patrocinada }); S.fac.turmas = await store.listTurmas(); render(); toast(tm.patrocinada ? 'Turma sem patrocinador' : 'Turma patrocinada'); } catch (e) { toast(e.message); }
   }
   else if (act === 'turma-nicho') {
     const tm = (S.fac.turmas || []).find(x => x.id === S.fac.sel); if (!tm) return;
@@ -3282,7 +3362,7 @@ document.addEventListener('click', async (ev) => {
     if (act === 'evo-recolher') { patch.status = 'rascunho'; patch.liberado_em = null; }
     try {
       const novo = await store.updateEvolucao(ev.id, patch);
-      if (novo) { S.evo.ev = novo; S.fac.evos = (S.fac.evos || []).map(x => x.id === novo.id ? novo : x); S.fac.evosInd = (S.fac.evosInd || []).map(x => x.id === novo.id ? novo : x); }
+      if (novo) { S.evo.ev = novo; S.fac.evos = (S.fac.evos || []).map(x => x.id === novo.id ? novo : x); }
       render(); toast(act === 'evo-liberar' ? 'Relatório liberado para ' + (ev.nome || 'a pessoa') : act === 'evo-recolher' ? 'Relatório recolhido para rascunho' : 'Comentário salvo');
     } catch (e) { toast(e.message); }
   }
@@ -3373,10 +3453,21 @@ document.addEventListener('submit', async (ev) => {
       if (r.status !== 'ok') { render(); return msg(msgCodigo(r)); }
       await loadAcesso(); render(); toast('Acesso liberado · turma ' + r.nome);
     } catch (e) { S.busy = false; render(); msg(e.message); }
+  } else if (f.id === 'f-pedido') {
+    const motivo = ($('#pd-motivo')?.value || '').trim();
+    const pmsg = m => { const el = $('#pd-msg'); if (el) el.innerHTML = `<div class="msg msg-err" role="alert">${esc(m)}</div>`; };
+    if (motivo.length < 10) return pmsg('Conte em poucas palavras por que você quer fazer um novo diagnóstico.');
+    S.busy = true; S.pedidoRascunho = motivo; render();
+    try { S.pedido = await store.pedirExecucao(motivo); S.pedidoRascunho = ''; S.busy = false; render(); toast('Pedido enviado para ' + AUTOR); }
+    catch (e) { S.busy = false; render(); pmsg(e.message); }
   } else if (f.id === 'f-turma') {
     const nome = val('tm-nome');
     if (!nome.trim()) { toast('Dê um nome para a turma'); return; }
-    try { const t = await store.createTurma(nome, $('#tm-nicho')?.checked !== false, $('#tm-expira')?.value || null); S.fac.newCode = t.codigo; S.fac.sel = t.id; S.fac.turmas = await store.listTurmas(); S.fac.results = await store.turmaResults(t.id); render(); }
+    const w = $('#tm-workshop')?.value || null; let expira = $('#tm-expira')?.value || null;
+    if (w && expira && expira < somaDias(w, 60)) expira = somaDias(w, 60);
+    const extra = { patrocinada: Boolean($('#tm-patro')?.checked) };
+    if (w) { extra.data_workshop = w; extra.reavaliar_em = somaDias(w, 45); }
+    try { const t = await store.createTurma(nome, $('#tm-nicho')?.checked !== false, expira, extra); S.fac.newCode = t.codigo; S.fac.sel = t.id; S.fac.turmas = await store.listTurmas(); S.fac.results = await store.turmaResults(t.id); render(); }
     catch (e) { toast(e.message); }
   }
 });
