@@ -8,5 +8,5 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.endsWith('config.js')) return;
   // Páginas e scripts do próprio site sempre conferem a versão no servidor, para cada publicação aparecer na hora.
   const fresco = e.request.mode === 'navigate' || /\.(html|js|webmanifest)$/.test(url.pathname) || url.pathname.endsWith('/');
-  e.respondWith((fresco ? fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' }) : fetch(e.request)).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return r; }).catch(() => caches.match(e.request).then(m => m || caches.match('./index.html'))));
+  e.respondWith((fresco ? fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' }).then(r => r.redirected ? fetch(e.request) : r) : fetch(e.request)).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return r; }).catch(() => caches.match(e.request).then(m => m || caches.match('./index.html'))));
 });
