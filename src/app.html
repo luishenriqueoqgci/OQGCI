@@ -1797,7 +1797,7 @@ function viewDiagnostico() {
     const n = q.negocio || {};
     return `<main class="quiz wrap"><div class="stack-lg">
       <div class="stack" style="gap:10px"><span class="eyebrow">Sobre o seu negócio</span><h1 style="font-size:clamp(28px,5vw,38px)">Conte o que você vende</h1>
-      <p class="muted">Com isso, o diagnóstico usa a linguagem do seu mercado e traz exemplos e frases prontas para o seu tipo de negócio.</p></div>
+      <p class="muted">Com isso, o diagnóstico se adapta ao seu tipo de negócio e personaliza a sua experiência.</p></div>
       <div class="card stack">
         <div class="field"><span class="field-label">Tipo de negócio</span><div class="seg-grid" role="radiogroup" aria-label="Tipo de negócio">${SEGMENTS.map(sg => `<button type="button" class="seg" role="radio" data-seg="${sg.id}" aria-checked="${n.segmento === sg.id}" aria-pressed="${n.segmento === sg.id}">${sg.nome}</button>`).join('')}</div></div>
         <div class="field"><span class="field-label">Como a maioria dos seus clientes compra de você?</span><div class="modo-grid" role="radiogroup" aria-label="Como a maioria dos seus clientes compra">${MODOS.map(m => `<button type="button" class="modo" role="radio" data-modo="${m.id}" aria-checked="${n.modo === m.id}" aria-pressed="${n.modo === m.id}"><strong>${m.nome}</strong><span>${m.sub}</span></button>`).join('')}</div>
