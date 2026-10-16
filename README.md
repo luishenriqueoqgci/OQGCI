@@ -8,10 +8,11 @@ Aplicação web do Diagnóstico OQGCI (Metodologia OQGCI): página de entrada, r
 | --- | --- |
 | `src/app.html` | Código da aplicação (fonte única) |
 | `build.py` | Gera `public/index.html` e a prévia a partir de `src/app.html` |
-| `public/` | O site publicado pelo Netlify |
+| `public/` | O site publicado pelo GitHub Pages |
 | `public/config.js` | Endereço e chave pública do Supabase. Vazio = modo demonstração |
 | `supabase/schema.sql` | Tabelas, regras de acesso e funções do banco |
-| `netlify.toml` | Configuração de publicação |
+| `.github/workflows/pages.yml` | Publicação automática no GitHub Pages a cada envio ao ramo `main` |
+| `netlify/` e `netlify.toml` | Função de servidor da leitura da história por IA (opcional, hospedagem à parte) |
 
 ## Publicação gratuita, passo a passo
 
@@ -19,27 +20,26 @@ Aplicação web do Diagnóstico OQGCI (Metodologia OQGCI): página de entrada, r
 1. Crie uma conta em supabase.com e um novo projeto (região South America, São Paulo).
 2. Abra **SQL Editor > New query**, cole o conteúdo de `supabase/schema.sql` e clique em **Run**.
 3. Em **Project Settings > API**, copie o **Project URL** e a chave **anon public**.
-4. Em **Authentication > URL Configuration**, preencha **Site URL** com o endereço do site no Netlify (passo 2) e adicione o mesmo endereço em **Redirect URLs**.
+4. Em **Authentication > URL Configuration**, preencha **Site URL** com o endereço do site no GitHub Pages (passo 2) e adicione o mesmo endereço em **Redirect URLs**.
 
-### 2. Netlify (site)
-1. Crie uma conta em netlify.com entrando com o GitHub.
-2. **Add new site > Import an existing project > GitHub** e escolha o repositório `diagnostico-oqgci`.
-3. Deixe o comando de build vazio e a pasta de publicação como `public`. Clique em **Deploy**.
-4. Em **Site configuration > Change site name**, use `diagnostico-oqgci` para ter o endereço `diagnostico-oqgci.netlify.app`.
+### 2. GitHub Pages (site)
+1. No repositório, abra **Settings > Pages** e escolha **GitHub Actions** como fonte.
+2. O fluxo `.github/workflows/pages.yml` publica a pasta `public` a cada envio ao ramo `main`.
+3. O endereço fica no formato `https://luishenriqueoqgci.github.io/OQGCI/`.
 
 ### 3. Ligar os dois
 1. Preencha `public/config.js` com o Project URL e a chave anon public.
-2. Ao salvar no GitHub, o Netlify publica a nova versão sozinho.
+2. Ao salvar no GitHub, o GitHub Pages publica a nova versão sozinho.
 3. Crie a sua conta no site e, no SQL Editor do Supabase, rode:
    `update public.profiles set role = 'facilitador' where email = 'seu-email';`
 4. Entre de novo no site: o menu **Facilitador** aparece.
 
 ### 4. Domínio próprio (quando quiser)
-No Netlify, **Domain management > Add a domain**. Depois, atualize o Site URL no Supabase com o novo endereço.
+Em **Settings > Pages > Custom domain**, informe o domínio e configure o DNS. Depois, atualize o Site URL no Supabase com o novo endereço.
 
 ### 5. Leitura da história por IA (opcional)
 1. Crie uma chave no Console do Claude (console.anthropic.com). O uso da API é cobrado à parte da assinatura do Claude; os planos Max e Team incluem créditos mensais de API.
-2. No Netlify, em **Site configuration > Environment variables**, crie `ANTHROPIC_API_KEY`, `SUPABASE_URL` e `SUPABASE_ANON_KEY`.
+2. Publique a função da pasta `netlify/` num serviço que rode funções de servidor (o GitHub Pages só publica páginas) e crie nele as variáveis `ANTHROPIC_API_KEY`, `SUPABASE_URL` e `SUPABASE_ANON_KEY`.
 3. Em `public/config.js`, troque `leituraIA: false` por `leituraIA: true`.
 Sem isso, o relatório mostra a história com um roteiro de autoleitura.
 
