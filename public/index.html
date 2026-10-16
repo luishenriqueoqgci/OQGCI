@@ -2213,7 +2213,7 @@ function viewResultado() {
 
   const situacoes = pk.sjt.map((s, k) => {
     const ch = sjt[s.id]; const mine = s.ops.find(o => o.k === ch); const best = s.ops.find(o => o.k === 'assertiva'); const W = pk.why[s.id];
-    const fraseLabel = rec.respostas?.negocio?.segmento ? 'Como soaria no seu negócio' : 'Como dizer com as suas palavras';
+    const fraseLabel = 'Um jeito de dizer';
     const body = !ch ? '' : ch === 'assertiva'
       ? `<p class="small"><span class="muted">Sua resposta:</span> ${esc(V(mine.t, voc))}</p>
          <div class="why ok"><span class="eyebrow">Por que ela funciona</span><p>${esc(V(W.why, voc))}</p></div>`
@@ -2436,7 +2436,7 @@ async function buildPDF(rec) {
     if (mine) para(`Sua resposta: ${V(mine.t, voc)}`, 9, 'normal', C.ink2, CW, M, 0.5);
     if (ch && ch !== 'assertiva') { para(`O que acontece com essa resposta: ${V(W[ch], voc)}`, 9, 'normal', C.ink2, CW, M, 0.5); para(`A resposta que sustenta o valor: ${V(best.t, voc)}`, 9, 'bold', C.ink, CW, M, 0.5); }
     para(`Por que ela funciona: ${V(W.why, voc)}`, 9, 'normal', C.ink, CW, M, 0.5);
-    para(`${rec.respostas?.negocio?.segmento ? 'Como soaria no seu negócio' : 'Como dizer'}: "${V(W.frase, voc)}"`, 9, 'italic', C.warm, CW, M, 0.5);
+    para(`Um jeito de dizer: "${V(W.frase, voc)}"`, 9, 'italic', C.warm, CW, M, 0.5);
     y += 3.5;
   });
 
