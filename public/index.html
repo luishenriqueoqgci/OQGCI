@@ -422,6 +422,18 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .evo-ponto.on { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
 .evo-ponto.on b { color: var(--ink); }
 .evo-grupo { display: grid; gap: 8px; }
+.patro-q { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; }
+.patro-q legend { font-weight: 600; font-size: 15px; line-height: 1.45; margin-bottom: 8px; padding: 0; }
+.patro-q + .patro-q { border-top: 1px solid var(--line); padding-top: 16px; }
+.patro-ops { display: grid; gap: 8px; }
+.patro-escala { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill-radio { position: relative; }
+.pill-radio input { position: absolute; opacity: 0; pointer-events: none; }
+.pill-radio span { display: inline-block; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+.pill-radio input:checked + span { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--ink); font-weight: 600; }
+.pill-radio input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.h-sub { font-size: 16px; font-weight: 600; }
+tr.row-hl td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .evo-grupo-h { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .evo-sits { display: grid; gap: 0; }
 .evo-sit { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
@@ -1475,11 +1487,85 @@ function seedExamples() {
   ];
 }
 
+// Questionário do patrocinador (aprovado em 16/10/2026): contexto do time, o que ele vê no time e dores do negócio.
+const PATRO_CTX = [
+  { id: 'C2', t: 'Qual é o tipo de negócio?', ops: SEGMENTS.map(x => [x.id, x.nome]) },
+  { id: 'C3', t: 'Como o seu cliente compra, na maior parte das vendas?', ops: [['conversa', 'Conversando com alguém do time'], ['contato', 'Escolhendo sozinho, diante de produtos, cardápio, loja ou site'], ['ambos', 'Os dois, na mesma proporção']] },
+  { id: 'C4', t: 'Quanto tempo passa, em média, entre o primeiro contato e a decisão do cliente?', ops: [['dia', 'No mesmo dia'], ['semana', 'Até uma semana'], ['mes', 'De uma a quatro semanas'], ['mais', 'Mais de um mês']] },
+  { id: 'C5', t: 'Qual é o valor médio de uma venda?', ops: [['ate200', 'Até R$ 200'], ['ate1000', 'De R$ 200 a R$ 1.000'], ['ate10000', 'De R$ 1.000 a R$ 10.000'], ['acima', 'Acima de R$ 10.000']] },
+  { id: 'C6', t: 'Quantas pessoas participam da decisão, do lado do cliente?', ops: [['1', 'Uma'], ['2', 'Duas'], ['3', 'Três ou mais']] },
+  { id: 'C7', t: 'De onde vem a maior parte dos clientes novos?', ops: [['indicacao', 'Indicação'], ['redes', 'Redes sociais e conteúdo'], ['anuncios', 'Anúncios'], ['ponto', 'Movimento do ponto físico'], ['prospeccao', 'Prospecção ativa do time']] }
+];
+const PATRO_ITENS = {
+  conversa: [
+    ['P1', 'D1', 0, 'O time recomenda ao cliente o que resolve o caso dele, mesmo quando é a opção mais barata.'],
+    ['P2', 'D1', 1, 'O time empurra o que dá mais margem ou bate a meta, mesmo quando não é o melhor para o cliente.'],
+    ['P3', 'D2', 0, 'O cliente novo chega já confiando no time, por indicação, conteúdo ou avaliações.'],
+    ['P4', 'D2', 1, 'O cliente novo chega sem saber nada sobre nós e precisa ser convencido do zero.'],
+    ['P5', 'D3', 0, 'Antes de apresentar produto ou preço, o time pergunta e entende a situação do cliente.'],
+    ['P6', 'D3', 1, 'O time abre a conversa apresentando produto, catálogo ou tabela de preços.'],
+    ['P7', 'D4', 0, 'O time mostra ao cliente algo sobre o problema dele que ele ainda não tinha percebido.'],
+    ['P8', 'D4', 1, 'O time responde só ao que o cliente pergunta.'],
+    ['P9', 'D5', 0, 'O time ajuda o cliente a enxergar o que ele perde ao adiar a decisão.'],
+    ['P10', 'D5', 1, 'O cliente sai da conversa achando que pode decidir depois, sem perder nada.'],
+    ['P11', 'D6', 0, 'O time recomenda uma opção com clareza e combina o próximo passo antes de encerrar.'],
+    ['P12', 'D6', 1, 'O time apresenta muitas opções e deixa o cliente escolher sozinho.'],
+    ['P13', 'D7', 0, 'O time identifica quem mais participa da decisão do cliente e fala com o ganho de cada um.'],
+    ['P14', 'D7', 1, 'Vendas param porque alguém que o time não conhecia vetou a compra.'],
+    ['P15', 'D8', 0, 'Diante de um pedido de desconto, o time mantém o preço e ajusta formato, prazo ou condição.'],
+    ['P16', 'D8', 1, 'O time concede desconto para fechar mais rápido.']
+  ],
+  contato: [
+    ['P1', 'D1', 0, 'O que fica à vista ajuda o cliente a escolher o que resolve o caso dele, mesmo quando é a opção mais barata.'],
+    ['P2', 'D1', 1, 'O que fica em destaque é o que dá mais margem, mesmo quando não é o melhor para o cliente.'],
+    ['P3', 'D2', 0, 'O cliente novo chega já confiando no negócio, por indicação, conteúdo ou avaliações.'],
+    ['P4', 'D2', 1, 'O cliente novo chega sem saber nada sobre nós e precisa ser convencido do zero.'],
+    ['P5', 'D3', 0, 'Antes de mostrar produtos e preços, o atendimento procura entender o que o cliente procura.'],
+    ['P6', 'D3', 1, 'O cliente recebe catálogo, cardápio ou tabela de preços antes de qualquer pergunta.'],
+    ['P7', 'D4', 0, 'O que o cliente encontra mostra algo sobre a escolha dele que ele ainda não sabia.'],
+    ['P8', 'D4', 1, 'Os pontos de contato só descrevem produtos e preços.'],
+    ['P9', 'D5', 0, 'Fica claro para o cliente o que ele perde ao deixar a compra para depois ou escolher outro lugar.'],
+    ['P10', 'D5', 1, 'O cliente sai achando que pode comprar depois ou em outro lugar, sem perder nada.'],
+    ['P11', 'D6', 0, 'O cliente encontra uma sugestão clara e um próximo passo para comprar ou voltar.'],
+    ['P12', 'D6', 1, 'O cliente encontra muitas opções e escolhe sozinho, sem orientação.'],
+    ['P13', 'D7', 0, 'O time percebe quem acompanha o cliente na escolha e fala com o que importa para cada um.'],
+    ['P14', 'D7', 1, 'Vendas se perdem porque quem acompanha o cliente não foi considerado.'],
+    ['P15', 'D8', 0, 'Diante de um pedido de desconto, o time mantém o preço e oferece uma vantagem ligada à recompra.'],
+    ['P16', 'D8', 1, 'O time concede desconto para não perder a venda.']
+  ]
+};
+const PATRO_DORES = [
+  { id: 1, t: 'Os clientes acham caro, e o time cede desconto para fechar.', dims: ['D5', 'D8'], modulo: 'Módulos 4.6 e 4.8, com a prática de preço e desconto no Módulo 5',
+    jogo: 'Cada desconto concedido para fechar sai direto da margem e ensina o cliente a negociar na próxima compra. O pedido de desconto costuma aparecer quando o cliente ainda não enxergou o custo de continuar com o problema.' },
+  { id: 2, t: 'Muitos orçamentos ficam sem resposta, e os clientes somem.', dims: ['D6', 'D8'], modulo: 'Módulos 4.7 e 4.8',
+    jogo: 'Orçamento sem resposta é venda parada no meio do caminho. O cliente costuma travar por medo de escolher errado e por falta de um próximo passo combinado.' },
+  { id: 3, t: 'O cliente demora a decidir e adia a compra.', dims: ['D5', 'D6'], modulo: 'Módulos 4.6 e 4.7',
+    jogo: 'Decisão adiada alonga o ciclo e esfria o interesse. O cliente adia quando não enxerga o que perde ao ficar como está e quando a recomendação chega sem um caminho claro.' },
+  { id: 4, t: 'O time disputa por preço, sem mostrar diferença em relação à concorrência.', dims: ['D3', 'D4'], modulo: 'Módulo 1 e Módulos 4.3 e 4.4',
+    jogo: 'Sem diferença percebida, o preço vira o único critério de escolha. A diferença aparece quando o time entende o caso do cliente e leva a ele uma leitura nova sobre o próprio problema.' },
+  { id: 5, t: 'Os clientes compram menos do que poderiam.', dims: ['D3', 'D4'], modulo: 'Módulos 4.3 e 4.4',
+    jogo: 'Ticket abaixo do potencial costuma vir de conversas que apresentam o produto antes de conhecer a situação completa do cliente.' },
+  { id: 6, t: 'Poucos clientes novos chegam por indicação.', dims: ['D1', 'D2'], modulo: 'Módulos 4.1 e 4.2',
+    jogo: 'Indicação nasce da confiança na intenção de quem vendeu. Clientes indicam quem os orientou bem, inclusive quando isso significou uma venda menor.' },
+  { id: 7, t: 'A venda trava quando outra pessoa participa da decisão.', dims: ['D7'], modulo: 'Módulo 4.5',
+    jogo: 'Quem não participou da conversa tende a dizer não ou a adiar. O time precisa saber quem decide junto e preparar o cliente para levar os argumentos certos.' },
+  { id: 8, t: 'O cliente compra uma vez e não volta.', dims: ['D1', 'D6'], modulo: 'Módulos 4.1 e 4.7',
+    jogo: 'A recompra depende de uma recomendação que tenha resolvido o caso do cliente e de um próximo passo combinado depois da compra.' },
+  { id: 9, t: 'O resultado depende de poucas pessoas do time, sem um jeito comum de vender.', dims: ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8'], modulo: 'Módulo 3 e Módulo 7, com o plano de cada pessoa',
+    jogo: 'Sem um jeito comum de conduzir a venda, o resultado oscila com quem atende. Um método compartilhado torna o desempenho replicável e mensurável.' },
+  { id: 10, t: 'A previsão de vendas erra com frequência.', dims: ['D6', 'D7'], modulo: 'Módulos 4.5 e 4.7',
+    jogo: 'A previsão erra quando o time não sabe quem decide nem qual é o próximo passo combinado com cada cliente.' }
+];
+const PATRO_METRICAS = [['conversao', 'Taxa de conversão de orçamentos em vendas'], ['ticket', 'Ticket médio'], ['desconto', 'Desconto médio concedido'], ['ciclo', 'Tempo entre o primeiro contato e a decisão'], ['indicacao', 'Clientes novos por indicação'], ['recompra', 'Taxa de recompra'], ['outro', 'Outro indicador']];
+const PATRO_ETAPAS = [['previa', 'Prévia'], ['workshop', 'Workshop'], ['reavaliacao', '45 dias']];
+const PATRO_MIN = 5;
+const modoPatro = r => r?.C3 === 'contato' ? 'contato' : 'conversa';
+
 function DemoStore() {
   const KEY = 'oqgci-demo-v1';
   let db = LS.get(KEY);
   if (db && db.v === 1) { db.results = [...db.results.filter(x => !x.exemplo), ...seedExamples()]; db.v = 2; }
-  if (!db || ![2, 3, 4].includes(db.v)) {
+  if (!db || ![2, 3, 4, 5].includes(db.v)) {
     db = { v: 2, users: [], session: null, results: seedExamples(), turmas: [{ id: 'turma-exemplo', nome: 'Exemplo · Workshop de vendas', codigo: 'OQG-DEMO', created_at: new Date().toISOString(), exemplo: true }] };
   }
   if (db.v === 2 || db.v === 3) {
@@ -1488,6 +1574,19 @@ function DemoStore() {
     db.results = [...db.results.filter(r => !r.exemplo || (r.turma_id !== ev.turma.id && r.user_id !== 'ex-user-16')), ...ev.results];
     db.evolucoes = [...(db.evolucoes || []).filter(e => !e.exemplo), ...ev.evolucoes]; db.v = 4;
   }
+  if (db.v === 4) {
+    // Patrocinador de exemplo da turma com reavaliação: entra com patrocinador@demo e a senha patrocinador.
+    db.users = (db.users || []).filter(u => u.id !== 'ex-patro');
+    db.users.push({ id: 'ex-patro', nome: 'Patrocinador de exemplo', email: 'patrocinador@demo', pw: hashStr('patrocinador'), role: 'respondente', created_at: new Date().toISOString(), turma_id: null, acesso_ate: null, acesso_bloqueado: false, exemplo: true });
+    const t = db.turmas.find(x => x.id === 'turma-evolucao'); if (t) { t.patrocinada = true; t.patrocinador_id = 'ex-patro'; }
+    const itens = Object.fromEntries(PATRO_ITENS.conversa.map(([id, , inv], k) => [id, String(inv ? [2, 3, 2, 2, 3, 2, 3, 2][k >> 1] : [4, 3, 2, 2, 2, 3, 2, 2][k >> 1])]));
+    db.patrocinios = { 'turma-evolucao': { turma_id: 'turma-evolucao', user_id: 'ex-patro', created_at: new Date(Date.now() - 52 * 86400000).toISOString(), updated_at: new Date(Date.now() - 52 * 86400000).toISOString(),
+      respostas: { C1: '6', C2: 'servicos', C3: 'conversa', C4: 'mes', C5: 'ate10000', C6: '2', C7: 'indicacao', ...itens, D1: ['1', '2', '7'], D2: '1', D3: 'desconto', D3_atual: '12%', D3_meta: '5%', D4: 'Um cliente pediu desconto de 15% para fechar um contrato anual. O vendedor concedeu na hora, sem entender o motivo, e o cliente pediu mais 5% na assinatura. Fechamos com margem negativa no primeiro trimestre.', D5: 'Quero ver o time sustentando o preço e mostrando o custo de não resolver o problema.' } } };
+    const ts = t ? db.results : [];
+    db.relPatro = t ? [['previa', 'liberado', ''], ['workshop', 'liberado', 'O time saiu do workshop com a pergunta antes da apresentação. O foco agora é sustentar o preço nos próximos 45 dias.'], ['reavaliacao', 'rascunho', '']].map(([e, st, com]) => ({ id: 'rp-' + e, turma_id: t.id, etapa: e, dados: dadosRelPatro(t, ts, e), comentario: com || null, status: st, gerado_em: new Date().toISOString(), liberado_em: st === 'liberado' ? new Date().toISOString() : null, exemplo: true })) : [];
+    db.v = 5;
+  }
+  db.patrocinios = db.patrocinios || {}; db.relPatro = db.relPatro || [];
   db.evolucoes = db.evolucoes || [];
   const save = () => LS.set(KEY, db);
   save();
@@ -1599,6 +1698,22 @@ function DemoStore() {
       save(); return rec;
     },
     async listEvolucoes(turmaId) { return db.evolucoes.filter(e => e.turma_id === turmaId).map(juntar).filter(e => e.inicial && e.reavaliacao); },
+    async minhasTurmasPatrocinadas() { return db.turmas.filter(t => t.patrocinada && t.patrocinador_id === db.session).map(t => ({ id: t.id, nome: t.nome, data_workshop: t.data_workshop || null, reavaliar_em: t.reavaliar_em || null, respondido_em: db.patrocinios[t.id]?.updated_at || null })); },
+    async definirPatrocinador(turmaId, email) {
+      const t = db.turmas.find(x => x.id === turmaId); if (!t) return { status: 'nao_encontrado' };
+      if (!email) { t.patrocinador_id = null; save(); return { status: 'removido' }; }
+      const u = db.users.find(x => x.email === email.trim().toLowerCase()); if (!u) return { status: 'nao_encontrado' };
+      t.patrocinador_id = u.id; t.patrocinada = true; save(); return { status: 'ok', nome: u.nome, email: u.email };
+    },
+    async patrocinadorDe(userId) { const u = userOf(userId); return u ? { nome: u.nome, email: u.email } : null; },
+    async getPatrocinio(turmaId) { const fac = userOf(db.session)?.role === 'facilitador'; return { respostas: db.patrocinios[turmaId] || null, relatorios: db.relPatro.filter(r => r.turma_id === turmaId && (fac || r.status === 'liberado')) }; },
+    async salvarPatrocinio(turmaId, respostas) { const agora = new Date().toISOString(); db.patrocinios[turmaId] = { turma_id: turmaId, user_id: db.session, respostas, created_at: db.patrocinios[turmaId]?.created_at || agora, updated_at: agora }; save(); return db.patrocinios[turmaId]; },
+    async salvarRelatorioPatro(turmaId, etapa, dados) {
+      let r = db.relPatro.find(x => x.turma_id === turmaId && x.etapa === etapa);
+      if (!r) { r = { id: uid(), turma_id: turmaId, etapa, comentario: null }; db.relPatro.push(r); }
+      Object.assign(r, { dados, status: 'rascunho', gerado_em: new Date().toISOString(), liberado_em: null }); save(); return r;
+    },
+    async atualizarRelatorioPatro(id, patch) { const r = db.relPatro.find(x => x.id === id); if (r) { Object.assign(r, patch); save(); } return r; },
     async listEvolucoesIndividuais() { return db.evolucoes.filter(e => tipoEvo(e) === 'individual').map(juntar).filter(e => e.inicial && e.reavaliacao); },
     async resultadosDe(userId) { return db.results.filter(r => r.user_id === userId).sort((a, b) => a.created_at.localeCompare(b.created_at)); },
     async updateEvolucao(id, patch) { const e = db.evolucoes.find(x => x.id === id); if (e) { Object.assign(e, patch); save(); } return e ? juntar(e) : null; },
@@ -1634,6 +1749,7 @@ function LiveStore() {
     if (/already registered/i.test(m)) return new Error('Já existe uma conta com este e-mail. Use a aba Entrar.');
     if (/Password should be at least/i.test(m)) return new Error('A senha precisa ter pelo menos 6 caracteres.');
     if (/rate limit/i.test(m)) return new Error('Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente de novo.');
+    if (/patrocinio_respostas|relatorios_patrocinador|patrocinador_id|minhas_turmas_patrocinadas|definir_patrocinador/i.test(m)) return new Error('Atualize o banco de dados com a atualização 08 (área do patrocinador) enviada pelo Claude.');
     if (/intermediario_id|evolucoes_tipo|column evolucoes\.tipo|evolucoes_turma_tipo_uq/i.test(m)) return new Error('Atualize o banco de dados com a atualização 07 (evolução por etapas) enviada pelo Claude.');
     if (/limite_baixo/i.test(m)) return new Error('O limite precisa ser maior que o número de execuções já feitas pela pessoa.');
     if (/data_invalida/i.test(m)) return new Error('Escolha uma data de hoje em diante.');
@@ -1757,6 +1873,23 @@ function LiveStore() {
       if (error) throw errPt(error);
       return juntarEvolucoes(data);
     },
+    async minhasTurmasPatrocinadas() { const { data, error } = await sb.rpc('minhas_turmas_patrocinadas'); if (error) return []; return data || []; },
+    async definirPatrocinador(turmaId, email) { const { data, error } = await sb.rpc('definir_patrocinador', { p_turma: turmaId, p_email: email || null }); if (error) throw errPt(error); return (data && data[0]) || { status: 'nao_encontrado' }; },
+    async patrocinadorDe(userId) { const { data } = await sb.from('profiles').select('nome, email').eq('id', userId).maybeSingle(); return data || null; },
+    async getPatrocinio(turmaId) {
+      const [a, b] = await Promise.all([sb.from('patrocinio_respostas').select('*').eq('turma_id', turmaId).maybeSingle(), sb.from('relatorios_patrocinador').select('*').eq('turma_id', turmaId)]);
+      if (a.error) throw errPt(a.error); if (b.error) throw errPt(b.error);
+      return { respostas: a.data || null, relatorios: b.data || [] };
+    },
+    async salvarPatrocinio(turmaId, respostas) {
+      const { data, error } = await sb.from('patrocinio_respostas').upsert({ turma_id: turmaId, respostas, updated_at: new Date().toISOString() }, { onConflict: 'turma_id' }).select().single();
+      if (error) throw errPt(error); return data;
+    },
+    async salvarRelatorioPatro(turmaId, etapa, dados) {
+      const { data, error } = await sb.from('relatorios_patrocinador').upsert({ turma_id: turmaId, etapa, dados, status: 'rascunho', gerado_em: new Date().toISOString(), liberado_em: null }, { onConflict: 'turma_id,etapa' }).select().single();
+      if (error) throw errPt(error); return data;
+    },
+    async atualizarRelatorioPatro(id, patch) { const { data, error } = await sb.from('relatorios_patrocinador').update(patch).eq('id', id).select().single(); if (error) throw errPt(error); return data; },
     async listEvolucoesIndividuais() {
       const { data, error } = await sb.from('evolucoes').select('*, profiles(nome)').eq('tipo', 'individual');
       if (error) { if (/tipo/i.test(error.message || '')) throw new Error('Atualize o banco de dados com a atualização 07 (evolução por etapas) enviada pelo Claude.'); throw errPt(error); }
@@ -1811,6 +1944,8 @@ const S = {
   minhasEvos: null,
   pedido: null,
   pedidoRascunho: '',
+  patro: null,
+  patroTurmas: [],
   installEvt: null,
   installHidden: false,
   leitura: {},
@@ -1820,8 +1955,8 @@ const S = {
   qv: null,
   enter: false
 };
-const ROUTES = ['inicio', 'referencias', 'entrar', 'painel', 'diagnostico', 'resultado', 'evolucao', 'facilitador', 'nova-senha'];
-const PRIVATE = ['painel', 'diagnostico', 'resultado', 'evolucao', 'facilitador'];
+const ROUTES = ['inicio', 'referencias', 'entrar', 'painel', 'diagnostico', 'resultado', 'evolucao', 'facilitador', 'nova-senha', 'patrocinio'];
+const PRIVATE = ['painel', 'diagnostico', 'resultado', 'evolucao', 'facilitador', 'patrocinio'];
 
 function go(route) {
   if (location.hash.slice(1) !== route) { location.hash = route; } else { route_(); }
@@ -1833,6 +1968,7 @@ async function route_() {
   if (r === 'facilitador' && S.session?.role !== 'facilitador') r = 'painel';
   if (r === 'resultado' && !S.result) r = 'painel';
   if (r === 'evolucao' && !S.evo) r = 'painel';
+  if (r === 'patrocinio' && !S.patro) r = 'painel';
   if (r === 'entrar' && S.session) r = 'painel';
   if (r === 'nova-senha' && !LIVE) r = 'entrar';
   S.route = r;
@@ -1842,6 +1978,7 @@ async function route_() {
     await loadAcesso();
     try { [S.reav, S.minhasEvos] = await Promise.all([store.minhaReavaliacao(), store.minhasEvolucoes()]); } catch (e) { S.reav = null; S.minhasEvos = []; }
     try { S.pedido = await store.meuPedido(); } catch (e) { S.pedido = null; }
+    try { S.patroTurmas = await store.minhasTurmasPatrocinadas(); } catch (e) { S.patroTurmas = []; }
   }
   if (r === 'diagnostico') await loadAcesso();
   if (r === 'facilitador') { await loadFac(); }
@@ -2033,12 +2170,19 @@ function viewPainel() {
     return null;
   }).filter(Boolean).sort((x, y) => x.ordem - y.ordem);
   const reavCard = cartoes.length ? cartoes[0].html : '';
+  // Área do patrocinador: aparece para quem foi indicado como patrocinador de uma turma.
+  const pts = S.patroTurmas || [];
+  const soPatro = pts.length > 0 && !(S.myResults || []).length && !(a && a.pode);
+  const patroCard = pts.map(t => `<div class="card stack evo-chamada" style="gap:10px"><span class="eyebrow">Área do patrocinador</span><h2 style="font-size:22px">${esc(t.nome)}</h2>
+    <p class="muted small">${t.respondido_em ? `Questionário respondido em ${fmtDate(t.respondido_em)}. O relatório reúne as dores do negócio e a leitura consolidada do time ao longo do programa.` : 'Responda o questionário do patrocinador, em cerca de 10 minutos. O relatório sai na hora.'}</p>
+    <div class="actions"><button class="btn btn-primary btn-sm" data-patro="${esc(t.id)}">${t.respondido_em ? 'Abrir o relatório' : 'Responder o questionário'} <span aria-hidden="true">→</span></button></div></div>`).join('');
   const evos = S.minhasEvos || [];
   const evoCard = evos.length ? `<div class="stack"><h2 class="h-sec" style="margin:0">Minha evolução</h2><div class="list">${evos.map(e => { const di = e.reavaliacao.resultado.indice - e.inicial.resultado.indice; return `<button class="row-btn" data-evo-mine="${esc(e.id)}"><span><strong>Índice ${[e.inicial, e.intermediario, e.reavaliacao].filter(Boolean).map(r => r.resultado.indice).join(' → ')}</strong> ${deltaChip(di, false, EVO_CORTE.indice)}<br><span class="row-meta">${fmtDate(e.inicial.created_at)} → ${fmtDate(e.reavaliacao.created_at)}${e.comentario ? ' · com comentário do facilitador' : ''}</span></span><span aria-hidden="true" class="muted">→</span></button>`; }).join('')}</div></div>` : '';
   return `<main class="page"><div class="wrap narrow stack-lg">
     <div class="hello"><div class="stack" style="gap:6px"><span class="eyebrow">Meu painel</span><h1 style="font-size:clamp(28px,5vw,40px)">Olá${s.nome ? ', ' + esc(s.nome.split(' ')[0]) : ''}</h1></div>
-    ${!a || a.pode ? `<button class="btn btn-primary" data-go="diagnostico">${draft ? 'Continuar diagnóstico' : 'Iniciar diagnóstico'} <span aria-hidden="true">→</span></button>` : ''}</div>
-    ${acessoCard}
+    ${(!a || a.pode) && !soPatro ? `<button class="btn btn-primary" data-go="diagnostico">${draft ? 'Continuar diagnóstico' : 'Iniciar diagnóstico'} <span aria-hidden="true">→</span></button>` : ''}</div>
+    ${patroCard}
+    ${soPatro ? '' : acessoCard}
     ${reavCard}
     ${evoCard}
     ${s.role === 'facilitador' ? `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><strong>Painel do facilitador</strong><br><span class="muted small">Turmas, códigos de acesso e resultados dos grupos.</span></span><button class="btn btn-ghost btn-sm" data-go="facilitador">Abrir</button></div>` : ''}
@@ -2159,7 +2303,15 @@ function viewDiagnostico() {
   </main>`;
 }
 
+function patroFormMudou(ev) {
+  if (!S.patro || !ev.target.closest('#f-patro')) return false;
+  const nome = ev.target.name; S.patro.form = lerFormPatro();
+  if (ev.type === 'change' && ['C3', 'D1', 'D3'].includes(nome)) { const y0 = window.scrollY; render(); window.scrollTo(0, y0); }
+  return true;
+}
+document.addEventListener('change', (ev) => { patroFormMudou(ev); });
 document.addEventListener('input', (ev) => {
+  if (patroFormMudou(ev)) return;
   if (ev.target.id === 'ps-busca') {
     S.fac.busca = ev.target.value; const pos = ev.target.selectionStart; render();
     const el = $('#ps-busca'); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) { /* */ } }
@@ -3506,6 +3658,354 @@ function viewEvolucaoTurma() {
   return config + andamento + turmaCard + fila + blocoInternos;
 }
 
+/* ============================== PATROCINADOR ============================== */
+
+// Nota de cada dimensão pela visão do patrocinador (mesma conta do diagnóstico; "Não sei dizer" fica fora).
+function dimsPatro(resp) {
+  const itens = PATRO_ITENS[modoPatro(resp)]; const out = {};
+  DIMS.forEach(d => {
+    const conv = itens.filter(i => i[1] === d.id).map(i => { const v = Number(resp?.[i[0]]); return v >= 1 && v <= 5 ? (i[2] ? 6 - v : v) : null; }).filter(v => v != null);
+    out[d.id] = conv.length ? Math.round((avg(conv) - 1) / 4 * 100) : null;
+  });
+  return out;
+}
+
+// Retrato agregado e anônimo da turma em cada etapa: uma execução por pessoa, sem nomes.
+function retratoTurma(t, results) {
+  const porPessoa = {};
+  results.filter(r => r.turma_id === t.id).forEach(r => { (porPessoa[r.user_id] = porPessoa[r.user_id] || []).push(r); });
+  const sel = { previa: [], workshop: [], reavaliacao: [] };
+  Object.values(porPessoa).forEach(rs => {
+    rs.sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const et = r => etapaTurma(t, diaBR(r.created_at));
+    const pv = rs.filter(r => ['previa', 'inicial'].includes(et(r))).at(-1); if (pv) sel.previa.push(pv);
+    const wk = rs.find(r => et(r) === 'workshop'); if (wk) sel.workshop.push(wk);
+    const rv = rs.find(r => et(r) === 'reavaliacao'); if (rv) sel.reavaliacao.push(rv);
+  });
+  const agg = rs => {
+    if (!rs.length) return { n: 0 };
+    const m = f => Math.round(avg(rs.map(f)));
+    const conta = f => { const o = {}; rs.forEach(r => { const k = f(r); o[k] = (o[k] || 0) + 1; }); return o; };
+    return { n: rs.length, indice: m(r => r.resultado.indice), aprox: m(r => r.resultado.aprox), afast: m(r => r.resultado.afast),
+      dims: Object.fromEntries(DIMS.map(d => [d.id, m(r => r.resultado.dims[d.id])])), perfis: conta(r => r.resultado.perfil),
+      niveis: conta(r => levelOf(r.resultado.indice).nome), assertivas: Math.round(avg(rs.map(r => r.resultado.postura.assertiva)) * 10) / 10 };
+  };
+  return { previa: agg(sel.previa), workshop: agg(sel.workshop), reavaliacao: agg(sel.reavaliacao) };
+}
+// Dados que o patrocinador recebe para uma etapa: a etapa e as anteriores com o mínimo de pessoas.
+function dadosRelPatro(t, results, etapa) {
+  const r = retratoTurma(t, results); const ordem = PATRO_ETAPAS.map(e => e[0]);
+  const etapas = {}; ordem.slice(0, ordem.indexOf(etapa) + 1).forEach(e => { if (r[e].n >= PATRO_MIN) etapas[e] = r[e]; });
+  return { etapa, turma: t.nome, gerado_em: new Date().toISOString(), etapas };
+}
+
+function viewPatroForm() {
+  const P = S.patro; const f = P.form || {};
+  const modo = modoPatro(f);
+  const radio = (name, ops) => `<div class="patro-ops">${ops.map(([v, t]) => `<label class="check"><input type="radio" name="${name}" value="${esc(v)}" ${String(f[name] ?? '') === String(v) ? 'checked' : ''}><span>${esc(t)}</span></label>`).join('')}</div>`;
+  const escala = [...SCALE.map((t, i) => [String(i + 1), `${t} · ${SCALE_SUB[i]}`]), ['0', 'Não sei dizer']];
+  const itens = PATRO_ITENS[modo].map(([id, , , t], k) => `<fieldset class="patro-q"><legend><span class="dim-code">${k + 1}</span> ${esc(t)}</legend><div class="patro-escala">${escala.map(([v, lab]) => `<label class="pill-radio"><input type="radio" name="${id}" value="${v}" ${String(f[id] ?? '') === v ? 'checked' : ''}><span>${esc(lab)}</span></label>`).join('')}</div></fieldset>`).join('');
+  const d1 = Array.isArray(f.D1) ? f.D1.map(String) : [];
+  return `<form id="f-patro" class="stack-lg" novalidate>
+    <div class="card stack"><span class="eyebrow">Parte 1 · Contexto do time</span>
+      <div class="field" style="max-width:280px"><label for="pt-C1">Quantas pessoas do time vão participar do workshop?</label><input id="pt-C1" name="C1" type="number" min="1" max="500" value="${esc(f.C1 || '')}"></div>
+      ${PATRO_CTX.map(q => `<fieldset class="patro-q"><legend>${esc(q.t)}</legend>${radio(q.id, q.ops)}</fieldset>`).join('')}
+    </div>
+    <div class="card stack"><span class="eyebrow">Parte 2 · O que você vê no time</span>
+      <p class="small muted">${modo === 'contato' ? 'Pense nas últimas semanas do negócio. Em quantos de cada 10 atendimentos ou visitas você vê isso acontecer?' : 'Pense nas últimas semanas de venda do time. Em quantas de cada 10 vendas você vê isso acontecer?'}</p>
+      ${itens}
+    </div>
+    <div class="card stack"><span class="eyebrow">Parte 3 · Dores e resultados esperados</span>
+      <fieldset class="patro-q"><legend>Quais destas situações mais pesam no resultado do seu negócio hoje? Escolha até três.</legend><div class="patro-ops">${PATRO_DORES.map(x => `<label class="check"><input type="checkbox" name="D1" value="${x.id}" ${d1.includes(String(x.id)) ? 'checked' : ''}><span>${esc(x.t)}</span></label>`).join('')}</div></fieldset>
+      <fieldset class="patro-q"><legend>Entre as que você escolheu, qual custa mais ao negócio hoje?</legend>${d1.length ? radio('D2', PATRO_DORES.filter(x => d1.includes(String(x.id))).map(x => [String(x.id), x.t])) : '<p class="small muted">Escolha as situações acima para responder.</p>'}</fieldset>
+      <fieldset class="patro-q"><legend>Que número você quer ver mudar nos 90 dias depois do workshop?</legend>${radio('D3', PATRO_METRICAS)}
+        ${f.D3 === 'outro' ? `<div class="field" style="max-width:420px"><label for="pt-D3n">Nome do indicador</label><input id="pt-D3n" name="D3_nome" type="text" value="${esc(f.D3_nome || '')}"></div>` : ''}
+        <div class="inline-form" style="max-width:520px"><div class="field"><label for="pt-D3a">Valor de hoje (se souber)</label><input id="pt-D3a" name="D3_atual" type="text" value="${esc(f.D3_atual || '')}"></div><div class="field"><label for="pt-D3m">Meta</label><input id="pt-D3m" name="D3_meta" type="text" value="${esc(f.D3_meta || '')}"></div></div></fieldset>
+      <div class="field"><label for="pt-D4">Conte uma venda recente que o time perdeu e que, na sua leitura, não deveria ter perdido.</label><textarea id="pt-D4" name="D4" maxlength="2000" style="min-height:110px">${esc(f.D4 || '')}</textarea></div>
+      <div class="field"><label for="pt-D5">O que você quer ver o time fazendo diferente depois do workshop? <span class="muted">(opcional)</span></label><textarea id="pt-D5" name="D5" maxlength="2000" style="min-height:90px">${esc(f.D5 || '')}</textarea></div>
+    </div>
+    <div id="pt-msg"></div>
+    <div class="actions"><button class="btn btn-primary" type="submit" ${S.busy ? 'disabled' : ''}>${P.dados?.respostas ? 'Salvar as respostas' : 'Enviar e ver o meu relatório'}</button>${P.dados?.respostas ? '<button type="button" class="btn btn-quiet" data-act="patro-cancelar">Cancelar</button>' : ''}</div>
+  </form>`;
+}
+function lerFormPatro() {
+  const el = $('#f-patro'); if (!el) return S.patro.form || {};
+  const fd = new FormData(el); const f = {};
+  for (const [k, v] of fd.entries()) { if (k === 'D1') (f.D1 = f.D1 || []).push(v); else f[k] = v; }
+  if (!f.D1) f.D1 = [];
+  return f;
+}
+function validarPatro(f) {
+  if (!f.C1 || Number(f.C1) < 1) return 'Informe quantas pessoas do time vão participar.';
+  for (const q of PATRO_CTX) if (!f[q.id]) return 'Responda a pergunta: ' + q.t;
+  const faltam = PATRO_ITENS[modoPatro(f)].filter(i => f[i[0]] == null || f[i[0]] === '').length;
+  if (faltam) return `Faltam ${faltam} ${faltam === 1 ? 'afirmação' : 'afirmações'} na Parte 2. Se não souber, marque "Não sei dizer".`;
+  if (!f.D1.length) return 'Escolha ao menos uma situação que pesa no resultado.';
+  if (f.D1.length > 3) return 'Escolha no máximo três situações.';
+  if (!f.D2 || !f.D1.includes(f.D2)) return 'Indique qual das situações escolhidas custa mais ao negócio.';
+  if (!f.D3) return 'Escolha o número que você quer ver mudar.';
+  if (f.D3 === 'outro' && !(f.D3_nome || '').trim()) return 'Dê um nome ao indicador.';
+  if ((f.D4 || '').trim().length < 20) return 'Conte em algumas linhas a venda que o time perdeu.';
+  return null;
+}
+
+// Relatório do time para o patrocinador (uma etapa liberada ou, para o facilitador, também em rascunho).
+function blocoTimePatro(rel, doresDims) {
+  const d = rel.dados; const es = PATRO_ETAPAS.filter(([e]) => d.etapas[e]);
+  if (!es.length) return '';
+  const vals = f => es.map(([e]) => f(d.etapas[e]));
+  const ult = d.etapas[es.at(-1)[0]]; const pri = d.etapas[es[0][0]];
+  const meio = es.length === 3 ? d.etapas[es[1][0]] : null;
+  const cls = (a, m, b, c) => es.length > 1 ? classeEvo(a, m, b, c) : null;
+  const ic = cls(pri.indice, meio ? meio.indice : null, ult.indice, EVO_CORTE.indice);
+  const perfisOrd = ['conselheiro', 'especialista', 'prestativo', 'reativo', 'insistente', 'desenvolvimento'];
+  const pct = (a, k) => Math.round(100 * (a.perfis[k] || 0) / a.n);
+  const linhaDim = dd => { const v = vals(a => a.dims[dd.id]); const c = cls(v[0], v.length === 3 ? v[1] : null, v.at(-1), EVO_CORTE.dim); return `<div class="evo-row"><span><strong>${dd.nome}</strong>${doresDims.includes(dd.id) ? ' <span class="tag">ligada às suas dores</span>' : ''}</span>${evoBars(v, eixoCorEvo(dd.eixo))}<span class="tnum evo-ab">${seq(v)}</span>${c ? classeChip(c, v.at(-1) - v[0]) : '<span></span>'}</div>`; };
+  return `<div class="card stack" style="gap:16px">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline"><h2 class="h-sec" style="margin:0">O time · ${es.map(e => e[1]).join(' → ')}</h2><span class="small muted">${ult.n} pessoas · dados consolidados e anônimos</span></div>
+    <div class="evo-pontos" style="grid-template-columns:repeat(${es.length}, minmax(0, 1fr))">${es.map(([e, nome], i) => `<div class="evo-ponto${i === es.length - 1 ? ' on' : ''}"><span class="eyebrow">${nome}</span><b class="tnum">${d.etapas[e].indice}</b><span class="small muted">Índice médio · ${d.etapas[e].n} pessoas</span></div>`).join('')}</div>
+    ${ic ? `<div>${classeChip(ic, ult.indice - pri.indice)}</div>` : ''}
+    <div class="stack" style="gap:8px"><h3 class="h-sub" style="margin:0">Perfil do time</h3>
+      <div class="table-wrap"><table class="heat"><thead><tr><th>Perfil</th>${es.map(e => `<th class="num">${e[1]}</th>`).join('')}</tr></thead><tbody>
+      ${perfisOrd.filter(k => es.some(([e]) => d.etapas[e].perfis[k])).map(k => `<tr${k === 'conselheiro' ? ' class="row-hl"' : ''}><td>${PROFILES[k].nome}${k === 'conselheiro' ? ' <span class="tag">o perfil que o workshop desenvolve</span>' : ''}</td>${es.map(([e]) => `<td class="num tnum">${d.etapas[e].perfis[k] || 0} <span class="muted small">(${pct(d.etapas[e], k)}%)</span></td>`).join('')}</tr>`).join('')}
+      </tbody></table></div>
+      <p class="small muted">Rumo ao Conselheiro: ${es.map(([e, nome]) => `${nome} ${pct(d.etapas[e], 'conselheiro')}%`).join(' · ')} do time. Respostas assertivas nas seis situações, em média: ${es.map(([e, nome]) => `${nome} ${String(d.etapas[e].assertivas).replace('.', ',')}`).join(' · ')} de 6.</p></div>
+    <div class="stack" style="gap:8px"><h3 class="h-sub" style="margin:0">As oito dimensões, na média do time</h3><div class="evo-rows">${DIMS.map(linhaDim).join('')}</div>
+      <div class="legend">${es.map(([, nome], i) => `<span><i class="swatch" style="background:${i === 0 ? 'var(--ink-3)' : 'var(--accent)'};opacity:${i === 0 ? .5 : i < es.length - 1 ? .45 : 1}"></i>${nome}</span>`).join('')}</div></div>
+    ${rel.comentario ? `<div class="stack" style="gap:6px"><h3 class="h-sub" style="margin:0">Comentário de ${esc(AUTOR)}</h3><blockquote class="story">${esc(rel.comentario)}</blockquote></div>` : ''}
+  </div>`;
+}
+
+function viewPatrocinio() {
+  const P = S.patro; const t = P.turma;
+  if (!P.dados) return `<main class="page"><div class="wrap narrow"><p class="muted">Carregando…</p></div></main>`;
+  const resp = P.dados.respostas?.respostas || null;
+  const voltar = `<div class="actions no-print"><button class="btn btn-primary" data-go="${P.fac ? 'facilitador' : 'painel'}">${P.fac ? 'Voltar ao painel do facilitador' : 'Voltar ao meu painel'}</button></div>`;
+  const head = `<div class="hello report-head"><div class="stack" style="gap:6px;min-width:0"><span class="eyebrow">Área do patrocinador · ${esc(t.nome)}</span><h1 style="font-size:clamp(28px,5vw,40px)">${!resp || P.editando ? 'Questionário do patrocinador' : 'Relatório do patrocinador'}</h1></div><img src="${LOGO_CLARO}" alt="Logo de ${AUTOR}" class="report-logo" width="64" height="71" onerror="this.hidden=true"></div>`;
+  if (!P.fac && (!resp || P.editando)) {
+    return `<main class="page"><div class="wrap narrow stack-lg">${head}
+      <p class="muted">Cerca de 10 minutos. As respostas mostram como você enxerga o time e o que mais pesa no resultado do negócio, e geram o seu relatório na hora. Ao longo do programa, o relatório recebe a leitura consolidada e anônima do time na prévia, no workshop e aos 45 dias.</p>
+      ${viewPatroForm()}${voltar}</div></main>`;
+  }
+  if (!resp) {
+    return `<main class="page"><div class="wrap stack-lg">${head}<div class="msg" role="status">O patrocinador ainda não respondeu o questionário.</div>${P.fac ? viewPatroFac() : ''}${voltar}</div></main>`;
+  }
+  const dores = (resp.D1 || []).map(Number).map(id => PATRO_DORES.find(x => x.id === id)).filter(Boolean).sort((a, b) => (b.id === Number(resp.D2)) - (a.id === Number(resp.D2)));
+  const doresDims = [...new Set(dores.flatMap(x => x.dims))];
+  const vis = dimsPatro(resp);
+  const rels = (P.dados.relatorios || []).filter(r => P.fac || r.status === 'liberado').sort((a, b) => PATRO_ETAPAS.findIndex(e => e[0] === b.etapa) - PATRO_ETAPAS.findIndex(e => e[0] === a.etapa));
+  const relPrevia = rels.find(r => r.etapa === 'previa' && r.dados.etapas.previa);
+  const time = relPrevia ? relPrevia.dados.etapas.previa.dims : null;
+  const metr = PATRO_METRICAS.find(m => m[0] === resp.D3);
+  const blocoDores = `<div class="stack"><h2 class="h-sec" style="margin:0">As dores que você apontou</h2>
+    ${dores.map((x, i) => `<div class="card stack${i === 0 ? ' evo-chamada' : ''}" style="gap:8px">${i === 0 ? '<span class="eyebrow">A que mais custa hoje</span>' : ''}<strong style="font-size:17px">${esc(x.t)}</strong>
+      <p class="small"><span class="muted">O que está em jogo:</span> ${esc(x.jogo)}</p>
+      <p class="small"><span class="muted">Dimensões ligadas:</span> ${x.dims.length === 8 ? 'as oito' : x.dims.map(k => DIM[k].nome).join(', ')} · <span class="muted">Onde o workshop atua:</span> ${esc(x.modulo)}</p></div>`).join('')}</div>`;
+  const visRows = DIMS.map(d => {
+    const v = vis[d.id]; const tm = time ? time[d.id] : null; const gap = v != null && tm != null ? v - tm : null;
+    return `<div class="evo-row"><span><strong>${d.nome}</strong>${doresDims.includes(d.id) ? ' <span class="tag">ligada às suas dores</span>' : ''}</span>${v == null ? '<span class="small muted">sem resposta</span>' : evoBars(tm != null ? [tm, v] : [v], eixoCorEvo(d.eixo))}<span class="tnum evo-ab">${v == null ? '—' : tm != null ? `time ${tm} · <b>você ${v}</b>` : `<b>${v}</b>`}</span>${gap != null && Math.abs(gap) >= 15 ? `<span class="delta" style="color:var(--warn);border-color:color-mix(in srgb, var(--warn) 50%, transparent)">${gap > 0 ? 'você vê acima' : 'você vê abaixo'}</span>` : '<span></span>'}</div>`;
+  }).join('');
+  const blocoVisao = `<div class="card stack"><h2 class="h-sec" style="margin:0">A sua visão do time${time ? ' e a visão do próprio time' : ''}</h2>
+    <p class="small muted">${time ? 'Cada dimensão mostra a média que o time deu a si mesmo na prévia e a nota que sai das suas respostas. Uma diferença de 15 pontos ou mais aparece em destaque e vale uma conversa.' : 'A nota de cada dimensão sai das suas respostas, de 0 a 100. Depois da prévia do time, a média que o time dá a si mesmo aparece ao lado.'}</p>
+    <div class="evo-rows">${visRows}</div>${time ? `<div class="legend"><span><i class="swatch" style="background:var(--ink-3);opacity:.5"></i>O time sobre si</span><span><i class="swatch" style="background:var(--accent)"></i>A sua visão</span></div>` : ''}</div>`;
+  const blocoNumero = metr ? `<div class="card stack" style="gap:8px"><h2 class="h-sec" style="margin:0">O número para acompanhar</h2><p><strong>${esc(resp.D3 === 'outro' ? resp.D3_nome : metr[1])}</strong></p><p class="small muted">Hoje: ${esc(resp.D3_atual || 'não informado')} · Meta: ${esc(resp.D3_meta || 'não informada')}. Retomamos este número nos 45 dias.</p></div>` : '';
+  // O patrocinador vê o relatório liberado mais recente, que já traz as etapas anteriores; o facilitador vê todos para revisar.
+  const relsTime = P.fac ? rels : rels.slice(0, 1);
+  const blocoTime = rels.length ? `<div class="stack"><h2 class="h-sec" style="margin:0">O time ao longo do programa</h2>${relsTime.map(r => (P.fac && r.status !== 'liberado' ? `<div class="msg evo-rascunho" role="status"><b>Rascunho · ${PATRO_ETAPAS.find(e => e[0] === r.etapa)[1]}.</b> O patrocinador ainda não vê este relatório.</div>` : '') + blocoTimePatro(r, doresDims)).join('')}</div>`
+    : `<div class="card stack" style="gap:6px"><h2 class="h-sec" style="margin:0">O time ao longo do programa</h2><p class="small muted">A leitura consolidada do time aparece aqui depois da prévia, do workshop e dos 45 dias, sempre sem identificar ninguém.</p></div>`;
+  const facExtra = P.fac ? `<div class="card stack" style="gap:10px"><div><h2 class="h-sec" style="margin:0">Só para você</h2><span class="tag" style="display:inline-block;margin-top:8px">Visível só para o facilitador</span></div>
+      <p class="small"><span class="muted">Venda perdida:</span> ${esc(resp.D4 || '—')}</p>${resp.D5 ? `<p class="small"><span class="muted">O que espera ver de diferente:</span> ${esc(resp.D5)}</p>` : ''}
+      <p class="small muted">Contexto: ${esc(resp.C1)} pessoas · ${esc(SEG[resp.C2]?.nome || '')} · ${esc(PATRO_CTX[1].ops.find(o => o[0] === resp.C3)?.[1] || '')} · decisão ${esc((PATRO_CTX[2].ops.find(o => o[0] === resp.C4)?.[1] || '').toLowerCase())} · ${esc(PATRO_CTX[3].ops.find(o => o[0] === resp.C5)?.[1] || '')}.</p></div>${viewPatroFac()}` : '';
+  return `<main class="page"><div class="wrap stack-lg">${head}
+    <p class="small muted">${P.fac ? 'Visão do facilitador. O patrocinador vê este relatório sem a venda perdida e sem os relatórios do time em rascunho.' : `Respondido em ${fmtDate(P.dados.respostas.updated_at || P.dados.respostas.created_at)}.`}</p>
+    ${facExtra}${blocoDores}${blocoVisao}${blocoNumero}${blocoTime}
+    <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o relatório</h2><div class="actions"><button class="btn btn-primary btn-sm" data-act="patro-pdf" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando PDF…' : 'Baixar relatório em PDF'}</button>${!P.fac ? '<button class="btn btn-quiet btn-sm" data-act="patro-editar">Revisar as minhas respostas</button>' : ''}</div></div>
+    ${voltar}</div></main>`;
+}
+// Controles do facilitador: gerar, revisar e liberar os relatórios do time para o patrocinador.
+function viewPatroFac() {
+  const P = S.patro; const t = P.turma;
+  if (!P.results) return '<p class="muted">Carregando a turma…</p>';
+  const r = retratoTurma(t, P.results);
+  const rels = P.dados.relatorios || [];
+  const linhas = PATRO_ETAPAS.map(([e, nome]) => {
+    const rel = rels.find(x => x.etapa === e); const n = r[e].n; const ok = n >= PATRO_MIN;
+    return `<tr><td><strong>${nome}</strong><br><span class="muted small">${n} ${n === 1 ? 'pessoa' : 'pessoas'} nesta etapa</span></td>
+      <td>${rel ? statusEvoChip(rel.status) + `<br><span class="muted small">gerado em ${fmtDate(rel.gerado_em)}</span>` : '<span class="muted small">não gerado</span>'}</td>
+      <td><div class="acesso-acoes" style="flex-wrap:wrap">${ok ? `<button type="button" class="btn btn-quiet btn-sm" data-act="patro-gerar" data-etapa="${e}">${rel ? 'Atualizar dados' : 'Gerar'}</button>` : `<span class="small muted">mínimo de ${PATRO_MIN} pessoas</span>`}
+        ${rel ? (rel.status === 'liberado' ? `<button type="button" class="btn btn-quiet btn-sm" data-act="patro-recolher" data-id="${esc(rel.id)}">Recolher</button>` : `<button type="button" class="btn btn-primary btn-sm" data-act="patro-liberar" data-id="${esc(rel.id)}">Liberar</button>`) : ''}</div>
+        ${rel ? `<div class="field" style="margin-top:8px"><label class="sr-only" for="pc-${esc(rel.id)}">Comentário</label><textarea id="pc-${esc(rel.id)}" data-patro-com="${esc(rel.id)}" placeholder="Comentário para o patrocinador (opcional)" style="min-height:60px">${esc(rel.comentario || '')}</textarea><button type="button" class="link-btn small" data-act="patro-comentar" data-id="${esc(rel.id)}">Salvar comentário</button></div>` : ''}</td></tr>`;
+  }).join('');
+  return `<div class="card stack"><h2 class="h-sec" style="margin:0">Relatórios do time para o patrocinador</h2>
+    <p class="small muted">Dados consolidados e anônimos, uma execução por pessoa em cada etapa. Gere depois que a etapa terminar, revise aqui na página e libere. "Atualizar dados" refaz o retrato com as execuções mais recentes e volta o relatório para rascunho.</p>
+    <div class="table-wrap"><table class="heat"><thead><tr><th>Etapa</th><th>Situação</th><th>Ações</th></tr></thead><tbody>${linhas}</tbody></table></div></div>`;
+}
+
+async function abrirPatrocinio(turma, fac) {
+  S.patro = { turma, fac: Boolean(fac), dados: null, results: null, editando: false, form: null };
+  go('patrocinio');
+  await carregarPatrocinio();
+}
+async function carregarPatrocinio() {
+  const P = S.patro; if (!P) return;
+  try {
+    P.dados = await store.getPatrocinio(P.turma.id);
+    if (P.fac) P.results = await store.turmaResults(P.turma.id);
+    if (!P.form) P.form = P.dados.respostas?.respostas ? { ...P.dados.respostas.respostas } : { D1: [] };
+  } catch (e) { P.dados = { respostas: null, relatorios: [] }; toast(e.message); }
+  render();
+}
+
+// PDF do relatório do patrocinador, na identidade dos relatórios do método.
+async function buildPatroPDF() {
+  const P = S.patro; const t = P.turma; const resp = P.dados.respostas.respostas;
+  const { jsPDF } = await loadJsPDF();
+  const [logo, fontes] = await Promise.all([logoDataURL(), pdfFontData()]);
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  if (fontes) { try { fontes.forEach(([file, fam, st, b64]) => { doc.addFileToVFS(file, b64); doc.addFont(file, fam, st); }); } catch (e) { /* segue com Helvetica */ } }
+  const RICO = Boolean(fontes) && doc.getFontList().Manrope;
+  const T = RICO ? pdfTextRico : pdfText;
+  const W = 210, M = 18, CW = W - 2 * M, BOTTOM = 274;
+  const C = { ink: [42, 44, 51], ink2: [86, 90, 101], ink3: [138, 142, 152], line: [216, 211, 200], line2: [233, 229, 220], white: [255, 255, 255],
+    warm: [181, 112, 26], warmL: [235, 200, 143], warmT: [252, 244, 232], cool: [60, 120, 194], coolL: [169, 198, 234], coolT: [239, 245, 252],
+    base: [110, 114, 128], baseL: [207, 209, 216], baseT: [243, 243, 245], good: [59, 148, 104], goodT: [238, 247, 242], crit: [191, 79, 92], critT: [251, 239, 241],
+    warn: [176, 128, 22], warnT: [252, 246, 230], ambar: [240, 179, 94], azul: [141, 184, 238] };
+  const EIXO = { aprox: [C.warm, C.warmL], afast: [C.cool, C.coolL], base: [C.base, C.baseL] };
+  let y = 0;
+  const color = (c, kind = 'text') => kind === 'text' ? doc.setTextColor(...c) : kind === 'fill' ? doc.setFillColor(...c) : doc.setDrawColor(...c);
+  const font = (size, role = 'body', c = C.ink) => {
+    const map = RICO ? { title: ['Urbanist', 'bold'], light: ['Urbanist', 'light'], body: ['Manrope', 'normal'], semi: ['Manrope', 'semibold'], bold: ['Manrope', 'bold'] }
+      : { title: ['helvetica', 'bold'], light: ['helvetica', 'normal'], body: ['helvetica', 'normal'], semi: ['helvetica', 'bold'], bold: ['helvetica', 'bold'] };
+    doc.setFont(...map[role]); doc.setFontSize(size); color(c);
+  };
+  const lh = size => size * 0.43;
+  const linhas = (tx, size, role, width) => { font(size, role); return doc.splitTextToSize(T(tx), width); };
+  const altura = (tx, size, role, width) => linhas(tx, size, role, width).length * (lh(size) + 0.6);
+  const escrever = (tx, x, yy, size, role, c, width) => { const ls = linhas(tx, size, role, width); font(size, role, c); ls.forEach((ln, i) => doc.text(ln, x, yy + lh(size) + i * (lh(size) + 0.6))); return ls.length * (lh(size) + 0.6); };
+  const eyebrow = (tx, x, yy, c = C.warm, size = 6.8) => { font(size, 'bold', c); doc.setCharSpace(0.35); doc.text(T(tx).toUpperCase(), x, yy); doc.setCharSpace(0); };
+  const caixa = (x, yy, w, h, fill, stroke) => { if (fill) color(fill, 'fill'); if (stroke) { color(stroke, 'draw'); doc.setLineWidth(0.3); } doc.roundedRect(x, yy, w, h, 2.6, 2.6, fill && stroke ? 'FD' : fill ? 'F' : 'S'); };
+  const barra = (x, yy, w, h, v, c) => { color(C.line2, 'fill'); doc.roundedRect(x, yy, w, h, h / 2, h / 2, 'F'); color(c, 'fill'); doc.roundedRect(x, yy, Math.max(h, w * v / 100), h, h / 2, h / 2, 'F'); };
+  const simbolo = (cx, cy, rr) => {
+    color(C.line, 'draw'); doc.setLineWidth(rr * 0.08); doc.circle(cx, cy, rr * 12.5 / 11.5, 'S');
+    color(C.ambar, 'fill'); doc.circle(cx, cy, rr, 'F'); color(C.white, 'fill'); doc.rect(cx, cy - rr - 0.2, rr + 0.3, 2 * rr + 0.4, 'F');
+    const b = rr * 7.5 / 11.5; color(C.azul, 'fill'); doc.circle(cx, cy, b, 'F'); color(C.ambar, 'fill'); doc.rect(cx - b - 0.05, cy - b - 0.05, b + 0.05, 2 * b + 0.1, 'F');
+  };
+  const rodape = () => { font(6.4, 'body', C.ink3); doc.text(T(COPYRIGHT), M, 289); font(8, 'bold', C.warm); doc.text(String(doc.getNumberOfPages()), W - M, 289, { align: 'right' }); };
+  const cabecalho = () => { simbolo(M + 2.2, 11.2, 2.2); font(7.4, 'semi', C.ink3); doc.text(T('Relatório do patrocinador'), M + 6.6, 12.4); doc.text(T(t.nome), W - M, 12.4, { align: 'right' }); color(C.line2, 'draw'); doc.setLineWidth(0.25); doc.line(M, 16, W - M, 16); };
+  const novaPagina = () => { rodape(); doc.addPage(); cabecalho(); y = 24; };
+  const precisa = h => { if (y + h > BOTTOM) novaPagina(); };
+  const secao = (eb, titulo, lead, reserva = 30) => {
+    const hl = lead ? altura(lead, 9, 'body', CW) + 2 : 0; precisa(26 + hl + reserva); y += 4;
+    eyebrow(eb, M, y + 3); font(16, 'title', C.ink); doc.text(T(titulo), M, y + 11); color(C.warmL, 'fill'); doc.rect(M, y + 14, 14, 0.8, 'F'); y += 19;
+    if (lead) y += escrever(lead, M, y, 9, 'body', C.ink2, CW) + 3;
+  };
+  const dores = (resp.D1 || []).map(Number).map(id => PATRO_DORES.find(x => x.id === id)).filter(Boolean).sort((a, b) => (b.id === Number(resp.D2)) - (a.id === Number(resp.D2)));
+  const doresDims = [...new Set(dores.flatMap(x => x.dims))];
+  const vis = dimsPatro(resp);
+  const rels = (P.dados.relatorios || []).filter(r => r.status === 'liberado');
+  const relPrevia = rels.find(r => r.etapa === 'previa' && r.dados.etapas.previa);
+  const time = relPrevia ? relPrevia.dados.etapas.previa.dims : null;
+  const ultimo = rels.slice().sort((a, b) => PATRO_ETAPAS.findIndex(e => e[0] === b.etapa) - PATRO_ETAPAS.findIndex(e => e[0] === a.etapa))[0];
+
+  // Capa
+  color(C.warmL, 'draw'); doc.setLineWidth(0.35); [74, 62, 50].forEach(rr => doc.circle(W + 18, 64, rr, 'S'));
+  color(C.coolL, 'draw'); [38, 26, 14].forEach(rr => doc.circle(W + 18, 64, rr, 'S'));
+  if (logo) { try { doc.addImage(logo, 'PNG', M, 16, 19, 21); } catch (e) { /* segue sem o logo */ } }
+  [[C.warmL, 0], [C.coolL, 1], [C.baseL, 2]].forEach(([c, i]) => { color(c, 'fill'); doc.roundedRect(M + i * 15, 64, 12, 1.4, 0.7, 0.7, 'F'); });
+  eyebrow('Venda com Neurociência · Metodologia OQGCI', M, 74);
+  font(32, 'title', C.ink); doc.text(T('Relatório do patrocinador'), M, 88);
+  font(17, 'light', C.ink); doc.text(T(t.nome), M, 97);
+  font(9.2, 'body', C.ink2); doc.text(T(`Respondido em ${fmtDate(P.dados.respostas.updated_at || P.dados.respostas.created_at)}${ultimo ? ' · leitura do time até ' + PATRO_ETAPAS.find(e => e[0] === ultimo.etapa)[1].toLowerCase() : ''}`), M, 104);
+  let yc = 114;
+  if (dores[0]) {
+    const x = dores[0]; const h = 16 + altura(x.t, 12, 'title', CW - 14) + altura(x.jogo, 8.8, 'body', CW - 14) + 10;
+    caixa(M, yc, CW, h, C.warmT, null); color(C.warmL, 'fill'); doc.rect(M, yc, 1.4, h, 'F');
+    eyebrow('A dor que mais custa hoje', M + 7, yc + 8); let yy = yc + 10; yy += escrever(x.t, M + 7, yy, 12, 'title', C.ink, CW - 14) + 2;
+    yy += escrever(x.jogo, M + 7, yy, 8.8, 'body', C.ink2, CW - 14) + 2;
+    font(8.2, 'semi', C.warm); doc.text(T(`Onde o workshop atua: ${x.modulo}`), M + 7, yy + 3); yc += h + 6;
+  }
+  const metr = PATRO_METRICAS.find(m => m[0] === resp.D3);
+  if (metr) {
+    caixa(M, yc, CW, 24, C.white, C.line); eyebrow('O número para acompanhar', M + 6, yc + 8);
+    font(12, 'title', C.ink); doc.text(T(resp.D3 === 'outro' ? resp.D3_nome : metr[1]), M + 6, yc + 15);
+    font(8.4, 'body', C.ink2); doc.text(T(`Hoje: ${resp.D3_atual || 'não informado'} · Meta: ${resp.D3_meta || 'não informada'}`), M + 6, yc + 20.5); yc += 30;
+  }
+  if (ultimo) {
+    const es = PATRO_ETAPAS.filter(([e]) => ultimo.dados.etapas[e]);
+    caixa(M, yc, CW, 34, C.white, C.line); eyebrow('Índice médio do time', M + 6, yc + 8);
+    const lg = (CW - 12) / es.length;
+    es.forEach(([e, nome], i) => { const a = ultimo.dados.etapas[e]; const ult = i === es.length - 1; const xi = M + 6 + i * lg;
+      eyebrow(nome, xi, yc + 15, ult ? C.warm : C.ink3, 6.2); font(ult ? 26 : 20, 'light', ult ? C.ink : C.ink3); doc.text(String(a.indice), xi, yc + 26);
+      font(7.6, 'body', C.ink3); doc.text(T(`${a.n} pessoas · ${Math.round(100 * (a.perfis.conselheiro || 0) / a.n)}% Conselheiro`), xi, yc + 31); });
+  }
+  rodape();
+
+  // Páginas internas
+  doc.addPage(); cabecalho(); y = 24;
+  secao('O que você apontou', 'As dores do negócio', 'Cada dor aponta para as dimensões que a explicam e para o trecho do workshop que atua sobre ela.');
+  dores.forEach((x, i) => {
+    const w = CW - 14; const dimTxt = `Dimensões ligadas: ${x.dims.length === 8 ? 'as oito' : x.dims.map(k => DIM[k].nome).join(', ')} · Onde o workshop atua: ${x.modulo}`;
+    const h = 10 + altura(x.t, 10.5, 'title', w) + altura(x.jogo, 8.6, 'body', w) + altura(dimTxt, 8, 'semi', w) + 8;
+    precisa(h + 4); caixa(M, y, CW, h, C.white, C.line);
+    if (i === 0) { color(C.warmL, 'fill'); doc.roundedRect(M, y, 1.4, h, 0.7, 0.7, 'F'); }
+    let yy = y + 5; yy += escrever(x.t, M + 7, yy, 10.5, 'title', C.ink, w) + 1.5; yy += escrever(x.jogo, M + 7, yy, 8.6, 'body', C.ink2, w) + 1.5;
+    escrever(dimTxt, M + 7, yy, 8, 'semi', C.warm, w); y += h + 4;
+  });
+
+  secao('Sua leitura', time ? 'A sua visão e a visão do time' : 'A sua visão do time', time ? 'Média que o time deu a si mesmo na prévia (barra clara) e a nota que sai das suas respostas (barra colorida). Diferença de 15 pontos ou mais em destaque.' : 'A nota de cada dimensão, de 0 a 100, a partir das suas respostas.', 60);
+  DIMS.forEach(d => {
+    const v = vis[d.id]; const tm = time ? time[d.id] : null; const [c, cl] = EIXO[d.eixo];
+    precisa(11);
+    font(9.2, 'semi', C.ink); doc.text(T(d.nome), M, y + 4.2);
+    if (doresDims.includes(d.id)) { font(6.2, 'bold', C.warm); doc.text(T('LIGADA ÀS SUAS DORES'), M, y + 7.6); }
+    if (v != null) { if (tm != null) barra(M + 44, y + 1.2, CW - 104, 2, tm, C.baseL); barra(M + 44, y + (tm != null ? 4 : 2.2), CW - 104, 2.4, v, c); }
+    font(8.6, 'body', C.ink2); doc.text(T(v == null ? 'sem resposta' : tm != null ? `time ${tm} · você ${v}` : String(v)), M + CW - 30, y + 4.4, { align: 'right' });
+    if (v != null && tm != null && Math.abs(v - tm) >= 15) { font(7.2, 'bold', C.warn); doc.text(T(v > tm ? 'você vê acima' : 'você vê abaixo'), M + CW, y + 4.4, { align: 'right' }); }
+    color(C.line2, 'draw'); doc.setLineWidth(0.2); doc.line(M, y + 9.4, M + CW, y + 9.4); y += 10;
+  });
+
+  if (ultimo) {
+    const es = PATRO_ETAPAS.filter(([e]) => ultimo.dados.etapas[e]);
+    secao('O time', `O time · ${es.map(e => e[1]).join(' > ')}`, 'Dados consolidados e anônimos, uma execução por pessoa em cada etapa.', 60);
+    const perfisOrd = ['conselheiro', 'especialista', 'prestativo', 'reativo', 'insistente', 'desenvolvimento'].filter(k => es.some(([e]) => ultimo.dados.etapas[e].perfis[k]));
+    eyebrow('Perfil do time', M, y + 3, C.ink3, 6.4); y += 5;
+    const cw = (CW - 60) / es.length;
+    font(7.4, 'bold', C.ink3); es.forEach(([, nome], i) => doc.text(T(nome), M + 60 + i * cw + cw - 2, y + 3, { align: 'right' })); y += 5;
+    perfisOrd.forEach(k => { precisa(8); const hl = k === 'conselheiro';
+      if (hl) caixa(M, y - 1, CW, 7, C.warmT, null);
+      font(8.8, hl ? 'bold' : 'body', C.ink); doc.text(T(PROFILES[k].nome), M + 3, y + 3.6);
+      es.forEach(([e], i) => { const a = ultimo.dados.etapas[e]; font(8.8, 'body', C.ink2); doc.text(T(`${a.perfis[k] || 0} (${Math.round(100 * (a.perfis[k] || 0) / a.n)}%)`), M + 60 + i * cw + cw - 2, y + 3.6, { align: 'right' }); });
+      y += 7.5; });
+    y += 3;
+    eyebrow('As oito dimensões, na média do time', M, y + 3, C.ink3, 6.4); y += 6;
+    DIMS.forEach(d => { const vs = es.map(([e]) => ultimo.dados.etapas[e].dims[d.id]); const [c, cl] = EIXO[d.eixo];
+      const h = Math.max(10, vs.length * 2.8 + 4.5); precisa(h + 1);
+      font(9.2, 'semi', C.ink); doc.text(T(d.nome), M, y + 4.2); if (doresDims.includes(d.id)) { font(6.2, 'bold', C.warm); doc.text(T('LIGADA ÀS SUAS DORES'), M, y + 7.6); }
+      vs.forEach((v, i) => barra(M + 44, y + 1.2 + i * 2.8, CW - 104, 2, v, i === 0 ? C.baseL : i < vs.length - 1 ? cl : c));
+      font(8.6, 'body', C.ink2); doc.text(T(vs.join(' -> ')), M + CW, y + 4.4, { align: 'right' });
+      color(C.line2, 'draw'); doc.setLineWidth(0.2); doc.line(M, y + h - 0.6, M + CW, y + h - 0.6); y += h; });
+    if (ultimo.comentario) { y += 3; const h = altura(ultimo.comentario, 9.2, 'body', CW - 14) + 14; precisa(h + 3); caixa(M, y, CW, h, C.baseT, null); color(C.warmL, 'fill'); doc.rect(M, y, 1.4, h, 'F'); eyebrow(`Comentário de ${AUTOR}`, M + 7, y + 7); escrever(ultimo.comentario, M + 7, y + 9, 9.2, 'body', C.ink, CW - 14); y += h + 3; }
+  }
+  precisa(10); y += 3;
+  escrever('Os dados do time são consolidados e anônimos. O instrumento está em fase de validação; use a leitura como ferramenta de desenvolvimento.', M, y, 7.6, 'body', C.ink3, CW);
+  rodape();
+  return doc.output('blob');
+}
+async function exportPatroPDF() {
+  if (S.pdfBusy || !S.patro?.dados?.respostas) return;
+  S.pdfBusy = true; render();
+  try {
+    const blob = await buildPatroPDF();
+    const name = `patrocinador-oqgci-${(S.patro.turma.nome || 'turma').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.pdf`;
+    let dl = null;
+    try { if (window.claude && typeof window.claude.use === 'function') dl = await window.claude.use('downloads'); } catch (e) { dl = null; }
+    if (dl) { await dl.save({ filename: name, data: blob }); toast('Relatório salvo'); }
+    else if (!window.claude) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast('PDF baixado'); }
+    else toast('O download não está disponível nesta visualização');
+  } catch (e) { toast((e && e.message && e.message.length < 120) ? e.message : 'Não foi possível gerar o PDF agora.'); }
+  finally { S.pdfBusy = false; render(); }
+}
+
 /* ============================== FACILITADOR =============================== */
 async function loadPessoas() {
   try { S.fac.pessoas = await store.pessoas(); } catch (e) { S.fac.pessoas = []; S.fac.pessoasErro = e.message; }
@@ -3585,6 +4085,15 @@ function viewPessoas() {
   </div>`;
 }
 
+// Cartão do patrocínio na turma selecionada: quem é o patrocinador e acesso à área dele.
+function cartaoPatrocinio(t) {
+  const info = (S.fac.patroInfo || {})[t.id];
+  if (t.patrocinador_id && info === undefined) { S.fac.patroInfo = { ...(S.fac.patroInfo || {}), [t.id]: null }; store.patrocinadorDe(t.patrocinador_id).then(x => { S.fac.patroInfo[t.id] = x; render(); }).catch(() => {}); }
+  return `<div class="card stack" style="gap:10px"><h2 class="h-sec" style="margin:0">Patrocínio</h2>
+    <div class="validade-row small"><label for="tm-patro-email"><b>Patrocinador</b></label><input type="email" id="tm-patro-email" style="max-width:280px" placeholder="E-mail da conta do patrocinador" value="${esc(info?.email || '')}"><button type="button" class="btn btn-quiet btn-sm" data-act="patro-definir">Salvar</button></div>
+    <p class="small muted">${t.patrocinador_id ? `Patrocinador: <b style="color:var(--ink)">${esc(info?.nome || info?.email || '…')}</b>. Ele encontra a área do patrocinador no painel dele.` : 'O patrocinador cria uma conta no app com este e-mail; depois de salvo, a área dele aparece no painel.'} Os relatórios do time para ele são consolidados e anônimos, com o mínimo de ${PATRO_MIN} pessoas por etapa.</p>
+    <div class="actions"><button type="button" class="btn btn-ghost btn-sm" data-act="patro-abrir">Abrir a área do patrocinador</button></div></div>`;
+}
 function viewFacilitador() {
   const F = S.fac; const resAll = F.results || []; const turmas = F.turmas || [];
   const nModo = m => resAll.filter(x => modoDe(x.respostas?.negocio) === m).length;
@@ -3637,7 +4146,8 @@ function viewFacilitador() {
     <div class="stack" style="gap:10px"><span class="small muted">Turma selecionada${selT ? ` · código <b class="tnum" style="color:var(--ink)">${esc(selT.codigo)}</b> <button type="button" class="link-btn small" data-copy="${esc(selT.codigo)}">copiar</button> · tipo de negócio: <b style="color:var(--ink)">${selT.perguntar_nicho === false ? 'não pergunta' : 'pergunta'}</b> <button type="button" class="link-btn small" data-act="turma-nicho">alterar</button>` : ''}</span><div class="turma-chips">${chips}</div>
       ${selT ? `<div class="validade-row small"><span class="muted">Diagnósticos desta turma ${selT.expira_em ? (selT.expira_em >= hojeBR() ? 'liberados até' : 'encerrados · último dia') + ` <b style="color:var(--ink)">${fmtDia(selT.expira_em)}</b>` : '<b style="color:var(--ink)">sem prazo</b>'}</span><input type="date" id="tm-expira-sel" aria-label="Nova validade da turma" value="${esc(selT.expira_em || '')}"><button type="button" class="btn btn-quiet btn-sm" data-act="turma-expira">Salvar validade</button>${!selT.expira_em || selT.expira_em >= hojeBR() ? '<button type="button" class="btn btn-quiet btn-sm" data-act="turma-encerrar">Encerrar hoje</button>' : ''}</div>` : ''}
       ${selT ? `<div class="validade-row small"><span class="muted">Workshop ${selT.data_workshop ? `em <b style="color:var(--ink)">${fmtDia(selT.data_workshop)}</b>` : '<b style="color:var(--ink)">sem data</b>'}${selT.reavaliar_em ? ` · 45 dias a partir de <b style="color:var(--ink)">${fmtDia(selT.reavaliar_em)}</b>` : ''} · etapa de hoje: <b style="color:var(--ink)">${ETAPA_NOME[etapaTurma(selT, hojeBR())]}</b></span><input type="date" id="tm-workshop-sel" aria-label="Data do workshop" value="${esc(selT.data_workshop || '')}"><button type="button" class="btn btn-quiet btn-sm" data-act="turma-workshop">Salvar data do workshop</button></div>
-      <div class="validade-row small"><span class="muted">Turma <b style="color:var(--ink)">${selT.patrocinada ? 'patrocinada' : 'sem patrocinador'}</b></span><button type="button" class="link-btn small" data-act="turma-patrocinada">${selT.patrocinada ? 'marcar como sem patrocinador' : 'marcar como patrocinada'}</button></div>` : ''}</div>
+      <div class="validade-row small"><span class="muted">Turma <b style="color:var(--ink)">${selT.patrocinada ? 'patrocinada' : 'sem patrocinador'}</b></span><button type="button" class="link-btn small" data-act="turma-patrocinada">${selT.patrocinada ? 'marcar como sem patrocinador' : 'marcar como patrocinada'}</button></div>` : ''}
+      ${selT && selT.patrocinada ? cartaoPatrocinio(selT) : ''}</div>
     ${F.results === null ? '<p class="muted">Carregando…</p>' : modoChips + body}`}
   </div></main>`;
 }
@@ -3654,7 +4164,7 @@ function siteFooter() {
 }
 
 function render() {
-  const views = { inicio: viewInicio, referencias: viewReferencias, entrar: viewEntrar, painel: viewPainel, diagnostico: viewDiagnostico, resultado: viewResultado, evolucao: viewEvolucao, facilitador: viewFacilitador, 'nova-senha': viewNovaSenha };
+  const views = { inicio: viewInicio, referencias: viewReferencias, entrar: viewEntrar, painel: viewPainel, diagnostico: viewDiagnostico, resultado: viewResultado, evolucao: viewEvolucao, patrocinio: viewPatrocinio, facilitador: viewFacilitador, 'nova-senha': viewNovaSenha };
   trackVisit();
   $('#app').innerHTML = topBar() + views[S.route]() + siteFooter() + installBar();
   if (S.route === 'resultado') afterRenderResultado();
@@ -3662,7 +4172,7 @@ function render() {
 
 /* ================================ EVENTOS ================================= */
 document.addEventListener('click', async (ev) => {
-  const t = ev.target.closest('[data-go],[data-act],[data-tab],[data-ans],[data-sjt],[data-open],[data-fac-open],[data-turma],[data-copy],[data-seg],[data-modo],[data-fac-modo],[data-fac-tab],[data-fac-filtro],[data-evo-open],[data-evo-mine]');
+  const t = ev.target.closest('[data-go],[data-act],[data-tab],[data-ans],[data-sjt],[data-open],[data-fac-open],[data-turma],[data-copy],[data-seg],[data-modo],[data-fac-modo],[data-fac-tab],[data-fac-filtro],[data-evo-open],[data-evo-mine],[data-patro]');
   if (!t) return;
   if (t.dataset.go) { if (t.dataset.go === 'diagnostico' && !S.quiz) startQuiz(); go(t.dataset.go); return; }
   if (t.dataset.tab) { S.authTab = t.dataset.tab; S.authMsg = null; render(); return; }
@@ -3701,6 +4211,7 @@ document.addEventListener('click', async (ev) => {
     let serie = null; if (tipoEvo(e) === 'individual') { try { serie = await store.resultadosDe(e.user_id); } catch (x) { serie = null; } }
     S.evo = { ev: e, from: 'fac', serie }; go('evolucao'); return;
   }
+  if (t.dataset.patro) { const tm = (S.patroTurmas || []).find(x => x.id === t.dataset.patro); if (tm) await abrirPatrocinio(tm, false); return; }
   if (t.dataset.evoMine) { const e = (S.minhasEvos || []).find(x => x.id === t.dataset.evoMine); if (e) { S.evo = { ev: e, from: 'painel', serie: tipoEvo(e) === 'individual' ? (S.myResults || []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at)) : null }; go('evolucao'); } return; }
   if (t.dataset.facFiltro) { S.fac.filtro = t.dataset.facFiltro; render(); return; }
   if (t.dataset.turma) { S.fac.sel = t.dataset.turma; S.fac.results = null; S.fac.evos = null; S.fac.newCode = null; render(); try { S.fac.results = S.fac.sel === 'individuais' ? [] : await store.turmaResults(S.fac.sel); } catch (e) { S.fac.results = []; toast(e.message); } if (S.fac.tab === 'evolucao') await loadEvos(); render(); return; }
@@ -3736,6 +4247,32 @@ document.addEventListener('click', async (ev) => {
   else if (act === 'acesso-estender') {
     const id = t.dataset.user; const x = (S.fac.pessoas || []).find(p => p.id === id); if (!x) return;
     try { await store.definirAcesso(id, t.dataset.ate, x.acesso_bloqueado); await loadPessoas(); render(); toast('Acesso liberado até ' + fmtDia(t.dataset.ate)); } catch (e) { toast(e.message); }
+  }
+  else if (act === 'patro-editar') { S.patro.editando = true; S.patro.form = { ...(S.patro.dados.respostas?.respostas || {}) }; render(); window.scrollTo(0, 0); }
+  else if (act === 'patro-cancelar') { S.patro.editando = false; render(); window.scrollTo(0, 0); }
+  else if (act === 'patro-pdf') { exportPatroPDF(); }
+  else if (act === 'patro-abrir') { const tm = (S.fac.turmas || []).find(x => x.id === S.fac.sel); if (tm) await abrirPatrocinio(tm, true); }
+  else if (act === 'patro-definir') {
+    const tm = (S.fac.turmas || []).find(x => x.id === S.fac.sel); if (!tm) return;
+    const email = ($('#tm-patro-email')?.value || '').trim();
+    try {
+      const r = await store.definirPatrocinador(tm.id, email);
+      if (r.status === 'nao_encontrado') { toast('Nenhuma conta com este e-mail. Peça ao patrocinador para criar a conta no app com ele.'); return; }
+      S.fac.turmas = await store.listTurmas(); S.fac.patroInfo = { ...(S.fac.patroInfo || {}), [tm.id]: r.status === 'ok' ? { nome: r.nome, email: r.email } : null }; render();
+      toast(r.status === 'ok' ? 'Patrocinador definido: ' + (r.nome || r.email) : 'Patrocinador removido');
+    } catch (e) { toast(e.message); }
+  }
+  else if (act === 'patro-gerar') {
+    const P = S.patro; if (!P?.fac) return; const e = t.dataset.etapa;
+    const dados = dadosRelPatro(P.turma, P.results || [], e);
+    if (!dados.etapas[e]) { toast(`É preciso ter ao menos ${PATRO_MIN} pessoas nesta etapa.`); return; }
+    try { await store.salvarRelatorioPatro(P.turma.id, e, dados); P.dados = await store.getPatrocinio(P.turma.id); render(); toast('Relatório gerado como rascunho. Revise nesta página antes de liberar.'); } catch (x) { toast(x.message); }
+  }
+  else if (act === 'patro-liberar' || act === 'patro-recolher' || act === 'patro-comentar') {
+    const P = S.patro; if (!P?.fac) return; const id = t.dataset.id;
+    const patch = act === 'patro-comentar' ? { comentario: (document.querySelector(`[data-patro-com="${CSS.escape(id)}"]`)?.value || '').trim() || null }
+      : act === 'patro-liberar' ? { status: 'liberado', liberado_em: new Date().toISOString(), comentario: (document.querySelector(`[data-patro-com="${CSS.escape(id)}"]`)?.value || '').trim() || null } : { status: 'rascunho', liberado_em: null };
+    try { await store.atualizarRelatorioPatro(id, patch); P.dados = await store.getPatrocinio(P.turma.id); render(); toast(act === 'patro-liberar' ? 'Relatório liberado para o patrocinador' : act === 'patro-recolher' ? 'Relatório recolhido para rascunho' : 'Comentário salvo'); } catch (x) { toast(x.message); }
   }
   else if (act === 'exec-salvar') {
     const id = t.dataset.user; const x = (S.fac.pessoas || []).find(p => p.id === id); if (!x) return;
@@ -3886,6 +4423,13 @@ document.addEventListener('submit', async (ev) => {
       if (r.status !== 'ok') { render(); return msg(msgCodigo(r)); }
       await loadAcesso(); render(); toast('Acesso liberado · turma ' + r.nome);
     } catch (e) { S.busy = false; render(); msg(e.message); }
+  } else if (f.id === 'f-patro') {
+    const P = S.patro; const resp = lerFormPatro(); P.form = resp;
+    const erro = validarPatro(resp);
+    if (erro) { const el = $('#pt-msg'); if (el) { el.innerHTML = `<div class="msg msg-err" role="alert">${esc(erro)}</div>`; el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } return; }
+    S.busy = true; render();
+    try { await store.salvarPatrocinio(P.turma.id, resp); P.dados = await store.getPatrocinio(P.turma.id); P.editando = false; S.busy = false; try { S.patroTurmas = await store.minhasTurmasPatrocinadas(); } catch (x) { /* */ } render(); window.scrollTo(0, 0); toast('Respostas salvas'); }
+    catch (e) { S.busy = false; render(); const el = $('#pt-msg'); if (el) el.innerHTML = `<div class="msg msg-err" role="alert">${esc(e.message)}</div>`; }
   } else if (f.id === 'f-pedido') {
     const motivo = ($('#pd-motivo')?.value || '').trim();
     const pmsg = m => { const el = $('#pd-msg'); if (el) el.innerHTML = `<div class="msg msg-err" role="alert">${esc(m)}</div>`; };

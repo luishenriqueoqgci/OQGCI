@@ -52,6 +52,7 @@ Projetos criados com o `schema.sql` atual já têm tudo. Em projetos antigos, ro
 - `supabase/atualizacao-05-evolucao-individual.sql` · evolução individual opcional, habilitada pessoa a pessoa em Pessoas e acessos
 - `supabase/atualizacao-06-etapas-e-pedidos.sql` · etapas da turma (prévia, workshop e 45 dias), turma patrocinada, limite de execuções por pessoa e pedidos de nova execução; retira a evolução individual por data da 05
 - `supabase/atualizacao-07-evolucao-por-etapas.sql` · relatório de evolução por etapas (prévia, workshop e 45 dias), relatório interno prévia → workshop e relatório individual a cada nova execução
+- `supabase/atualizacao-08-patrocinador.sql` · área do patrocinador: indicação na turma patrocinada, questionário de dores e relatórios consolidados do time
 
 ## Observações
 - A chave anon public pode ficar no site: o acesso aos dados é protegido pelas regras de RLS do `schema.sql`.
