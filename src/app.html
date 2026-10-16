@@ -2149,7 +2149,7 @@ function oqgciMap(r, prev) {
 }
 
 function levelMeter(v, color, label) {
-  return `<div class="lvl-meter" role="img" aria-label="${label}: ${v} de 100"><div class="lvl-track"><i style="width:${Math.max(2, v)}%;background:${color}"></i><span style="left:40%"></span><span style="left:60%"></span><span style="left:80%"></span></div></div>`;
+  return `<div class="lvl-meter" role="img" aria-label="${label}: ${v} de 100"><div class="lvl-track"><i style="width:${Math.max(2, v)}%;background:${color}"></i><span style="left:25%"></span><span style="left:50%"></span><span style="left:75%"></span></div></div>`;
 }
 
 function confiabHTML(r) {
@@ -2276,7 +2276,7 @@ function viewResultado() {
     <div class="stack"><h2 class="h-sec" style="margin:0">Suas forças</h2>
       <div class="grid-3">${r.forcas.map(k => `<div class="card prio"><div class="prio-head"><strong>${DIM[k].nome}</strong><b class="tnum">${r.dims[k]}</b></div>${levelMeter(r.dims[k], eixoCor(DIM[k].eixo), DIM[k].nome)}<p class="muted small">${esc(V(pk.bands[k][bandOf(r.dims[k])], voc))}</p></div>`).join('')}</div></div>
 
-    <div class="stack"><div class="acc-headrow"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Leitura das oito dimensões</h2><p class="muted small">Toque em uma dimensão para abrir a leitura completa. As linhas na barra marcam os níveis 40, 60 e 80.</p></div><button class="btn btn-quiet btn-sm no-print" data-act="acc-all" data-target="dim-acc">Abrir todas</button></div>
+    <div class="stack"><div class="acc-headrow"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Leitura das oito dimensões</h2><p class="muted small">Toque em uma dimensão para abrir a leitura completa.</p></div><button class="btn btn-quiet btn-sm no-print" data-act="acc-all" data-target="dim-acc">Abrir todas</button></div>
       <div class="acc-list">${dimCards}</div></div>
 
     <div class="stack"><div class="acc-headrow"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Sua postura nas situações</h2><p class="muted small">Toque em uma situação para ver a sua resposta, o efeito dela na decisão do cliente e por que a resposta assertiva funciona.</p></div><button class="btn btn-quiet btn-sm no-print" data-act="acc-all" data-target="sit-acc">Abrir todas</button></div>
@@ -2341,7 +2341,7 @@ async function buildPDF(rec) {
     y += gap;
   };
   const h2 = t => { need(28); y += 3; font(13, 'bold', C.ink); doc.text(pdfText(t), M, y + 5); y += 8; color(C.warm, 'draw'); doc.setLineWidth(0.6); doc.line(M, y, M + 14, y); y += 5; };
-  const bar = (x, yy, w, h, v, c) => { color(C.line, 'fill'); doc.roundedRect(x, yy, w, h, h / 2, h / 2, 'F'); color(c, 'fill'); doc.roundedRect(x, yy, Math.max(h, w * v / 100), h, h / 2, h / 2, 'F'); color([255, 255, 255], 'draw'); doc.setLineWidth(0.3); [40, 60, 80].forEach(t => doc.line(x + w * t / 100, yy, x + w * t / 100, yy + h)); };
+  const bar = (x, yy, w, h, v, c, marcas = [40, 60, 80]) => { color(C.line, 'fill'); doc.roundedRect(x, yy, w, h, h / 2, h / 2, 'F'); color(c, 'fill'); doc.roundedRect(x, yy, Math.max(h, w * v / 100), h, h / 2, h / 2, 'F'); color([255, 255, 255], 'draw'); doc.setLineWidth(0.3); marcas.forEach(t => doc.line(x + w * t / 100, yy, x + w * t / 100, yy + h)); };
   const eixoRGB = e => e === 'aprox' ? C.warm : e === 'afast' ? C.cool : C.ink2;
 
   // Capa
@@ -2386,11 +2386,11 @@ async function buildPDF(rec) {
   DIMS.forEach(d => {
     need(9); const v = r.dims[d.id];
     font(9.5, 'bold', C.ink); doc.text(pdfText(`${d.id} ${d.nome}`), M, y + 3.4);
-    bar(M + 40, y + 1, CW - 72, 3.2, v, eixoRGB(d.eixo));
+    bar(M + 40, y + 1, CW - 72, 3.2, v, eixoRGB(d.eixo), [25, 50, 75]);
     font(9.5, 'bold', C.ink); doc.text(String(v), M + CW - 22, y + 3.6, { align: 'right' }); font(8.5, 'normal', C.ink3); doc.text(pdfText(levelOf(v).nome), M + CW, y + 3.6, { align: 'right' });
     y += 7.5;
   });
-  font(8, 'normal', C.ink3); doc.text(pdfText('Cor dourada: Aproximação · azul: Afastamento · cinza: linha de base. As marcas na barra indicam os níveis 40, 60 e 80.'), M, y + 2); y += 8;
+  font(8, 'normal', C.ink3); doc.text(pdfText('Cor dourada: Aproximação · azul: Afastamento · cinza: linha de base.'), M, y + 2); y += 8;
 
   h2('Leitura das dimensões');
   const items = rec.respostas?.items;
