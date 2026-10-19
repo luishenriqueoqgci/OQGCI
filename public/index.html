@@ -422,6 +422,15 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .evo-ponto.on { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
 .evo-ponto.on b { color: var(--ink); }
 .evo-grupo { display: grid; gap: 8px; }
+.patro-resumo p:first-of-type { font-size: 17px; line-height: 1.6; }
+.patro-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.patro-dado { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.patro-dado p { flex: 1 1 260px; }
+.patro-big { font-family: var(--font-display); font-size: 40px; font-weight: 300; line-height: 1; white-space: nowrap; }
+table.pessoas td { white-space: normal; }
+table.pessoas td:first-child { min-width: 180px; }
+table.pessoas td:last-child { min-width: 300px; }
+table.pessoas .acesso-acoes { flex-wrap: wrap; }
 .patro-q { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; }
 .patro-q legend { font-weight: 600; font-size: 15px; line-height: 1.45; margin-bottom: 8px; padding: 0; }
 .patro-q + .patro-q { border-top: 1px solid var(--line); padding-top: 16px; }
@@ -807,6 +816,7 @@ const SEGMENTS = [
   { id: 'educacao', nome: 'Educação e cursos', cliente: 'aluno', clientes: 'alunos', atendimento: 'aula', primeiro: 'uma aula experimental' },
   { id: 'imobiliario', nome: 'Imobiliário', cliente: 'cliente', clientes: 'clientes', atendimento: 'visita', primeiro: 'uma visita' },
   { id: 'consultoria', nome: 'Consultoria', cliente: 'cliente', clientes: 'clientes', atendimento: 'reunião', primeiro: 'uma reunião de diagnóstico' },
+  { id: 'seguros', nome: 'Seguros e serviços financeiros', cliente: 'cliente', clientes: 'clientes', atendimento: 'reunião', primeiro: 'uma análise do seu caso', cotacao: true },
   { id: 'outro', nome: 'Outro', cliente: 'cliente', clientes: 'clientes', atendimento: 'atendimento', primeiro: 'uma primeira conversa' }
 ];
 const SEG = Object.fromEntries(SEGMENTS.map(x => [x.id, x]));
@@ -822,8 +832,13 @@ function V(t, voc) {
     .replace(/\{clientes\}/g, voc.clientes).replace(/\{cliente\}/g, voc.cliente).replace(/\{atendimento\}/g, voc.atendimento)
     .replace(/\{primeiro\}/g, voc.primeiro).replace(/\{oferta\}/g, voc.oferta)
     .replace(/\bClientes\b/g, cap(voc.clientes)).replace(/\bclientes\b/g, voc.clientes)
-    .replace(/\bCliente\b/g, cap(voc.cliente)).replace(/\bcliente\b/g, voc.cliente);
+    .replace(/\bCliente\b/g, cap(voc.cliente)).replace(/\bcliente\b/g, voc.cliente)
+    .replace(COTACAO_RE, m => voc.cotacao ? COTACAO_MAP[m] : m);
 }
+// Em seguros, orçamento vira cotação, com artigo e plural no gênero certo.
+const COTACAO = [['Muitos orçamentos', 'Muitas cotações'], ['os orçamentos', 'as cotações'], ['o orçamento', 'a cotação'], ['O orçamento', 'A cotação'], ['um orçamento', 'uma cotação'], ['do orçamento', 'da cotação'], ['no orçamento', 'na cotação'], ['Orçamentos', 'Cotações'], ['orçamentos', 'cotações'], ['Orçamento', 'Cotação'], ['orçamento', 'cotação']];
+const COTACAO_MAP = Object.fromEntries(COTACAO);
+const COTACAO_RE = new RegExp('(?<![A-Za-zÀ-ú])(?:' + COTACAO.map(([a]) => a).join('|') + ')', 'g');
 function negocioLinha(rec) {
   const n = rec?.respostas?.negocio; if (!n || !n.segmento) return '';
   return 'Seu negócio: ' + (SEG[n.segmento]?.nome || 'Outro') + (n.oferta ? ' · ' + n.oferta : '') + (n.modo === 'contato' ? ' · clientes escolhem sozinhos' : '');
@@ -1574,6 +1589,56 @@ const PATRO_EXEMPLO_REL = (() => {
 const PATRO_VISTOS = 'oqgci-patro-vistos';
 const patroNovo = x => Boolean(x.patrocinador && x.patro_respondido && !x.patro_turmas && (LS.get(PATRO_VISTOS) || {})[x.id] !== x.patro_respondido);
 const patroNovos = () => (S.fac.pessoas || []).filter(patroNovo).length;
+// O que o time pratica no workshop para cada dor e o que o patrocinador acompanha depois.
+const PATRO_DORES_PROG = {
+  1: { workshop: 'O time pratica as respostas para "quanto custa?" e "faz desconto?", mostra ao cliente o custo de continuar com o problema antes de falar de preço e, diante do pedido de desconto, ajusta formato, prazo ou quantidade e preserva o valor.', sinal: 'Descontos concedidos sem pedido do cliente e o desconto médio do time.' },
+  2: { workshop: 'O time pratica a recomendação clara, com duas ou três opções e o risco fora da mesa, e encerra cada conversa com um próximo passo e uma data. Treina também a retomada do cliente que sumiu, com algo útil e sem cobrança.', sinal: 'Orçamentos com próximo passo combinado e respostas na retomada.' },
+  3: { workshop: 'O time pratica perguntas que ajudam o cliente a medir, com os números dele, quanto custa deixar como está, e fecha a conversa com uma recomendação direta e um próximo passo seguro.', sinal: 'Conversas que terminam em "vou pensar" e o tempo entre o primeiro contato e a decisão.' },
+  4: { workshop: 'O time pratica perguntar e entender o caso do cliente antes de apresentar, e prepara leituras novas para os problemas mais comuns, que mostram ao cliente uma diferença que ele ainda não tinha percebido.', sinal: 'Clientes que comparam só por preço e reações do tipo "nunca tinha pensado nisso desse jeito".' },
+  5: { workshop: 'O time pratica conhecer a situação completa do cliente antes de recomendar e leva a ele o que ainda não tinha considerado no próprio caso.', sinal: 'Ticket médio e itens por venda.' },
+  6: { workshop: 'O time trabalha a intenção de ajudar como base da conversa, com o teste da família, e pratica pedir avaliação e indicação ao final de cada atendimento que deu certo.', sinal: 'Indicações e avaliações pedidas e recebidas no mês.' },
+  7: { workshop: 'O time pratica perguntar cedo quem mais participa da decisão, entender o que importa para quem usa, quem paga e quem influencia, e preparar o cliente com um resumo para essa conversa.', sinal: 'Conversas com quem decide junto e vendas vetadas por quem não participou.' },
+  8: { workshop: 'O time pratica recomendar o que resolve o caso do cliente e combinar o próximo passo também depois da compra.', sinal: 'Taxa de recompra e clientes que voltam pelo próximo passo combinado.' },
+  9: { workshop: 'O time inteiro aprende o mesmo jeito de conduzir a venda, em quatro movimentos, e cada pessoa sai com um plano de três semanas a partir do próprio diagnóstico.', sinal: 'A diferença entre as pessoas do time no diagnóstico e nos resultados.' },
+  10: { workshop: 'O time pratica identificar quem decide e combinar um próximo passo com data em cada negociação, o que deixa o andamento de cada venda visível.', sinal: 'Negociações com quem decide mapeado e próximo passo registrado.' }
+};
+PATRO_DORES.forEach(d => Object.assign(d, PATRO_DORES_PROG[d.id] || {}));
+// A pergunta do cliente em cada dimensão (a mesma da página inicial).
+const DIM_PERGUNTA = { D1: 'Essa pessoa quer o meu bem?', D2: 'Por que eu confiaria antes mesmo de conversar?', D3: 'Ele entende a minha situação?', D4: 'O que eu ainda não sabia sobre isso?', D7: 'Como eu decido com quem decide comigo?', D5: 'Quanto me custa deixar como está?', D6: 'Qual é o próximo passo seguro?', D8: 'Posso decidir sem me sentir pressionado?' };
+// Argumentos do programa no relatório do patrocinador (os mesmos da apresentação comercial).
+const PATRO_EIXOS = [
+  { nome: 'Aproximação', cor: 'var(--c-warm)', pdf: 'warm', t: 'O cliente percebe o que ganha. O cérebro antecipa o ganho no circuito de recompensa.', dims: 'Presença · Espelho · Virada · Quem decide' },
+  { nome: 'Afastamento', cor: 'var(--c-cool)', pdf: 'cool', t: 'O cliente se livra do custo de ficar parado, do medo de errar e da pressão. Perder pesa cerca de duas vezes mais que ganhar.', dims: 'Custo · Caminho · Condução' },
+  { nome: 'Linha de base', cor: 'var(--ink-2)', pdf: 'base', t: 'O interesse genuíno em ajudar o cliente. Julgamos a intenção de alguém antes da competência.', dims: 'Propósito' }
+];
+const PATRO_MOVIMENTOS = [
+  ['1', 'Espelho', 'Mostrar que conhece a realidade do cliente e perguntar antes de apresentar.', '"É exatamente isso."'],
+  ['2', 'Virada', 'Levar ao cliente uma leitura nova sobre o próprio problema.', '"Nunca tinha pensado nisso desse jeito."'],
+  ['3', 'Custo', 'Ajudar o cliente a medir quanto custa deixar como está, sem exagero.', 'o cliente diz o custo com as próprias palavras.'],
+  ['4', 'Caminho', 'Recomendar com clareza, com poucas opções, o risco fora da mesa e o próximo passo combinado.', 'a conversa termina com data combinada.']
+];
+const PATRO_PROGRAMA = [
+  ['Prévia', 'Antes do workshop', 'cada pessoa faz o diagnóstico on-line, em cerca de 15 minutos, e recebe o relatório completo na hora.', 'o retrato inicial do time, consolidado e anônimo, ao lado da sua visão.'],
+  ['Workshop', 'Dia presencial', 'um dia inteiro ou meio dia de prática sobre as situações reais do time, e um plano de três semanas para cada pessoa.', 'o comparativo do time entre a prévia e o workshop.'],
+  ['Reavaliação', '45 dias depois', 'cada pessoa refaz o diagnóstico e recebe o relatório de evolução, revisado por ' + AUTOR + '.', 'o comparativo completo e o avanço do time rumo ao perfil Conselheiro, com comentário.']
+];
+const PATRO_CONFIDENCIAL = [
+  'Você vê dados do time consolidados e anônimos: médias e distribuição de perfis, sem nomes e sem respostas individuais.',
+  'Cada relatório do time exige pelo menos ' + PATRO_MIN + ' pessoas na etapa, para que ninguém seja identificado.',
+  'Os relatórios do time e de evolução são revisados e liberados um a um por ' + AUTOR + '.',
+  'O diagnóstico individual fica com a pessoa. As respostas seguem a LGPD, com autorização no cadastro. É isso que permite ao time responder com franqueza.'
+];
+const PATRO_PRECO = 'R$ 20.000';
+const PATRO_TURMA_MAX = 24;
+const PATRO_INCLUI = [
+  'Diagnóstico completo de cada pessoa, na prévia',
+  'Questionário e relatório do patrocinador',
+  'Workshop presencial, dia inteiro ou meio dia',
+  'Caderno do participante, cartas de situação e pôster com o mapa da turma',
+  'Nova execução do diagnóstico no workshop',
+  'Reavaliação aos 45 dias, com o relatório de evolução de cada pessoa',
+  'Três relatórios do time para você: prévia, workshop e 45 dias'
+];
 const modoPatro = r => r?.C3 === 'contato' ? 'contato' : 'conversa';
 
 function DemoStore() {
@@ -2375,7 +2440,7 @@ function viewDiagnostico() {
 function patroFormMudou(ev) {
   if (!S.patro || !ev.target.closest('#f-patro')) return false;
   const nome = ev.target.name; S.patro.form = lerFormPatro();
-  if (ev.type === 'change' && ['C3', 'D1', 'D3'].includes(nome)) { const y0 = window.scrollY; render(); window.scrollTo(0, y0); }
+  if (ev.type === 'change' && ['C2', 'C3', 'D1', 'D3'].includes(nome)) { const y0 = window.scrollY; render(); window.scrollTo(0, y0); }
   return true;
 }
 document.addEventListener('change', (ev) => { patroFormMudou(ev); });
@@ -3772,23 +3837,24 @@ function dadosRelPatro(t, results, etapa) {
 function viewPatroForm() {
   const P = S.patro; const f = P.form || {};
   const modo = modoPatro(f);
+  const vocF = vocabOf({ segmento: f.C2, oferta: f.C8 });
   const radio = (name, ops) => `<div class="patro-ops">${ops.map(([v, t]) => `<label class="check"><input type="radio" name="${name}" value="${esc(v)}" ${String(f[name] ?? '') === String(v) ? 'checked' : ''}><span>${esc(t)}</span></label>`).join('')}</div>`;
   const escala = [...SCALE.map((t, i) => [String(i + 1), `${t} · ${SCALE_SUB[i]}`]), ['0', 'Não sei dizer']];
-  const itens = PATRO_ITENS[modo].map(([id, , , t], k) => `<fieldset class="patro-q"><legend><span class="dim-code">${k + 1}</span> ${esc(t)}</legend><div class="patro-escala">${escala.map(([v, lab]) => `<label class="pill-radio"><input type="radio" name="${id}" value="${v}" ${String(f[id] ?? '') === v ? 'checked' : ''}><span>${esc(lab)}</span></label>`).join('')}</div></fieldset>`).join('');
+  const itens = PATRO_ITENS[modo].map(([id, , , t], k) => `<fieldset class="patro-q"><legend><span class="dim-code">${k + 1}</span> ${esc(V(t, vocF))}</legend><div class="patro-escala">${escala.map(([v, lab]) => `<label class="pill-radio"><input type="radio" name="${id}" value="${v}" ${String(f[id] ?? '') === v ? 'checked' : ''}><span>${esc(lab)}</span></label>`).join('')}</div></fieldset>`).join('');
   const d1 = Array.isArray(f.D1) ? f.D1.map(String) : [];
   return `<form id="f-patro" class="stack-lg" novalidate>
     <div class="card stack"><span class="eyebrow">Parte 1 · Contexto do time</span>
       <div class="field" style="max-width:280px"><label for="pt-C1">Quantas pessoas do time vão participar do workshop?</label><input id="pt-C1" name="C1" type="number" min="1" max="500" value="${esc(f.C1 || '')}"></div>
-      ${PATRO_CTX.map(q => `<fieldset class="patro-q"><legend>${esc(q.t)}</legend>${radio(q.id, q.ops)}</fieldset>`).join('')}
+      ${PATRO_CTX.map(q => `<fieldset class="patro-q"><legend>${esc(q.t)}</legend>${radio(q.id, q.ops)}</fieldset>` + (q.id === 'C2' ? `<div class="field"><label for="pt-C8">O que a sua empresa vende, em poucas palavras${f.C2 === 'outro' ? '' : ' <span class="muted">(opcional)</span>'}</label><input id="pt-C8" name="C8" type="text" maxlength="80" autocomplete="off" placeholder="Ex.: seguros empresariais e de vida" value="${esc(f.C8 || '')}"></div>` : '')).join('')}
     </div>
     <div class="card stack"><span class="eyebrow">Parte 2 · O que você vê no time</span>
       <p class="small muted">${modo === 'contato' ? 'Pense nas últimas semanas do negócio. Em quantos de cada 10 atendimentos ou visitas você vê isso acontecer?' : 'Pense nas últimas semanas de venda do time. Em quantas de cada 10 vendas você vê isso acontecer?'}</p>
       ${itens}
     </div>
     <div class="card stack"><span class="eyebrow">Parte 3 · Dores e resultados esperados</span>
-      <fieldset class="patro-q"><legend>Quais destas situações mais pesam no resultado do seu negócio hoje? Escolha até três.</legend><div class="patro-ops">${PATRO_DORES.map(x => `<label class="check"><input type="checkbox" name="D1" value="${x.id}" ${d1.includes(String(x.id)) ? 'checked' : ''}><span>${esc(x.t)}</span></label>`).join('')}</div></fieldset>
-      <fieldset class="patro-q"><legend>Entre as que você escolheu, qual custa mais ao negócio hoje?</legend>${d1.length ? radio('D2', PATRO_DORES.filter(x => d1.includes(String(x.id))).map(x => [String(x.id), x.t])) : '<p class="small muted">Escolha as situações acima para responder.</p>'}</fieldset>
-      <fieldset class="patro-q"><legend>Que número você quer ver mudar nos 90 dias depois do workshop?</legend>${radio('D3', PATRO_METRICAS)}
+      <fieldset class="patro-q"><legend>Quais destas situações mais pesam no resultado do seu negócio hoje? Escolha até três.</legend><div class="patro-ops">${PATRO_DORES.map(x => `<label class="check"><input type="checkbox" name="D1" value="${x.id}" ${d1.includes(String(x.id)) ? 'checked' : ''}><span>${esc(V(x.t, vocF))}</span></label>`).join('')}</div></fieldset>
+      <fieldset class="patro-q"><legend>Entre as que você escolheu, qual custa mais ao negócio hoje?</legend>${d1.length ? radio('D2', PATRO_DORES.filter(x => d1.includes(String(x.id))).map(x => [String(x.id), V(x.t, vocF)])) : '<p class="small muted">Escolha as situações acima para responder.</p>'}</fieldset>
+      <fieldset class="patro-q"><legend>Que número você quer ver mudar nos 90 dias depois do workshop?</legend>${radio('D3', PATRO_METRICAS.map(([k, t]) => [k, V(t, vocF)]))}
         ${f.D3 === 'outro' ? `<div class="field" style="max-width:420px"><label for="pt-D3n">Nome do indicador</label><input id="pt-D3n" name="D3_nome" type="text" value="${esc(f.D3_nome || '')}"></div>` : ''}
         <div class="inline-form" style="max-width:520px"><div class="field"><label for="pt-D3a">Valor de hoje (se souber)</label><input id="pt-D3a" name="D3_atual" type="text" value="${esc(f.D3_atual || '')}"></div><div class="field"><label for="pt-D3m">Meta</label><input id="pt-D3m" name="D3_meta" type="text" value="${esc(f.D3_meta || '')}"></div></div></fieldset>
       <div class="field"><label for="pt-D4">Conte uma venda recente que o time perdeu e que, na sua leitura, não deveria ter perdido.</label><textarea id="pt-D4" name="D4" maxlength="2000" style="min-height:110px">${esc(f.D4 || '')}</textarea></div>
@@ -3808,6 +3874,7 @@ function lerFormPatro() {
 function validarPatro(f) {
   if (!f.C1 || Number(f.C1) < 1) return 'Informe quantas pessoas do time vão participar.';
   for (const q of PATRO_CTX) if (!f[q.id]) return 'Responda a pergunta: ' + q.t;
+  if (f.C2 === 'outro' && !(f.C8 || '').trim()) return 'Conte em poucas palavras o que a sua empresa vende.';
   const faltam = PATRO_ITENS[modoPatro(f)].filter(i => f[i[0]] == null || f[i[0]] === '').length;
   if (faltam) return `Faltam ${faltam} ${faltam === 1 ? 'afirmação' : 'afirmações'} na Parte 2. Se não souber, marque "Não sei dizer".`;
   if (!f.D1.length) return 'Escolha ao menos uma situação que pesa no resultado.';
@@ -3846,6 +3913,31 @@ function blocoTimePatro(rel, doresDims) {
   </div>`;
 }
 
+// Relatório do patrocinador: leitura dele, argumentos do programa e, na pré-venda, investimento e próximo passo.
+function conteudoPatro(P) {
+  const resp = P.dados.respostas.respostas;
+  const voc = vocabOf({ segmento: resp.C2, oferta: resp.C8 });
+  const v = t => V(t, voc);
+  const lc = t => t ? t.charAt(0).toLowerCase() + t.slice(1) : t;
+  const lista = xs => xs.length <= 1 ? (xs[0] || '') : xs.slice(0, -1).join(', ') + ' e ' + xs.at(-1);
+  const dores = (resp.D1 || []).map(Number).map(id => PATRO_DORES.find(x => x.id === id)).filter(Boolean).sort((a, b) => (b.id === Number(resp.D2)) - (a.id === Number(resp.D2)));
+  const doresDims = [...new Set(dores.flatMap(x => x.dims))];
+  const nomesDims = ids => ids.length === 8 ? 'as oito dimensões do método' : lista(ids.map(k => DIM[k].nome));
+  const vis = dimsPatro(resp);
+  const lacunas = DIMS.filter(d => vis[d.id] != null).sort((a, b) => vis[a.id] - vis[b.id]).slice(0, 3);
+  const metr = PATRO_METRICAS.find(m => m[0] === resp.D3);
+  const numero = metr ? (resp.D3 === 'outro' ? (resp.D3_nome || '').trim() : V(metr[1], voc)) : '';
+  const negocio = [SEG[resp.C2]?.nome, (resp.C8 || '').trim()].filter(Boolean).join(' · ');
+  const principal = dores[0];
+  const resumo = [
+    principal ? `Na sua leitura, o que mais pesa hoje no resultado do negócio é: ${lc(v(principal.t))}` : '',
+    principal ? `Essa dor está ligada a ${nomesDims(principal.dims)}, e é sobre esses pontos que o workshop trabalha com o time.` : '',
+    lacunas.length ? `Na sua visão do time, as maiores lacunas estão em ${lista(lacunas.map(d => d.nome))}.` : '',
+    numero ? `O número que você quer ver mudar: ${lc(numero)}.` : ''
+  ].filter(Boolean).join(' ');
+  return { resp, voc, v, dores, doresDims, nomesDims, vis, lacunas, metr, numero, negocio, resumo, pre: !P.turma.id };
+}
+
 function viewPatrocinio() {
   const P = S.patro; const t = P.turma;
   if (!P.dados) return `<main class="page"><div class="wrap narrow"><p class="muted">Carregando…</p></div></main>`;
@@ -3860,39 +3952,65 @@ function viewPatrocinio() {
   if (!resp) {
     return `<main class="page"><div class="wrap stack-lg">${head}<div class="msg" role="status">O patrocinador ainda não respondeu o questionário.</div>${P.fac && t.id ? viewPatroFac() : ''}${voltar}</div></main>`;
   }
-  const dores = (resp.D1 || []).map(Number).map(id => PATRO_DORES.find(x => x.id === id)).filter(Boolean).sort((a, b) => (b.id === Number(resp.D2)) - (a.id === Number(resp.D2)));
-  const doresDims = [...new Set(dores.flatMap(x => x.dims))];
-  const vis = dimsPatro(resp);
+  const K = conteudoPatro(P); const { v, dores, doresDims, vis } = K;
   const rels = (P.dados.relatorios || []).filter(r => P.fac || r.status === 'liberado').sort((a, b) => PATRO_ETAPAS.findIndex(e => e[0] === b.etapa) - PATRO_ETAPAS.findIndex(e => e[0] === a.etapa));
   const relPrevia = rels.find(r => r.etapa === 'previa' && r.dados.etapas.previa);
   const time = relPrevia ? relPrevia.dados.etapas.previa.dims : null;
-  const metr = PATRO_METRICAS.find(m => m[0] === resp.D3);
-  const blocoDores = `<div class="stack"><h2 class="h-sec" style="margin:0">As dores que você apontou</h2>
-    ${dores.map((x, i) => `<div class="card stack${i === 0 ? ' evo-chamada' : ''}" style="gap:8px">${i === 0 ? '<span class="eyebrow">A que mais custa hoje</span>' : ''}<strong style="font-size:17px">${esc(x.t)}</strong>
-      <p class="small"><span class="muted">O que está em jogo:</span> ${esc(x.jogo)}</p>
-      <p class="small"><span class="muted">Dimensões ligadas:</span> ${x.dims.length === 8 ? 'as oito' : x.dims.map(k => DIM[k].nome).join(', ')} · <span class="muted">Onde o workshop atua:</span> ${esc(x.modulo)}</p></div>`).join('')}</div>`;
+  const secTitulo = (eb, h, lead) => `<div class="stack" style="gap:6px"><span class="eyebrow">${eb}</span><h2 class="h-sec" style="margin:0">${h}</h2>${lead ? `<p class="muted small">${lead}</p>` : ''}</div>`;
+
+  const blocoResumo = `<div class="card stack evo-chamada patro-resumo" style="gap:10px"><span class="eyebrow">Em resumo</span><p>${esc(K.resumo)}</p>${K.negocio ? `<p class="small muted">Seu negócio: ${esc(K.negocio)}</p>` : ''}</div>`;
+
+  const blocoDores = `<div class="stack">${secTitulo('O que você apontou', 'As dores do negócio', 'Cada dor mostra o que está em jogo, o que o time pratica no workshop para mudar esse ponto e o que acompanhar depois.')}
+    ${dores.map((x, i) => `<div class="card stack${i === 0 ? ' evo-chamada' : ''}" style="gap:10px">${i === 0 ? '<span class="eyebrow">A que mais custa hoje</span>' : ''}<strong style="font-size:17px">${esc(v(x.t))}</strong>
+      <p class="small"><span class="muted">O que está em jogo:</span> ${esc(v(x.jogo))}</p>
+      <p class="small"><span class="muted">O que o time pratica no workshop:</span> ${esc(v(x.workshop))}</p>
+      <p class="small"><span class="muted">O que acompanhar:</span> ${esc(v(x.sinal))}</p>
+      <p class="small muted">Dimensões ligadas: ${esc(K.nomesDims(x.dims))}</p></div>`).join('')}</div>`;
+
+  const blocoNumero = K.numero ? `<div class="card stack" style="gap:8px"><h2 class="h-sec" style="margin:0">O número que você quer ver mudar</h2><p><strong>${esc(K.numero)}</strong></p><p class="small muted">Hoje: ${esc(K.resp.D3_atual || 'não informado')} · Meta: ${esc(K.resp.D3_meta || 'não informada')}. É a referência de negócio para a conversa de acompanhamento do time depois do workshop.</p></div>` : '';
+
   const visRows = DIMS.map(d => {
-    const v = vis[d.id]; const tm = time ? time[d.id] : null; const gap = v != null && tm != null ? v - tm : null;
-    return `<div class="evo-row"><span><strong>${d.nome}</strong>${doresDims.includes(d.id) ? ' <span class="tag">ligada às suas dores</span>' : ''}</span>${v == null ? '<span class="small muted">sem resposta</span>' : evoBars(tm != null ? [tm, v] : [v], eixoCorEvo(d.eixo))}<span class="tnum evo-ab">${v == null ? '—' : tm != null ? `time ${tm} · <b>você ${v}</b>` : `<b>${v}</b>`}</span>${gap != null && Math.abs(gap) >= 15 ? `<span class="delta" style="color:var(--warn);border-color:color-mix(in srgb, var(--warn) 50%, transparent)">${gap > 0 ? 'você vê acima' : 'você vê abaixo'}</span>` : '<span></span>'}</div>`;
+    const vv = vis[d.id]; const tm = time ? time[d.id] : null; const gap = vv != null && tm != null ? vv - tm : null;
+    return `<div class="evo-row"><span><strong>${d.nome}</strong>${doresDims.includes(d.id) ? ' <span class="tag">ligada às suas dores</span>' : ''}</span>${vv == null ? '<span class="small muted">sem resposta</span>' : evoBars(tm != null ? [tm, vv] : [vv], eixoCorEvo(d.eixo))}<span class="tnum evo-ab">${vv == null ? '—' : tm != null ? `time ${tm} · <b>você ${vv}</b>` : `<b>${vv}</b>`}</span>${gap != null && Math.abs(gap) >= 15 ? `<span class="delta" style="color:var(--warn);border-color:color-mix(in srgb, var(--warn) 50%, transparent)">${gap > 0 ? 'você vê acima' : 'você vê abaixo'}</span>` : '<span></span>'}</div>`;
   }).join('');
   const blocoVisao = `<div class="card stack"><h2 class="h-sec" style="margin:0">A sua visão do time${time ? ' e a visão do próprio time' : ''}</h2>
-    <p class="small muted">${time ? 'Cada dimensão mostra a média que o time deu a si mesmo na prévia e a nota que sai das suas respostas. Uma diferença de 15 pontos ou mais aparece em destaque e vale uma conversa.' : 'A nota de cada dimensão sai das suas respostas, de 0 a 100. Depois da prévia do time, a média que o time dá a si mesmo aparece ao lado.'}</p>
-    <div class="evo-rows">${visRows}</div>${time ? `<div class="legend"><span><i class="swatch" style="background:var(--ink-3);opacity:.5"></i>O time sobre si</span><span><i class="swatch" style="background:var(--accent)"></i>A sua visão</span></div>` : ''}</div>`;
-  const blocoNumero = metr ? `<div class="card stack" style="gap:8px"><h2 class="h-sec" style="margin:0">O número para acompanhar</h2><p><strong>${esc(resp.D3 === 'outro' ? resp.D3_nome : metr[1])}</strong></p><p class="small muted">Hoje: ${esc(resp.D3_atual || 'não informado')} · Meta: ${esc(resp.D3_meta || 'não informada')}. Retomamos este número nos 45 dias.</p></div>` : '';
+    <p class="small muted">${time ? 'Cada dimensão mostra a média que o time deu a si mesmo na prévia e a nota que sai das suas respostas. Uma diferença de 15 pontos ou mais aparece em destaque e vale uma conversa.' : 'A nota de cada dimensão sai das suas respostas, de 0 a 100, e mostra a sua leitura geral do time. Depois da prévia, a média que o time dá a si mesmo aparece ao lado.'}</p>
+    <div class="evo-rows">${visRows}</div>${time ? `<div class="legend"><span><i class="swatch" style="background:var(--ink-3);opacity:.5"></i>O time sobre si</span><span><i class="swatch" style="background:var(--accent)"></i>A sua visão</span></div>` : ''}
+    ${K.lacunas.length ? `<div class="subbloco" style="justify-items:stretch"><span class="subbloco-t">As maiores lacunas na sua visão</span>${K.lacunas.map(d => `<p class="small"><b>${d.nome}</b> · <span class="muted">o cliente pergunta</span> “${esc(v(DIM_PERGUNTA[d.id]))}” <span class="muted">· ${esc(v(d.mede))}</span></p>`).join('')}</div>` : ''}</div>`;
+
+  const blocoLogica = `<div class="stack">${secTitulo('A lógica do método', 'Todo cliente decide com uma pergunta: o que eu ganho com isto?', v('O cliente se aproxima do que lhe faz bem e se afasta do que lhe faz mal. O time que conduz a conversa por essa pergunta mostra ao cliente o ganho, o custo de deixar como está e um caminho seguro para decidir.'))}
+    <div class="patro-cols">${PATRO_EIXOS.map(e => `<div class="card stack" style="gap:6px;border-top:3px solid ${e.cor}"><strong style="color:${e.cor}">${e.nome}</strong><p class="small">${esc(v(e.t))}</p><p class="small muted">${e.dims}</p></div>`).join('')}</div>
+    <div class="card patro-dado"><b class="patro-big tnum">40% a 60%</b><div class="stack" style="gap:4px"><p>das negociações terminam sem decisão. A principal causa é o medo de o cliente escolher errado, e é nesse ponto que a condução do time faz a diferença.</p><p class="small muted">Análise de 2,5 milhões de conversas de venda (Dixon e McKenna, 2022).</p></div></div></div>`;
+
+  const blocoDesenvolve = `<div class="stack">${secTitulo('O que o time desenvolve', 'Quatro movimentos na conversa de venda', 'O produto entra na conversa no último movimento, depois que o cliente se reconheceu, enxergou algo novo e mediu o custo de deixar como está.')}
+    <div class="patro-cols">${PATRO_MOVIMENTOS.map(([n, nome, t2, sinal], i) => `<div class="card stack" style="gap:6px;border-top:3px solid ${i < 2 ? 'var(--c-warm)' : 'var(--c-cool)'}"><span class="eyebrow">${n}</span><strong>${nome}</strong><p class="small">${esc(v(t2))}</p><p class="small muted">Sinal: ${esc(v(sinal))}</p></div>`).join('')}</div>
+    <p class="small muted">${esc(v('Atravessam a conversa inteira: Quem decide, com quem usa, quem paga e quem influencia, e Condução, com firmeza e respeito em preço, desconto e retomada. Tudo apoiado na linha de base: o interesse genuíno em ajudar o cliente.'))}</p>
+    <div class="card stack evo-chamada" style="gap:8px"><span class="eyebrow">O destino do time</span><strong style="font-size:18px">O perfil Conselheiro</strong><p class="small">Traz uma leitura nova, mostra o custo com ética e recomenda com firmeza.</p><p class="small"><b>Quase 40%</b> dos vendedores de alto desempenho levam ao cliente uma visão nova. Só 7% se concentram em agradar.</p><p class="small muted">CEB, estudo com mais de 6.000 vendedores em 90 empresas (2011).</p></div></div>`;
+
+  const blocoPrograma = `<div class="stack">${secTitulo('Como o programa funciona', 'Três momentos, com a evolução medida', 'Entre o workshop e os 45 dias, o diagnóstico fica fechado: o time pratica o plano, e a reavaliação mostra o que entrou na rotina.')}
+    <div class="patro-cols">${PATRO_PROGRAMA.map(([nome, quando, timeTx, voce]) => `<div class="card stack" style="gap:8px"><span class="eyebrow">${quando}</span><strong>${nome}</strong><p class="small"><span class="muted">O time:</span> ${esc(timeTx)}</p><p class="small"><span class="muted">Você recebe:</span> ${esc(voce)}</p></div>`).join('')}</div></div>`;
+
   // O patrocinador vê o relatório liberado mais recente, que já traz as etapas anteriores; o facilitador vê todos para revisar.
   const relsTime = P.fac ? rels : rels.slice(0, 1);
+  const exemploIndividual = `<div class="card stack" style="gap:10px"><h2 class="h-sec" style="margin:0">Exemplo de diagnóstico individual</h2><p class="muted small">Cada pessoa do time recebe o próprio diagnóstico logo depois de responder, com índice, perfil, leitura das oito dimensões e três prioridades com passos práticos. Só ela vê esse relatório.</p><div class="actions"><button class="btn btn-ghost btn-sm" data-act="patro-ex-individual">Ver um exemplo de diagnóstico individual</button></div></div>`;
   const blocoTime = rels.length ? `<div class="stack"><h2 class="h-sec" style="margin:0">O time ao longo do programa</h2>${relsTime.map(r => (P.fac && r.status !== 'liberado' ? `<div class="msg evo-rascunho" role="status"><b>Rascunho · ${PATRO_ETAPAS.find(e => e[0] === r.etapa)[1]}.</b> O patrocinador ainda não vê este relatório.</div>` : '') + blocoTimePatro(r, doresDims)).join('')}</div>`
-    : `<div class="stack"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">O que você recebe com o seu time</h2>
-        <p class="muted small">${t.id ? 'A leitura consolidada do seu time aparece aqui depois da prévia, do workshop e dos 45 dias, sempre sem identificar ninguém.' : 'Com o workshop, a leitura consolidada e anônima do seu time aparece aqui na prévia, no workshop e aos 45 dias.'} Enquanto isso, veja um exemplo.</p></div>
+    : `<div class="stack">${secTitulo('O que você recebe', 'O relatório do seu time', (t.id ? 'A leitura consolidada do seu time aparece aqui depois da prévia, do workshop e dos 45 dias, sempre sem identificar ninguém.' : 'Com o workshop, a leitura consolidada e anônima do seu time aparece aqui na prévia, no workshop e aos 45 dias.') + ' Enquanto isso, veja um exemplo.')}
       <div class="msg" role="note"><b>Exemplo com dados fictícios.</b> Um time de 12 pessoas, da prévia aos 45 dias.</div>
-      ${blocoTimePatro(PATRO_EXEMPLO_REL, doresDims)}
-      <div class="card stack" style="gap:10px"><h2 class="h-sec" style="margin:0">Exemplo de diagnóstico individual</h2><p class="muted small">Cada pessoa do time recebe o próprio diagnóstico logo depois de responder, e só ela vê esse relatório. Veja como ele é.</p><div class="actions"><button class="btn btn-ghost btn-sm" data-act="patro-ex-individual">Ver um exemplo de diagnóstico individual</button></div></div></div>`;
+      ${blocoTimePatro(PATRO_EXEMPLO_REL, doresDims)}${exemploIndividual}</div>`;
+
+  const blocoConf = `<div class="card stack" style="gap:8px"><h2 class="h-sec" style="margin:0">Confidencialidade e controle</h2><ul class="guide">${PATRO_CONFIDENCIAL.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+
+  const blocoInvest = K.pre ? `<div class="card stack evo-chamada" style="gap:12px"><span class="eyebrow">Investimento e próximo passo</span>
+    <div class="patro-dado"><b class="patro-big tnum">${PATRO_PRECO}</b><p>para uma turma de até ${PATRO_TURMA_MAX} pessoas, com mínimo de ${PATRO_MIN}, para que os relatórios do time preservem o anonimato.</p></div>
+    <div class="stack" style="gap:6px"><strong>O que está incluído</strong><ul class="guide">${PATRO_INCLUI.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
+    <p><b>Próximo passo:</b> uma conversa com ${esc(AUTOR)} para ajustar o programa às dores que você apontou e definir a data do workshop.</p></div>` : '';
+
   const facExtra = P.fac ? `<div class="card stack" style="gap:10px"><div><h2 class="h-sec" style="margin:0">Só para você</h2><span class="tag" style="display:inline-block;margin-top:8px">Visível só para o facilitador</span></div>
-      <p class="small"><span class="muted">Venda perdida:</span> ${esc(resp.D4 || '—')}</p>${resp.D5 ? `<p class="small"><span class="muted">O que espera ver de diferente:</span> ${esc(resp.D5)}</p>` : ''}
-      <p class="small muted">Contexto: ${esc(resp.C1)} pessoas · ${esc(SEG[resp.C2]?.nome || '')} · ${esc(PATRO_CTX[1].ops.find(o => o[0] === resp.C3)?.[1] || '')} · decisão ${esc((PATRO_CTX[2].ops.find(o => o[0] === resp.C4)?.[1] || '').toLowerCase())} · ${esc(PATRO_CTX[3].ops.find(o => o[0] === resp.C5)?.[1] || '')}.</p></div>${viewPatroFac()}` : '';
+      <p class="small"><span class="muted">Venda perdida:</span> ${esc(K.resp.D4 || '—')}</p>${K.resp.D5 ? `<p class="small"><span class="muted">O que espera ver de diferente:</span> ${esc(K.resp.D5)}</p>` : ''}
+      <p class="small muted">Contexto: ${esc(K.resp.C1)} pessoas · ${esc(K.negocio || '')} · ${esc(PATRO_CTX[1].ops.find(o => o[0] === K.resp.C3)?.[1] || '')} · decisão ${esc((PATRO_CTX[2].ops.find(o => o[0] === K.resp.C4)?.[1] || '').toLowerCase())} · venda média ${esc((PATRO_CTX[3].ops.find(o => o[0] === K.resp.C5)?.[1] || '').toLowerCase())} · ${esc((PATRO_CTX[4].ops.find(o => o[0] === K.resp.C6)?.[1] || '').toLowerCase())} na decisão · clientes novos por ${esc((PATRO_CTX[5].ops.find(o => o[0] === K.resp.C7)?.[1] || '').toLowerCase())}.</p></div>${t.id ? viewPatroFac() : ''}` : '';
   return `<main class="page"><div class="wrap stack-lg">${head}
     <p class="small muted">${P.fac ? 'Visão do facilitador. O patrocinador vê este relatório sem a venda perdida e sem os relatórios do time em rascunho.' : `Respondido em ${fmtDate(P.dados.respostas.updated_at || P.dados.respostas.created_at)}.`}</p>
-    ${facExtra}${blocoDores}${blocoVisao}${blocoNumero}${blocoTime}
+    ${facExtra}${blocoResumo}${blocoDores}${blocoNumero}${blocoVisao}${blocoLogica}${blocoDesenvolve}${blocoPrograma}${blocoTime}${blocoConf}${blocoInvest}
     <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o relatório</h2><div class="actions"><button class="btn btn-primary btn-sm" data-act="patro-pdf" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando PDF…' : 'Baixar relatório em PDF'}</button>${!P.fac ? '<button class="btn btn-quiet btn-sm" data-act="patro-editar">Revisar as minhas respostas</button>' : ''}${!P.fac && store.mode === 'demo' ? '<button class="btn btn-quiet btn-sm" data-act="patro-limpar">Recomeçar o questionário em branco</button>' : ''}</div></div>
     ${voltar}</div></main>`;
 }
@@ -3933,7 +4051,8 @@ async function carregarPatrocinio() {
 
 // PDF do relatório do patrocinador, na identidade dos relatórios do método.
 async function buildPatroPDF() {
-  const P = S.patro; const t = P.turma; const resp = P.dados.respostas.respostas;
+  const P = S.patro; const t = P.turma;
+  const K = conteudoPatro(P); const { resp, v, dores, doresDims, vis } = K;
   const { jsPDF } = await loadJsPDF();
   const [logo, fontes] = await Promise.all([logoDataURL(), pdfFontData()]);
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -3959,7 +4078,7 @@ async function buildPatroPDF() {
   const escrever = (tx, x, yy, size, role, c, width) => { const ls = linhas(tx, size, role, width); font(size, role, c); ls.forEach((ln, i) => doc.text(ln, x, yy + lh(size) + i * (lh(size) + 0.6))); return ls.length * (lh(size) + 0.6); };
   const eyebrow = (tx, x, yy, c = C.warm, size = 6.8) => { font(size, 'bold', c); doc.setCharSpace(0.35); doc.text(T(tx).toUpperCase(), x, yy); doc.setCharSpace(0); };
   const caixa = (x, yy, w, h, fill, stroke) => { if (fill) color(fill, 'fill'); if (stroke) { color(stroke, 'draw'); doc.setLineWidth(0.3); } doc.roundedRect(x, yy, w, h, 2.6, 2.6, fill && stroke ? 'FD' : fill ? 'F' : 'S'); };
-  const barra = (x, yy, w, h, v, c) => { color(C.line2, 'fill'); doc.roundedRect(x, yy, w, h, h / 2, h / 2, 'F'); color(c, 'fill'); doc.roundedRect(x, yy, Math.max(h, w * v / 100), h, h / 2, h / 2, 'F'); };
+  const barra = (x, yy, w, h, val, c) => { color(C.line2, 'fill'); doc.roundedRect(x, yy, w, h, h / 2, h / 2, 'F'); color(c, 'fill'); doc.roundedRect(x, yy, Math.max(h, w * val / 100), h, h / 2, h / 2, 'F'); };
   const simbolo = (cx, cy, rr) => {
     color(C.line, 'draw'); doc.setLineWidth(rr * 0.08); doc.circle(cx, cy, rr * 12.5 / 11.5, 'S');
     color(C.ambar, 'fill'); doc.circle(cx, cy, rr, 'F'); color(C.white, 'fill'); doc.rect(cx, cy - rr - 0.2, rr + 0.3, 2 * rr + 0.4, 'F');
@@ -3970,13 +4089,29 @@ async function buildPatroPDF() {
   const novaPagina = () => { rodape(); doc.addPage(); cabecalho(); y = 24; };
   const precisa = h => { if (y + h > BOTTOM) novaPagina(); };
   const secao = (eb, titulo, lead, reserva = 30) => {
-    const hl = lead ? altura(lead, 9, 'body', CW) + 2 : 0; precisa(26 + hl + reserva); y += 4;
-    eyebrow(eb, M, y + 3); font(16, 'title', C.ink); doc.text(T(titulo), M, y + 11); color(C.warmL, 'fill'); doc.rect(M, y + 14, 14, 0.8, 'F'); y += 19;
+    const ht = altura(titulo, 16, 'title', CW); const hl = lead ? altura(lead, 9, 'body', CW) + 2 : 0; precisa(16 + ht + hl + reserva); y += 4;
+    eyebrow(eb, M, y + 3); y += 4.5; y += escrever(titulo, M, y, 16, 'title', C.ink, CW) + 1; color(C.warmL, 'fill'); doc.rect(M, y, 14, 0.8, 'F'); y += 4;
     if (lead) y += escrever(lead, M, y, 9, 'body', C.ink2, CW) + 3;
   };
-  const dores = (resp.D1 || []).map(Number).map(id => PATRO_DORES.find(x => x.id === id)).filter(Boolean).sort((a, b) => (b.id === Number(resp.D2)) - (a.id === Number(resp.D2)));
-  const doresDims = [...new Set(dores.flatMap(x => x.dims))];
-  const vis = dimsPatro(resp);
+  // Caixa com rótulo e parágrafos; devolve a altura usada.
+  const cartao = (x, yy, w, partes, opt = {}) => {
+    const pad = 5; const iw = w - 2 * pad - (opt.barra ? 2 : 0);
+    const h = pad * 2 + partes.reduce((s, p) => s + (p.eb ? 4.5 : altura(p.t, p.size || 8.6, p.role || 'body', iw) + (p.gap ?? 1.2)), 0);
+    caixa(x, yy, w, h, opt.fill || C.white, opt.stroke === undefined ? C.line : opt.stroke);
+    if (opt.barra) { color(opt.barra, 'fill'); doc.roundedRect(x, yy, 1.4, h, 0.7, 0.7, 'F'); }
+    let yi = yy + pad; const xi = x + pad + (opt.barra ? 2 : 0);
+    partes.forEach(p => { if (p.eb) { eyebrow(p.eb, xi, yi + 2.6, p.c || C.warm); yi += 4.5; } else { yi += escrever(p.t, xi, yi, p.size || 8.6, p.role || 'body', p.c || C.ink, iw) + (p.gap ?? 1.2); } });
+    return h;
+  };
+  const alturaCartao = (w, partes, opt = {}) => { const iw = w - 10 - (opt.barra ? 2 : 0); return 10 + partes.reduce((s, p) => s + (p.eb ? 4.5 : altura(p.t, p.size || 8.6, p.role || 'body', iw) + (p.gap ?? 1.2)), 0); };
+  // Linha de cartões lado a lado, com a mesma altura.
+  const linhaCartoes = (lista, opt = {}) => {
+    const gap = 4; const w = (CW - gap * (lista.length - 1)) / lista.length;
+    const h = Math.max(...lista.map(p => alturaCartao(w, p.partes, p.opt || {})));
+    precisa(h + 4);
+    lista.forEach((p, i) => { const x = M + i * (w + gap); caixa(x, y, w, h, (p.opt || {}).fill || C.white, C.line); if ((p.opt || {}).topo) { color(p.opt.topo, 'fill'); doc.rect(x + 2.6, y, w - 5.2, 1, 'F'); } cartao(x, y, w, p.partes, { ...(p.opt || {}), fill: (p.opt || {}).fill || C.white, stroke: null }); });
+    y += h + 4;
+  };
   const rels = (P.dados.relatorios || []).filter(r => r.status === 'liberado');
   const relPrevia = rels.find(r => r.etapa === 'previa' && r.dados.etapas.previa);
   const time = relPrevia ? relPrevia.dados.etapas.previa.dims : null;
@@ -3989,79 +4124,113 @@ async function buildPatroPDF() {
   [[C.warmL, 0], [C.coolL, 1], [C.baseL, 2]].forEach(([c, i]) => { color(c, 'fill'); doc.roundedRect(M + i * 15, 64, 12, 1.4, 0.7, 0.7, 'F'); });
   eyebrow('Venda com Neurociência · Metodologia OQGCI', M, 74);
   font(32, 'title', C.ink); doc.text(T('Relatório do patrocinador'), M, 88);
-  font(17, 'light', C.ink); doc.text(T(t.nome || 'Área do patrocinador'), M, 97);
-  font(9.2, 'body', C.ink2); doc.text(T(`Respondido em ${fmtDate(P.dados.respostas.updated_at || P.dados.respostas.created_at)}${ultimo ? ' · leitura do time até ' + PATRO_ETAPAS.find(e => e[0] === ultimo.etapa)[1].toLowerCase() : ''}`), M, 104);
-  let yc = 114;
-  if (dores[0]) {
-    const x = dores[0]; const h = 16 + altura(x.t, 12, 'title', CW - 14) + altura(x.jogo, 8.8, 'body', CW - 14) + 10;
-    caixa(M, yc, CW, h, C.warmT, null); color(C.warmL, 'fill'); doc.rect(M, yc, 1.4, h, 'F');
-    eyebrow('A dor que mais custa hoje', M + 7, yc + 8); let yy = yc + 10; yy += escrever(x.t, M + 7, yy, 12, 'title', C.ink, CW - 14) + 2;
-    yy += escrever(x.jogo, M + 7, yy, 8.8, 'body', C.ink2, CW - 14) + 2;
-    font(8.2, 'semi', C.warm); doc.text(T(`Onde o workshop atua: ${x.modulo}`), M + 7, yy + 3); yc += h + 6;
-  }
-  const metr = PATRO_METRICAS.find(m => m[0] === resp.D3);
-  if (metr) {
-    caixa(M, yc, CW, 24, C.white, C.line); eyebrow('O número para acompanhar', M + 6, yc + 8);
-    font(12, 'title', C.ink); doc.text(T(resp.D3 === 'outro' ? resp.D3_nome : metr[1]), M + 6, yc + 15);
-    font(8.4, 'body', C.ink2); doc.text(T(`Hoje: ${resp.D3_atual || 'não informado'} · Meta: ${resp.D3_meta || 'não informada'}`), M + 6, yc + 20.5); yc += 30;
-  }
+  font(17, 'light', C.ink); doc.text(T(t.nome || 'Workshop OQGCI'), M, 97);
+  font(9.2, 'body', C.ink2); doc.text(T(`${K.negocio ? K.negocio + ' · ' : ''}respondido em ${fmtDate(P.dados.respostas.updated_at || P.dados.respostas.created_at)}${ultimo ? ' · leitura do time até ' + PATRO_ETAPAS.find(e => e[0] === ultimo.etapa)[1].toLowerCase() : ''}`), M, 104);
+  y = 114;
+  if (K.resumo) { y += cartao(M, y, CW, [{ eb: 'Em resumo' }, { t: K.resumo, size: 10.2, gap: 0 }], { fill: C.warmT, stroke: null, barra: C.warmL }) + 6; }
+  if (K.numero) { y += cartao(M, y, CW, [{ eb: 'O número que você quer ver mudar' }, { t: K.numero, size: 12, role: 'title', gap: 1 }, { t: `Hoje: ${resp.D3_atual || 'não informado'} · Meta: ${resp.D3_meta || 'não informada'}`, size: 8.4, c: C.ink2, gap: 0 }]) + 6; }
   if (ultimo) {
     const es = PATRO_ETAPAS.filter(([e]) => ultimo.dados.etapas[e]);
-    caixa(M, yc, CW, 34, C.white, C.line); eyebrow('Índice médio do time', M + 6, yc + 8);
+    caixa(M, y, CW, 34, C.white, C.line); eyebrow('Índice médio do time', M + 6, y + 8);
     const lg = (CW - 12) / es.length;
     es.forEach(([e, nome], i) => { const a = ultimo.dados.etapas[e]; const ult = i === es.length - 1; const xi = M + 6 + i * lg;
-      eyebrow(nome, xi, yc + 15, ult ? C.warm : C.ink3, 6.2); font(ult ? 26 : 20, 'light', ult ? C.ink : C.ink3); doc.text(String(a.indice), xi, yc + 26);
-      font(7.6, 'body', C.ink3); doc.text(T(`${a.n} pessoas · ${Math.round(100 * (a.perfis.conselheiro || 0) / a.n)}% Conselheiro`), xi, yc + 31); });
+      eyebrow(nome, xi, y + 15, ult ? C.warm : C.ink3, 6.2); font(ult ? 26 : 20, 'light', ult ? C.ink : C.ink3); doc.text(String(a.indice), xi, y + 26);
+      font(7.6, 'body', C.ink3); doc.text(T(`${a.n} pessoas · ${Math.round(100 * (a.perfis.conselheiro || 0) / a.n)}% Conselheiro`), xi, y + 31); });
   }
   rodape();
 
-  // Páginas internas
+  // Dores
   doc.addPage(); cabecalho(); y = 24;
-  secao('O que você apontou', 'As dores do negócio', 'Cada dor aponta para as dimensões que a explicam e para o trecho do workshop que atua sobre ela.');
+  secao('O que você apontou', 'As dores do negócio', 'Cada dor mostra o que está em jogo, o que o time pratica no workshop para mudar esse ponto e o que acompanhar depois.');
   dores.forEach((x, i) => {
-    const w = CW - 14; const dimTxt = `Dimensões ligadas: ${x.dims.length === 8 ? 'as oito' : x.dims.map(k => DIM[k].nome).join(', ')} · Onde o workshop atua: ${x.modulo}`;
-    const h = 10 + altura(x.t, 10.5, 'title', w) + altura(x.jogo, 8.6, 'body', w) + altura(dimTxt, 8, 'semi', w) + 8;
-    precisa(h + 4); caixa(M, y, CW, h, C.white, C.line);
-    if (i === 0) { color(C.warmL, 'fill'); doc.roundedRect(M, y, 1.4, h, 0.7, 0.7, 'F'); }
-    let yy = y + 5; yy += escrever(x.t, M + 7, yy, 10.5, 'title', C.ink, w) + 1.5; yy += escrever(x.jogo, M + 7, yy, 8.6, 'body', C.ink2, w) + 1.5;
-    escrever(dimTxt, M + 7, yy, 8, 'semi', C.warm, w); y += h + 4;
+    const partes = [...(i === 0 ? [{ eb: 'A que mais custa hoje' }] : []), { t: v(x.t), size: 10.5, role: 'title', gap: 1.6 },
+      { t: 'O que está em jogo: ' + v(x.jogo), c: C.ink2 }, { t: 'O que o time pratica no workshop: ' + v(x.workshop), c: C.ink }, { t: 'O que acompanhar: ' + v(x.sinal), c: C.ink2 },
+      { t: 'Dimensões ligadas: ' + K.nomesDims(x.dims), size: 8, role: 'semi', c: C.warm, gap: 0 }];
+    const h = alturaCartao(CW, partes, { barra: i === 0 ? C.warmL : null }); precisa(h + 4);
+    cartao(M, y, CW, partes, { barra: i === 0 ? C.warmL : null }); y += h + 4;
   });
 
-  secao('Sua leitura', time ? 'A sua visão e a visão do time' : 'A sua visão do time', time ? 'Média que o time deu a si mesmo na prévia (barra clara) e a nota que sai das suas respostas (barra colorida). Diferença de 15 pontos ou mais em destaque.' : 'A nota de cada dimensão, de 0 a 100, a partir das suas respostas.', 60);
+  // Visão do time
+  secao('Sua leitura', time ? 'A sua visão e a visão do time' : 'A sua visão do time', time ? 'Média que o time deu a si mesmo na prévia (barra clara) e a nota que sai das suas respostas (barra colorida). Diferença de 15 pontos ou mais em destaque.' : 'A nota de cada dimensão, de 0 a 100, a partir das suas respostas: a sua leitura geral do time.', 60);
   DIMS.forEach(d => {
-    const v = vis[d.id]; const tm = time ? time[d.id] : null; const [c, cl] = EIXO[d.eixo];
+    const vv = vis[d.id]; const tm = time ? time[d.id] : null; const [c] = EIXO[d.eixo];
     precisa(11);
     font(9.2, 'semi', C.ink); doc.text(T(d.nome), M, y + 4.2);
     if (doresDims.includes(d.id)) { font(6.2, 'bold', C.warm); doc.text(T('LIGADA ÀS SUAS DORES'), M, y + 7.6); }
-    if (v != null) { if (tm != null) barra(M + 44, y + 1.2, CW - 104, 2, tm, C.baseL); barra(M + 44, y + (tm != null ? 4 : 2.2), CW - 104, 2.4, v, c); }
-    font(8.6, 'body', C.ink2); doc.text(T(v == null ? 'sem resposta' : tm != null ? `time ${tm} · você ${v}` : String(v)), M + CW - 30, y + 4.4, { align: 'right' });
-    if (v != null && tm != null && Math.abs(v - tm) >= 15) { font(7.2, 'bold', C.warn); doc.text(T(v > tm ? 'você vê acima' : 'você vê abaixo'), M + CW, y + 4.4, { align: 'right' }); }
+    if (vv != null) { if (tm != null) barra(M + 44, y + 1.2, CW - 104, 2, tm, C.baseL); barra(M + 44, y + (tm != null ? 4 : 2.2), CW - 104, 2.4, vv, c); }
+    font(8.6, 'body', C.ink2); doc.text(T(vv == null ? 'sem resposta' : tm != null ? `time ${tm} · você ${vv}` : String(vv)), M + CW - 30, y + 4.4, { align: 'right' });
+    if (vv != null && tm != null && Math.abs(vv - tm) >= 15) { font(7.2, 'bold', C.warn); doc.text(T(vv > tm ? 'você vê acima' : 'você vê abaixo'), M + CW, y + 4.4, { align: 'right' }); }
     color(C.line2, 'draw'); doc.setLineWidth(0.2); doc.line(M, y + 9.4, M + CW, y + 9.4); y += 10;
   });
+  if (K.lacunas.length) {
+    y += 3;
+    const partes = [{ eb: 'As maiores lacunas na sua visão' }, ...K.lacunas.map((d, i) => ({ t: `${d.nome} · o cliente pergunta "${v(DIM_PERGUNTA[d.id])}". ${v(d.mede)}`, size: 8.6, gap: i === K.lacunas.length - 1 ? 0 : 1.8 }))];
+    const h = alturaCartao(CW, partes); precisa(h + 4); cartao(M, y, CW, partes, { fill: C.baseT, stroke: null }); y += h + 4;
+  }
 
-  if (ultimo) {
-    const es = PATRO_ETAPAS.filter(([e]) => ultimo.dados.etapas[e]);
-    secao('O time', `O time · ${es.map(e => e[1]).join(' > ')}`, 'Dados consolidados e anônimos, uma execução por pessoa em cada etapa.', 60);
-    const perfisOrd = ['conselheiro', 'especialista', 'prestativo', 'reativo', 'insistente', 'desenvolvimento'].filter(k => es.some(([e]) => ultimo.dados.etapas[e].perfis[k]));
+  // Lógica do método
+  secao('A lógica do método', 'Todo cliente decide com uma pergunta: o que eu ganho com isto?', v('O cliente se aproxima do que lhe faz bem e se afasta do que lhe faz mal. O time que conduz a conversa por essa pergunta mostra ao cliente o ganho, o custo de deixar como está e um caminho seguro para decidir.'), 50);
+  linhaCartoes(PATRO_EIXOS.map(e => ({ partes: [{ t: e.nome, size: 10, role: 'title', c: C[e.pdf], gap: 1.4 }, { t: v(e.t) }, { t: e.dims, size: 7.8, c: C.ink3, gap: 0 }], opt: { topo: C[e.pdf === 'base' ? 'baseL' : e.pdf + 'L'] } })));
+  {
+    const txt = 'das negociações terminam sem decisão. A principal causa é o medo de o cliente escolher errado, e é nesse ponto que a condução do time faz a diferença.';
+    const h = Math.max(24, altura(txt, 9.2, 'body', CW - 62) + altura('Análise de 2,5 milhões de conversas de venda (Dixon e McKenna, 2022).', 7.6, 'body', CW - 62) + 12);
+    precisa(h + 4); caixa(M, y, CW, h, C.warmT, null);
+    font(24, 'light', C.ink); doc.text(T('40% a 60%'), M + 6, y + h / 2 + 3);
+    let yy = y + 6; yy += escrever(txt, M + 56, yy, 9.2, 'body', C.ink, CW - 62) + 1.5; escrever('Análise de 2,5 milhões de conversas de venda (Dixon e McKenna, 2022).', M + 56, yy, 7.6, 'body', C.ink3, CW - 62);
+    y += h + 4;
+  }
+
+  // O que o time desenvolve
+  secao('O que o time desenvolve', 'Quatro movimentos na conversa de venda', 'O produto entra na conversa no último movimento, depois que o cliente se reconheceu, enxergou algo novo e mediu o custo de deixar como está.', 50);
+  const mov = PATRO_MOVIMENTOS.map(([n, nome, t2, sinal], i) => ({ partes: [{ eb: n, c: i < 2 ? C.warm : C.cool }, { t: nome, size: 10.5, role: 'title', gap: 1.2 }, { t: v(t2) }, { t: 'Sinal: ' + v(sinal), size: 7.8, c: C.ink3, gap: 0 }], opt: { topo: i < 2 ? C.warmL : C.coolL } }));
+  linhaCartoes(mov.slice(0, 2)); linhaCartoes(mov.slice(2));
+  { const tx = v('Atravessam a conversa inteira: Quem decide, com quem usa, quem paga e quem influencia, e Condução, com firmeza e respeito em preço, desconto e retomada. Tudo apoiado na linha de base: o interesse genuíno em ajudar o cliente.'); precisa(altura(tx, 8.6, 'body', CW) + 4); y += escrever(tx, M, y, 8.6, 'body', C.ink2, CW) + 4; }
+  { const partes = [{ eb: 'O destino do time' }, { t: 'O perfil Conselheiro', size: 11, role: 'title', gap: 1.2 }, { t: 'Traz uma leitura nova, mostra o custo com ética e recomenda com firmeza.' }, { t: 'Quase 40% dos vendedores de alto desempenho levam ao cliente uma visão nova. Só 7% se concentram em agradar.', role: 'semi' }, { t: 'CEB, estudo com mais de 6.000 vendedores em 90 empresas (2011).', size: 7.6, c: C.ink3, gap: 0 }];
+    const h = alturaCartao(CW, partes, { barra: C.warmL }); precisa(h + 4); cartao(M, y, CW, partes, { fill: C.warmT, stroke: null, barra: C.warmL }); y += h + 4; }
+
+  // Programa
+  secao('Como o programa funciona', 'Três momentos, com a evolução medida', 'Entre o workshop e os 45 dias, o diagnóstico fica fechado: o time pratica o plano, e a reavaliação mostra o que entrou na rotina.', 50);
+  linhaCartoes(PATRO_PROGRAMA.map(([nome, quando, timeTx, voce]) => ({ partes: [{ eb: quando }, { t: nome, size: 10.5, role: 'title', gap: 1.4 }, { t: 'O time: ' + timeTx }, { t: 'Você recebe: ' + voce, c: C.ink2, gap: 0 }] })));
+
+  // O time (real ou exemplo)
+  const relTime = ultimo || PATRO_EXEMPLO_REL;
+  {
+    const es = PATRO_ETAPAS.filter(([e]) => relTime.dados.etapas[e]);
+    if (ultimo) secao('O time', `O time · ${es.map(e => e[1]).join(' > ')}`, 'Dados consolidados e anônimos, uma execução por pessoa em cada etapa.', 60);
+    else secao('Exemplo com dados fictícios', 'O que você recebe com o seu time', 'Com o workshop, a leitura consolidada e anônima do seu time chega na prévia, no workshop e aos 45 dias. Este exemplo mostra um time de 12 pessoas.', 60);
+    const perfisOrd = ['conselheiro', 'especialista', 'prestativo', 'reativo', 'insistente', 'desenvolvimento'].filter(k => es.some(([e]) => relTime.dados.etapas[e].perfis[k]));
     eyebrow('Perfil do time', M, y + 3, C.ink3, 6.4); y += 5;
     const cw = (CW - 60) / es.length;
     font(7.4, 'bold', C.ink3); es.forEach(([, nome], i) => doc.text(T(nome), M + 60 + i * cw + cw - 2, y + 3, { align: 'right' })); y += 5;
     perfisOrd.forEach(k => { precisa(8); const hl = k === 'conselheiro';
       if (hl) caixa(M, y - 1, CW, 7, C.warmT, null);
       font(8.8, hl ? 'bold' : 'body', C.ink); doc.text(T(PROFILES[k].nome), M + 3, y + 3.6);
-      es.forEach(([e], i) => { const a = ultimo.dados.etapas[e]; font(8.8, 'body', C.ink2); doc.text(T(`${a.perfis[k] || 0} (${Math.round(100 * (a.perfis[k] || 0) / a.n)}%)`), M + 60 + i * cw + cw - 2, y + 3.6, { align: 'right' }); });
+      es.forEach(([e], i) => { const a = relTime.dados.etapas[e]; font(8.8, 'body', C.ink2); doc.text(T(`${a.perfis[k] || 0} (${Math.round(100 * (a.perfis[k] || 0) / a.n)}%)`), M + 60 + i * cw + cw - 2, y + 3.6, { align: 'right' }); });
       y += 7.5; });
     y += 3;
     eyebrow('As oito dimensões, na média do time', M, y + 3, C.ink3, 6.4); y += 6;
-    DIMS.forEach(d => { const vs = es.map(([e]) => ultimo.dados.etapas[e].dims[d.id]); const [c, cl] = EIXO[d.eixo];
+    DIMS.forEach(d => { const vs = es.map(([e]) => relTime.dados.etapas[e].dims[d.id]); const [c, cl] = EIXO[d.eixo];
       const h = Math.max(10, vs.length * 2.8 + 4.5); precisa(h + 1);
       font(9.2, 'semi', C.ink); doc.text(T(d.nome), M, y + 4.2); if (doresDims.includes(d.id)) { font(6.2, 'bold', C.warm); doc.text(T('LIGADA ÀS SUAS DORES'), M, y + 7.6); }
-      vs.forEach((v, i) => barra(M + 44, y + 1.2 + i * 2.8, CW - 104, 2, v, i === 0 ? C.baseL : i < vs.length - 1 ? cl : c));
+      vs.forEach((val, i) => barra(M + 44, y + 1.2 + i * 2.8, CW - 104, 2, val, i === 0 ? C.baseL : i < vs.length - 1 ? cl : c));
       font(8.6, 'body', C.ink2); doc.text(T(vs.join(' -> ')), M + CW, y + 4.4, { align: 'right' });
       color(C.line2, 'draw'); doc.setLineWidth(0.2); doc.line(M, y + h - 0.6, M + CW, y + h - 0.6); y += h; });
-    if (ultimo.comentario) { y += 3; const h = altura(ultimo.comentario, 9.2, 'body', CW - 14) + 14; precisa(h + 3); caixa(M, y, CW, h, C.baseT, null); color(C.warmL, 'fill'); doc.rect(M, y, 1.4, h, 'F'); eyebrow(`Comentário de ${AUTOR}`, M + 7, y + 7); escrever(ultimo.comentario, M + 7, y + 9, 9.2, 'body', C.ink, CW - 14); y += h + 3; }
+    if (relTime.comentario) { y += 3; const h = altura(relTime.comentario, 9.2, 'body', CW - 14) + 14; precisa(h + 3); caixa(M, y, CW, h, C.baseT, null); color(C.warmL, 'fill'); doc.rect(M, y, 1.4, h, 'F'); eyebrow(`Comentário de ${AUTOR}`, M + 7, y + 7); escrever(relTime.comentario, M + 7, y + 9, 9.2, 'body', C.ink, CW - 14); y += h + 3; }
+    if (!ultimo) { const tx = 'Cada pessoa do time também recebe o próprio diagnóstico logo depois de responder, com índice, perfil, leitura das oito dimensões e três prioridades com passos práticos. Só ela vê esse relatório.'; precisa(altura(tx, 8.6, 'body', CW) + 6); y += 2; y += escrever(tx, M, y, 8.6, 'body', C.ink2, CW) + 4; }
   }
-  precisa(10); y += 3;
+
+  // Confidencialidade
+  secao('Confidencialidade', 'Controle em cada etapa', null, 40);
+  PATRO_CONFIDENCIAL.forEach(x => { const h = altura(x, 8.8, 'body', CW - 6) + 2; precisa(h); color(C.warm, 'fill'); doc.circle(M + 1.2, y + 2.6, 0.8, 'F'); y += escrever(x, M + 5, y, 8.8, 'body', C.ink, CW - 6) + 2; });
+
+  // Pré-venda: investimento e próximo passo
+  if (K.pre) {
+    secao('Investimento', 'Investimento e próximo passo', null, 70);
+    const partes = [{ t: PATRO_PRECO, size: 24, role: 'light', gap: 1.5 }, { t: `para uma turma de até ${PATRO_TURMA_MAX} pessoas, com mínimo de ${PATRO_MIN}, para que os relatórios do time preservem o anonimato.`, c: C.ink2, gap: 3 }, { eb: 'O que está incluído' }, ...PATRO_INCLUI.map(x => ({ t: '- ' + x, gap: 0.8 })), { t: `Próximo passo: uma conversa com ${AUTOR} para ajustar o programa às dores que você apontou e definir a data do workshop.`, role: 'semi', gap: 0 }];
+    const h = alturaCartao(CW, partes, { barra: C.warmL }); precisa(h + 4); cartao(M, y, CW, partes, { fill: C.warmT, stroke: null, barra: C.warmL }); y += h + 4;
+  }
+  // A nota final usa a margem de baixo antes de abrir uma página só para ela.
+  y += 3; if (y + 7 > BOTTOM + 8) novaPagina();
   escrever('Os dados do time são consolidados e anônimos. O instrumento está em fase de validação; use a leitura como ferramenta de desenvolvimento.', M, y, 7.6, 'body', C.ink3, CW);
   rodape();
   return doc.output('blob');
@@ -4239,6 +4408,13 @@ function viewFacilitador() {
 }
 
 /* ================================ RENDER ================================== */
+// O aviso de instalar fica fora de #app: abrir e fechar o aviso não redesenha a tela nem apaga o que foi digitado.
+function syncInstallBar() {
+  let el = document.getElementById('install-bar');
+  const html = installBar();
+  if (!html) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'install-bar'; document.body.appendChild(el); el.innerHTML = html; }
+}
 function installBar() {
   if (!S.installEvt || S.installHidden) return '';
   return `<div class="install no-print"><div class="wrap"><span class="small">Instale o Diagnóstico OQGCI como aplicativo no seu celular.</span><span class="actions" style="flex-wrap:nowrap"><button class="btn btn-primary btn-sm" data-act="instalar" style="width:auto">Instalar</button><button class="btn btn-quiet btn-sm" data-act="fechar-instalar" style="width:auto" aria-label="Fechar aviso">✕</button></span></div></div>`;
@@ -4252,7 +4428,8 @@ function siteFooter() {
 function render() {
   const views = { inicio: viewInicio, referencias: viewReferencias, entrar: viewEntrar, painel: viewPainel, diagnostico: viewDiagnostico, resultado: viewResultado, evolucao: viewEvolucao, patrocinio: viewPatrocinio, facilitador: viewFacilitador, 'nova-senha': viewNovaSenha };
   trackVisit();
-  $('#app').innerHTML = topBar() + views[S.route]() + siteFooter() + installBar();
+  $('#app').innerHTML = topBar() + views[S.route]() + siteFooter();
+  syncInstallBar();
   if (S.route === 'resultado') afterRenderResultado();
 }
 
@@ -4469,8 +4646,8 @@ document.addEventListener('click', async (ev) => {
     const blob = new Blob(['﻿' + csvOf(S.fac.results || [])], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagnostico-oqgci.csv'; document.body.appendChild(a); a.click(); a.remove();
   }
-  else if (act === 'instalar') { const e = S.installEvt; S.installEvt = null; render(); if (e) { e.prompt(); try { await e.userChoice; } catch (x) { /* */ } } }
-  else if (act === 'fechar-instalar') { S.installHidden = true; render(); }
+  else if (act === 'instalar') { const e = S.installEvt; S.installEvt = null; syncInstallBar(); if (e) { e.prompt(); try { await e.userChoice; } catch (x) { /* */ } } }
+  else if (act === 'fechar-instalar') { S.installHidden = true; syncInstallBar(); }
 });
 
 document.addEventListener('toggle', (ev) => { const d = ev.target; if (d && d.matches && d.matches('details[data-acc]')) S.accOpen[d.id] = d.open; }, true);
@@ -4558,7 +4735,7 @@ document.addEventListener('submit', async (ev) => {
 });
 
 window.addEventListener('hashchange', route_);
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); S.installEvt = e; render(); });
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); S.installEvt = e; syncInstallBar(); });
 
 /* ================================ INÍCIO ================================== */
 (async function boot() {
