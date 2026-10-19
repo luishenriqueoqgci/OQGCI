@@ -1559,13 +1559,28 @@ const PATRO_DORES = [
 const PATRO_METRICAS = [['conversao', 'Taxa de conversão de orçamentos em vendas'], ['ticket', 'Ticket médio'], ['desconto', 'Desconto médio concedido'], ['ciclo', 'Tempo entre o primeiro contato e a decisão'], ['indicacao', 'Clientes novos por indicação'], ['recompra', 'Taxa de recompra'], ['outro', 'Outro indicador']];
 const PATRO_ETAPAS = [['previa', 'Prévia'], ['workshop', 'Workshop'], ['reavaliacao', '45 dias']];
 const PATRO_MIN = 5;
+// Exemplo com dados fictícios (12 pessoas) que o patrocinador qualificado vê enquanto não há relatório do time dele.
+const PATRO_EXEMPLO_REL = (() => {
+  const D = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8'];
+  const mk = (indice, aprox, afast, dv, perfis, niveis, assertivas) => ({ n: 12, indice, aprox, afast, dims: Object.fromEntries(D.map((k, i) => [k, dv[i]])), perfis, niveis, assertivas });
+  return { id: 'exemplo', etapa: 'reavaliacao', status: 'liberado', exemplo: true,
+    comentario: 'O time manteve o ganho em Custo, Caminho e Condução. O próximo passo é levar a Virada para as propostas escritas e envolver quem decide junto.',
+    dados: { etapa: 'reavaliacao', turma: 'Exemplo', etapas: {
+      previa: mk(51, 49, 46, [72, 52, 58, 41, 38, 48, 45, 52], { prestativo: 4, especialista: 2, reativo: 2, desenvolvimento: 4 }, { Vitrine: 2, Atendimento: 7, Conversa: 3 }, 2.8),
+      workshop: mk(68, 65, 68, [80, 60, 76, 67, 63, 70, 58, 70], { conselheiro: 4, desenvolvimento: 6, prestativo: 2 }, { Atendimento: 3, Conversa: 7, 'Propósito': 2 }, 4.9),
+      reavaliacao: mk(64, 61, 64, [79, 58, 73, 62, 58, 66, 52, 67], { conselheiro: 5, desenvolvimento: 5, prestativo: 1, especialista: 1 }, { Atendimento: 4, Conversa: 7, 'Propósito': 1 }, 4.6) } } };
+})();
+// Questionários de pré-venda que o facilitador já abriu (guardado neste aparelho).
+const PATRO_VISTOS = 'oqgci-patro-vistos';
+const patroNovo = x => Boolean(x.patrocinador && x.patro_respondido && !x.patro_turmas && (LS.get(PATRO_VISTOS) || {})[x.id] !== x.patro_respondido);
+const patroNovos = () => (S.fac.pessoas || []).filter(patroNovo).length;
 const modoPatro = r => r?.C3 === 'contato' ? 'contato' : 'conversa';
 
 function DemoStore() {
   const KEY = 'oqgci-demo-v1';
   let db = LS.get(KEY);
   if (db && db.v === 1) { db.results = [...db.results.filter(x => !x.exemplo), ...seedExamples()]; db.v = 2; }
-  if (!db || ![2, 3, 4, 5].includes(db.v)) {
+  if (!db || ![2, 3, 4, 5, 6].includes(db.v)) {
     db = { v: 2, users: [], session: null, results: seedExamples(), turmas: [{ id: 'turma-exemplo', nome: 'Exemplo · Workshop de vendas', codigo: 'OQG-DEMO', created_at: new Date().toISOString(), exemplo: true }] };
   }
   if (db.v === 2 || db.v === 3) {
@@ -1586,7 +1601,15 @@ function DemoStore() {
     db.relPatro = t ? [['previa', 'liberado', ''], ['workshop', 'liberado', 'O time saiu do workshop com a pergunta antes da apresentação. O foco agora é sustentar o preço nos próximos 45 dias.'], ['reavaliacao', 'rascunho', '']].map(([e, st, com]) => ({ id: 'rp-' + e, turma_id: t.id, etapa: e, dados: dadosRelPatro(t, ts, e), comentario: com || null, status: st, gerado_em: new Date().toISOString(), liberado_em: st === 'liberado' ? new Date().toISOString() : null, exemplo: true })) : [];
     db.v = 5;
   }
-  db.patrocinios = db.patrocinios || {}; db.relPatro = db.relPatro || [];
+  if (db.v === 5) {
+    // Patrocinador qualificado em pré-venda, sem turma: entra com potencial@demo e a senha patrocinador.
+    const agora = new Date().toISOString();
+    const ep = db.users.find(u => u.id === 'ex-patro'); if (ep) { ep.patrocinador = true; ep.patrocinador_em = ep.created_at || agora; }
+    db.users = db.users.filter(u => u.id !== 'ex-patro-pre');
+    db.users.push({ id: 'ex-patro-pre', nome: 'Patrocinador em pré-venda', email: 'potencial@demo', pw: hashStr('patrocinador'), role: 'respondente', created_at: agora, turma_id: null, acesso_ate: null, acesso_bloqueado: false, patrocinador: true, patrocinador_em: agora, exemplo: true });
+    db.patroPre = {}; db.v = 6;
+  }
+  db.patrocinios = db.patrocinios || {}; db.relPatro = db.relPatro || []; db.patroPre = db.patroPre || {};
   db.evolucoes = db.evolucoes || [];
   const save = () => LS.set(KEY, db);
   save();
@@ -1656,7 +1679,9 @@ function DemoStore() {
         const t = db.turmas.find(x => x.id === u.turma_id); const rs = db.results.filter(r => r.user_id === u.id);
         const pd = ultimoPedido(u.id);
         return { id: u.id, nome: u.nome, email: u.email, role: u.role, created_at: u.created_at || rs.at(-1)?.created_at || null, turma_nome: t?.nome || null, ...calcAcesso(u, t, db.results), diagnosticos: rs.length, ultimo: rs.map(r => r.created_at).sort().at(-1) || null,
-          nova_execucao: Boolean(u.nova_execucao), limite_execucoes: u.limite_execucoes || 1, pedido_id: pd?.id || null, pedido_status: pd?.status || null, pedido_motivo: pd?.motivo || null, pedido_em: pd?.created_at || null };
+          nova_execucao: Boolean(u.nova_execucao), limite_execucoes: u.limite_execucoes || 1, pedido_id: pd?.id || null, pedido_status: pd?.status || null, pedido_motivo: pd?.motivo || null, pedido_em: pd?.created_at || null,
+          patrocinador: Boolean(u.patrocinador), patro_respondido: [db.patroPre[u.id], ...Object.values(db.patrocinios).filter(p => p.user_id === u.id)].filter(Boolean).map(p => p.updated_at).sort().at(-1) || null,
+          patro_turmas: db.turmas.filter(t => t.patrocinador_id === u.id).map(t => t.nome).join(', ') || null };
       }).sort((a, b) => (b.ultimo || b.created_at || '').localeCompare(a.ultimo || a.created_at || ''));
     },
     async definirAcesso(userId, ate, bloqueado) {
@@ -1698,22 +1723,35 @@ function DemoStore() {
       save(); return rec;
     },
     async listEvolucoes(turmaId) { return db.evolucoes.filter(e => e.turma_id === turmaId).map(juntar).filter(e => e.inicial && e.reavaliacao); },
-    async minhasTurmasPatrocinadas() { return db.turmas.filter(t => t.patrocinada && t.patrocinador_id === db.session).map(t => ({ id: t.id, nome: t.nome, data_workshop: t.data_workshop || null, reavaliar_em: t.reavaliar_em || null, respondido_em: db.patrocinios[t.id]?.updated_at || null })); },
+    async minhasTurmasPatrocinadas() { return db.turmas.filter(t => t.patrocinada && t.patrocinador_id === db.session).map(t => ({ id: t.id, nome: t.nome, data_workshop: t.data_workshop || null, reavaliar_em: t.reavaliar_em || null, respondido_em: db.patrocinios[t.id]?.user_id === db.session ? db.patrocinios[t.id].updated_at : null })); },
     async definirPatrocinador(turmaId, email) {
       const t = db.turmas.find(x => x.id === turmaId); if (!t) return { status: 'nao_encontrado' };
       if (!email) { t.patrocinador_id = null; save(); return { status: 'removido' }; }
       const u = db.users.find(x => x.email === email.trim().toLowerCase()); if (!u) return { status: 'nao_encontrado' };
-      t.patrocinador_id = u.id; t.patrocinada = true; save(); return { status: 'ok', nome: u.nome, email: u.email };
+      t.patrocinador_id = u.id; t.patrocinada = true; u.patrocinador = true; u.patrocinador_em = u.patrocinador_em || new Date().toISOString();
+      // O questionário respondido na pré-venda passa para a turma.
+      if (db.patroPre[u.id] && db.patrocinios[t.id]?.user_id !== u.id) { db.patrocinios[t.id] = { ...db.patroPre[u.id], turma_id: t.id }; delete db.patroPre[u.id]; }
+      save(); return { status: 'ok', nome: u.nome, email: u.email };
     },
     async patrocinadorDe(userId) { const u = userOf(userId); return u ? { nome: u.nome, email: u.email } : null; },
-    async getPatrocinio(turmaId) { const fac = userOf(db.session)?.role === 'facilitador'; return { respostas: db.patrocinios[turmaId] || null, relatorios: db.relPatro.filter(r => r.turma_id === turmaId && (fac || r.status === 'liberado')) }; },
-    async salvarPatrocinio(turmaId, respostas) { const agora = new Date().toISOString(); db.patrocinios[turmaId] = { turma_id: turmaId, user_id: db.session, respostas, created_at: db.patrocinios[turmaId]?.created_at || agora, updated_at: agora }; save(); return db.patrocinios[turmaId]; },
+    async getPatrocinio(turmaId) { const fac = userOf(db.session)?.role === 'facilitador'; const t = db.turmas.find(x => x.id === turmaId); const pr = db.patrocinios[turmaId]; return { respostas: pr && (!t?.patrocinador_id || pr.user_id === t.patrocinador_id) ? pr : null, relatorios: db.relPatro.filter(r => r.turma_id === turmaId && (fac || r.status === 'liberado')) }; },
+    async salvarPatrocinio(turmaId, respostas) { const agora = new Date().toISOString();
+      if (!turmaId) { if (!userOf(db.session)?.patrocinador) throw new Error('A área do patrocinador ainda não foi liberada para você.'); db.patroPre[db.session] = { turma_id: null, user_id: db.session, respostas, created_at: db.patroPre[db.session]?.created_at || agora, updated_at: agora }; save(); return db.patroPre[db.session]; }
+      db.patrocinios[turmaId] = { turma_id: turmaId, user_id: db.session, respostas, created_at: db.patrocinios[turmaId]?.created_at || agora, updated_at: agora }; save(); return db.patrocinios[turmaId]; },
     async salvarRelatorioPatro(turmaId, etapa, dados) {
       let r = db.relPatro.find(x => x.turma_id === turmaId && x.etapa === etapa);
       if (!r) { r = { id: uid(), turma_id: turmaId, etapa, comentario: null }; db.relPatro.push(r); }
       Object.assign(r, { dados, status: 'rascunho', gerado_em: new Date().toISOString(), liberado_em: null }); save(); return r;
     },
     async atualizarRelatorioPatro(id, patch) { const r = db.relPatro.find(x => x.id === id); if (r) { Object.assign(r, patch); save(); } return r; },
+    async signInPatrocinadorDemo(pre) { db.session = pre ? 'ex-patro-pre' : 'ex-patro'; save(); return pub(userOf(db.session)); },
+    async meuPatrocinio() { const u = userOf(db.session); return { qualificado: Boolean(u?.patrocinador), respostas: db.patroPre[db.session] || null }; },
+    async getPatrocinioPessoa(userId) { return { respostas: db.patroPre[userId] || null, relatorios: [] }; },
+    async definirPatrocinadorPessoa(userId, valor) {
+      const u = userOf(userId); if (!u) throw new Error('Na prévia, só pessoas com conta podem ser qualificadas como patrocinador.');
+      u.patrocinador = Boolean(valor); u.patrocinador_em = valor ? (u.patrocinador_em || new Date().toISOString()) : null; save();
+    },
+    async limparPatrocinioDemo(turmaId) { if (turmaId) { if (db.patrocinios[turmaId]?.user_id === db.session) delete db.patrocinios[turmaId]; } else delete db.patroPre[db.session]; save(); },
     async listEvolucoesIndividuais() { return db.evolucoes.filter(e => tipoEvo(e) === 'individual').map(juntar).filter(e => e.inicial && e.reavaliacao); },
     async resultadosDe(userId) { return db.results.filter(r => r.user_id === userId).sort((a, b) => a.created_at.localeCompare(b.created_at)); },
     async updateEvolucao(id, patch) { const e = db.evolucoes.find(x => x.id === id); if (e) { Object.assign(e, patch); save(); } return e ? juntar(e) : null; },
@@ -1749,6 +1787,7 @@ function LiveStore() {
     if (/already registered/i.test(m)) return new Error('Já existe uma conta com este e-mail. Use a aba Entrar.');
     if (/Password should be at least/i.test(m)) return new Error('A senha precisa ter pelo menos 6 caracteres.');
     if (/rate limit/i.test(m)) return new Error('Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente de novo.');
+    if (/definir_patrocinador_pessoa|is_patrocinador|profiles\.patrocinador|column "?patrocinador"? |"turma_id" of relation "patrocinio_respostas"|patrocinio_respostas.*not-null/i.test(m)) return new Error('Atualize o banco de dados com a atualização 09 (patrocinador qualificado) enviada pelo Claude.');
     if (/patrocinio_respostas|relatorios_patrocinador|patrocinador_id|minhas_turmas_patrocinadas|definir_patrocinador/i.test(m)) return new Error('Atualize o banco de dados com a atualização 08 (área do patrocinador) enviada pelo Claude.');
     if (/intermediario_id|evolucoes_tipo|column evolucoes\.tipo|evolucoes_turma_tipo_uq/i.test(m)) return new Error('Atualize o banco de dados com a atualização 07 (evolução por etapas) enviada pelo Claude.');
     if (/limite_baixo/i.test(m)) return new Error('O limite precisa ser maior que o número de execuções já feitas pela pessoa.');
@@ -1877,14 +1916,37 @@ function LiveStore() {
     async definirPatrocinador(turmaId, email) { const { data, error } = await sb.rpc('definir_patrocinador', { p_turma: turmaId, p_email: email || null }); if (error) throw errPt(error); return (data && data[0]) || { status: 'nao_encontrado' }; },
     async patrocinadorDe(userId) { const { data } = await sb.from('profiles').select('nome, email').eq('id', userId).maybeSingle(); return data || null; },
     async getPatrocinio(turmaId) {
-      const [a, b] = await Promise.all([sb.from('patrocinio_respostas').select('*').eq('turma_id', turmaId).maybeSingle(), sb.from('relatorios_patrocinador').select('*').eq('turma_id', turmaId)]);
+      // As respostas da turma são as do patrocinador atual (a turma pode ter trocado de patrocinador).
+      let pid = S.session?.id;
+      if (S.session?.role === 'facilitador') { const t = await sb.from('turmas').select('patrocinador_id').eq('id', turmaId).maybeSingle(); pid = t.data?.patrocinador_id || null; }
+      const [a, b] = await Promise.all([pid ? sb.from('patrocinio_respostas').select('*').eq('turma_id', turmaId).eq('user_id', pid).maybeSingle() : Promise.resolve({ data: null }), sb.from('relatorios_patrocinador').select('*').eq('turma_id', turmaId)]);
       if (a.error) throw errPt(a.error); if (b.error) throw errPt(b.error);
       return { respostas: a.data || null, relatorios: b.data || [] };
     },
     async salvarPatrocinio(turmaId, respostas) {
-      const { data, error } = await sb.from('patrocinio_respostas').upsert({ turma_id: turmaId, respostas, updated_at: new Date().toISOString() }, { onConflict: 'turma_id' }).select().single();
-      if (error) throw errPt(error); return data;
+      const uidAtual = S.session?.id;
+      let q = sb.from('patrocinio_respostas').select('id').eq('user_id', uidAtual);
+      q = turmaId ? q.eq('turma_id', turmaId) : q.is('turma_id', null);
+      const atual = await q.maybeSingle();
+      if (atual.error) throw errPt(atual.error);
+      const agora = new Date().toISOString();
+      const r = atual.data
+        ? await sb.from('patrocinio_respostas').update({ respostas, updated_at: agora }).eq('id', atual.data.id).select().single()
+        : await sb.from('patrocinio_respostas').insert({ turma_id: turmaId || null, respostas, updated_at: agora }).select().single();
+      if (r.error) { if (/row-level security/i.test(r.error.message || '')) throw new Error('A área do patrocinador ainda não foi liberada para você. Fale com ' + AUTOR + '.'); throw errPt(r.error); }
+      return r.data;
     },
+    async meuPatrocinio() {
+      const id = S.session?.id; if (!id) return { qualificado: false, respostas: null };
+      const [p, r] = await Promise.all([sb.from('profiles').select('patrocinador').eq('id', id).maybeSingle(), sb.from('patrocinio_respostas').select('*').eq('user_id', id).is('turma_id', null).maybeSingle()]);
+      if (p.error) return { qualificado: false, respostas: null };
+      return { qualificado: Boolean(p.data?.patrocinador), respostas: r.error ? null : (r.data || null) };
+    },
+    async getPatrocinioPessoa(userId) {
+      const { data, error } = await sb.from('patrocinio_respostas').select('*').eq('user_id', userId).is('turma_id', null).maybeSingle();
+      if (error) throw errPt(error); return { respostas: data || null, relatorios: [] };
+    },
+    async definirPatrocinadorPessoa(userId, valor) { const { error } = await sb.rpc('definir_patrocinador_pessoa', { p_user: userId, p_valor: Boolean(valor) }); if (error) throw errPt(error); },
     async salvarRelatorioPatro(turmaId, etapa, dados) {
       const { data, error } = await sb.from('relatorios_patrocinador').upsert({ turma_id: turmaId, etapa, dados, status: 'rascunho', gerado_em: new Date().toISOString(), liberado_em: null }, { onConflict: 'turma_id,etapa' }).select().single();
       if (error) throw errPt(error); return data;
@@ -1946,6 +2008,7 @@ const S = {
   pedidoRascunho: '',
   patro: null,
   patroTurmas: [],
+  patroPre: null,
   installEvt: null,
   installHidden: false,
   leitura: {},
@@ -1979,6 +2042,7 @@ async function route_() {
     try { [S.reav, S.minhasEvos] = await Promise.all([store.minhaReavaliacao(), store.minhasEvolucoes()]); } catch (e) { S.reav = null; S.minhasEvos = []; }
     try { S.pedido = await store.meuPedido(); } catch (e) { S.pedido = null; }
     try { S.patroTurmas = await store.minhasTurmasPatrocinadas(); } catch (e) { S.patroTurmas = []; }
+    try { S.patroPre = await store.meuPatrocinio(); } catch (e) { S.patroPre = null; }
   }
   if (r === 'diagnostico') await loadAcesso();
   if (r === 'facilitador') { await loadFac(); }
@@ -2117,7 +2181,7 @@ function viewEntrar() {
       ${t !== 'esqueci' ? `<div class="tabs" role="tablist"><button role="tab" data-tab="entrar" aria-selected="${t === 'entrar'}">Entrar</button><button role="tab" data-tab="criar" aria-selected="${t === 'criar'}">Criar conta</button></div>` : ''}
       ${form}
     </div>
-    ${store.mode === 'demo' ? `<div class="stack" style="gap:12px"><div class="divider">Prévia</div><button class="btn btn-quiet" data-act="fac-demo">Ver o painel do facilitador com dados de exemplo</button></div>` : ''}
+    ${store.mode === 'demo' ? `<div class="stack" style="gap:12px"><div class="divider">Prévia</div><button class="btn btn-quiet" data-act="fac-demo">Ver o painel do facilitador com dados de exemplo</button><button class="btn btn-quiet" data-act="patro-demo" data-pre="1">Ver a área do patrocinador em pré-venda</button><button class="btn btn-quiet" data-act="patro-demo">Ver a área do patrocinador com turma em andamento</button></div>` : ''}
   </div></div></main>`;
 }
 
@@ -2172,7 +2236,12 @@ function viewPainel() {
   const reavCard = cartoes.length ? cartoes[0].html : '';
   // Área do patrocinador: aparece para quem foi indicado como patrocinador de uma turma.
   const pts = S.patroTurmas || [];
-  const soPatro = pts.length > 0 && !(S.myResults || []).length && !(a && a.pode);
+  // Patrocinador qualificado antes de existir turma (pré-venda).
+  const pre = S.patroPre && S.patroPre.qualificado && !pts.length ? S.patroPre : null;
+  const soPatro = (pts.length > 0 || Boolean(pre)) && !(S.myResults || []).length && !(a && a.pode);
+  const preCard = pre ? `<div class="card stack evo-chamada" style="gap:10px"><span class="eyebrow">Área do patrocinador</span><h2 style="font-size:22px">O seu time e o seu negócio</h2>
+    <p class="muted small">${pre.respostas ? `Questionário respondido em ${fmtDate(pre.respostas.updated_at || pre.respostas.created_at)}. O relatório traz as dores que você apontou, a sua visão do time e exemplos do que você recebe ao longo do programa.` : 'Cerca de 10 minutos de perguntas sobre o seu time e o seu negócio. O relatório sai na hora, com as dores que mais pesam e exemplos do que você recebe ao longo do programa.'}</p>
+    <div class="actions"><button class="btn btn-primary btn-sm" data-patro-pre="1">${pre.respostas ? 'Abrir o relatório' : 'Responder o questionário'} <span aria-hidden="true">→</span></button></div></div>` : '';
   const patroCard = pts.map(t => `<div class="card stack evo-chamada" style="gap:10px"><span class="eyebrow">Área do patrocinador</span><h2 style="font-size:22px">${esc(t.nome)}</h2>
     <p class="muted small">${t.respondido_em ? `Questionário respondido em ${fmtDate(t.respondido_em)}. O relatório reúne as dores do negócio e a leitura consolidada do time ao longo do programa.` : 'Responda o questionário do patrocinador, em cerca de 10 minutos. O relatório sai na hora.'}</p>
     <div class="actions"><button class="btn btn-primary btn-sm" data-patro="${esc(t.id)}">${t.respondido_em ? 'Abrir o relatório' : 'Responder o questionário'} <span aria-hidden="true">→</span></button></div></div>`).join('');
@@ -2181,12 +2250,12 @@ function viewPainel() {
   return `<main class="page"><div class="wrap narrow stack-lg">
     <div class="hello"><div class="stack" style="gap:6px"><span class="eyebrow">Meu painel</span><h1 style="font-size:clamp(28px,5vw,40px)">Olá${s.nome ? ', ' + esc(s.nome.split(' ')[0]) : ''}</h1></div>
     ${(!a || a.pode) && !soPatro ? `<button class="btn btn-primary" data-go="diagnostico">${draft ? 'Continuar diagnóstico' : 'Iniciar diagnóstico'} <span aria-hidden="true">→</span></button>` : ''}</div>
-    ${patroCard}
+    ${preCard}${patroCard}
     ${soPatro ? '' : acessoCard}
     ${reavCard}
     ${evoCard}
     ${s.role === 'facilitador' ? `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><strong>Painel do facilitador</strong><br><span class="muted small">Turmas, códigos de acesso e resultados dos grupos.</span></span><button class="btn btn-ghost btn-sm" data-go="facilitador">Abrir</button></div>` : ''}
-    <div class="stack"><h2 class="h-sec" style="margin:0">Meus diagnósticos</h2>${rows}</div>
+    ${soPatro && !(S.myResults || []).length ? '' : `<div class="stack"><h2 class="h-sec" style="margin:0">Meus diagnósticos</h2>${rows}</div>`}
   </div></main>`;
 }
 
@@ -2703,7 +2772,8 @@ function viewResultado() {
     <button class="btn btn-quiet btn-sm" data-act="copiar-resumo">Copiar resumo</button>`;
 
   return `<main class="page"><div class="wrap stack-lg">
-    <div class="hello report-head"><div class="stack" style="gap:6px;min-width:0"><span class="eyebrow">Diagnóstico completo · ${fmtDate(rec.created_at)}${rec.nome && !isMine ? ' · ' + esc(rec.nome) : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">${isMine ? 'Seu Diagnóstico OQGCI' : 'Diagnóstico OQGCI'}</h1>${negocioLinha(rec) ? `<p class="muted small">${esc(negocioLinha(rec))}</p>` : ''}</div><img src="${LOGO_CLARO}" alt="Logo de ${AUTOR}" class="report-logo" width="64" height="71" onerror="this.hidden=true"></div>
+    <div class="hello report-head"><div class="stack" style="gap:6px;min-width:0"><span class="eyebrow">${rec.exemploPatro ? 'Exemplo · ' : ''}Diagnóstico completo · ${fmtDate(rec.created_at)}${rec.nome && !isMine && !rec.exemploPatro ? ' · ' + esc(rec.nome) : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">${isMine ? 'Seu Diagnóstico OQGCI' : 'Diagnóstico OQGCI'}</h1>${negocioLinha(rec) ? `<p class="muted small">${esc(negocioLinha(rec))}</p>` : ''}</div><img src="${LOGO_CLARO}" alt="Logo de ${AUTOR}" class="report-logo" width="64" height="71" onerror="this.hidden=true"></div>
+    ${rec.exemploPatro ? '<div class="msg" role="note"><b>Exemplo com dados fictícios.</b> É o relatório que cada pessoa do time recebe logo depois de responder o diagnóstico. Só ela vê o próprio relatório.</div>' : ''}
     <textarea id="resumo-fallback" hidden readonly style="width:100%;min-height:160px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px"></textarea>
 
     <div class="report-hero">
@@ -2756,7 +2826,7 @@ function viewResultado() {
 
     <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o seu diagnóstico</h2><p class="muted small">O relatório em PDF traz todas as leituras, abertas, para guardar ou enviar.${LIVE ? ' No celular, Compartilhar envia o PDF por WhatsApp ou e-mail.' : ''}</p><div class="actions">${exportBtns}</div></div>
 
-    <div class="actions no-print">${isMine ? '<button class="btn btn-primary" data-go="painel">Voltar ao meu painel</button>' : '<button class="btn btn-primary" data-go="facilitador">Voltar ao painel do facilitador</button>'}<button class="btn btn-ghost" data-go="referencias">Referências científicas</button></div>
+    <div class="actions no-print">${isMine ? '<button class="btn btn-primary" data-go="painel">Voltar ao meu painel</button>' : rec.exemploPatro ? '<button class="btn btn-primary" data-go="patrocinio">Voltar à área do patrocinador</button>' : '<button class="btn btn-primary" data-go="facilitador">Voltar ao painel do facilitador</button>'}<button class="btn btn-ghost" data-go="referencias">Referências científicas</button></div>
   </div></main>`;
 }
 
@@ -3781,14 +3851,14 @@ function viewPatrocinio() {
   if (!P.dados) return `<main class="page"><div class="wrap narrow"><p class="muted">Carregando…</p></div></main>`;
   const resp = P.dados.respostas?.respostas || null;
   const voltar = `<div class="actions no-print"><button class="btn btn-primary" data-go="${P.fac ? 'facilitador' : 'painel'}">${P.fac ? 'Voltar ao painel do facilitador' : 'Voltar ao meu painel'}</button></div>`;
-  const head = `<div class="hello report-head"><div class="stack" style="gap:6px;min-width:0"><span class="eyebrow">Área do patrocinador · ${esc(t.nome)}</span><h1 style="font-size:clamp(28px,5vw,40px)">${!resp || P.editando ? 'Questionário do patrocinador' : 'Relatório do patrocinador'}</h1></div><img src="${LOGO_CLARO}" alt="Logo de ${AUTOR}" class="report-logo" width="64" height="71" onerror="this.hidden=true"></div>`;
+  const head = `<div class="hello report-head"><div class="stack" style="gap:6px;min-width:0"><span class="eyebrow">Área do patrocinador${t.nome ? ' · ' + esc(t.nome) : ''}${P.fac && P.pessoa ? ' · ' + esc(P.pessoa.nome || P.pessoa.email || '') : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">${!resp || P.editando ? 'Questionário do patrocinador' : 'Relatório do patrocinador'}</h1></div><img src="${LOGO_CLARO}" alt="Logo de ${AUTOR}" class="report-logo" width="64" height="71" onerror="this.hidden=true"></div>`;
   if (!P.fac && (!resp || P.editando)) {
     return `<main class="page"><div class="wrap narrow stack-lg">${head}
       <p class="muted">Cerca de 10 minutos. As respostas mostram como você enxerga o time e o que mais pesa no resultado do negócio, e geram o seu relatório na hora. Ao longo do programa, o relatório recebe a leitura consolidada e anônima do time na prévia, no workshop e aos 45 dias.</p>
       ${viewPatroForm()}${voltar}</div></main>`;
   }
   if (!resp) {
-    return `<main class="page"><div class="wrap stack-lg">${head}<div class="msg" role="status">O patrocinador ainda não respondeu o questionário.</div>${P.fac ? viewPatroFac() : ''}${voltar}</div></main>`;
+    return `<main class="page"><div class="wrap stack-lg">${head}<div class="msg" role="status">O patrocinador ainda não respondeu o questionário.</div>${P.fac && t.id ? viewPatroFac() : ''}${voltar}</div></main>`;
   }
   const dores = (resp.D1 || []).map(Number).map(id => PATRO_DORES.find(x => x.id === id)).filter(Boolean).sort((a, b) => (b.id === Number(resp.D2)) - (a.id === Number(resp.D2)));
   const doresDims = [...new Set(dores.flatMap(x => x.dims))];
@@ -3812,14 +3882,18 @@ function viewPatrocinio() {
   // O patrocinador vê o relatório liberado mais recente, que já traz as etapas anteriores; o facilitador vê todos para revisar.
   const relsTime = P.fac ? rels : rels.slice(0, 1);
   const blocoTime = rels.length ? `<div class="stack"><h2 class="h-sec" style="margin:0">O time ao longo do programa</h2>${relsTime.map(r => (P.fac && r.status !== 'liberado' ? `<div class="msg evo-rascunho" role="status"><b>Rascunho · ${PATRO_ETAPAS.find(e => e[0] === r.etapa)[1]}.</b> O patrocinador ainda não vê este relatório.</div>` : '') + blocoTimePatro(r, doresDims)).join('')}</div>`
-    : `<div class="card stack" style="gap:6px"><h2 class="h-sec" style="margin:0">O time ao longo do programa</h2><p class="small muted">A leitura consolidada do time aparece aqui depois da prévia, do workshop e dos 45 dias, sempre sem identificar ninguém.</p></div>`;
+    : `<div class="stack"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">O que você recebe com o seu time</h2>
+        <p class="muted small">${t.id ? 'A leitura consolidada do seu time aparece aqui depois da prévia, do workshop e dos 45 dias, sempre sem identificar ninguém.' : 'Com o workshop, a leitura consolidada e anônima do seu time aparece aqui na prévia, no workshop e aos 45 dias.'} Enquanto isso, veja um exemplo.</p></div>
+      <div class="msg" role="note"><b>Exemplo com dados fictícios.</b> Um time de 12 pessoas, da prévia aos 45 dias.</div>
+      ${blocoTimePatro(PATRO_EXEMPLO_REL, doresDims)}
+      <div class="card stack" style="gap:10px"><h2 class="h-sec" style="margin:0">Exemplo de diagnóstico individual</h2><p class="muted small">Cada pessoa do time recebe o próprio diagnóstico logo depois de responder, e só ela vê esse relatório. Veja como ele é.</p><div class="actions"><button class="btn btn-ghost btn-sm" data-act="patro-ex-individual">Ver um exemplo de diagnóstico individual</button></div></div></div>`;
   const facExtra = P.fac ? `<div class="card stack" style="gap:10px"><div><h2 class="h-sec" style="margin:0">Só para você</h2><span class="tag" style="display:inline-block;margin-top:8px">Visível só para o facilitador</span></div>
       <p class="small"><span class="muted">Venda perdida:</span> ${esc(resp.D4 || '—')}</p>${resp.D5 ? `<p class="small"><span class="muted">O que espera ver de diferente:</span> ${esc(resp.D5)}</p>` : ''}
       <p class="small muted">Contexto: ${esc(resp.C1)} pessoas · ${esc(SEG[resp.C2]?.nome || '')} · ${esc(PATRO_CTX[1].ops.find(o => o[0] === resp.C3)?.[1] || '')} · decisão ${esc((PATRO_CTX[2].ops.find(o => o[0] === resp.C4)?.[1] || '').toLowerCase())} · ${esc(PATRO_CTX[3].ops.find(o => o[0] === resp.C5)?.[1] || '')}.</p></div>${viewPatroFac()}` : '';
   return `<main class="page"><div class="wrap stack-lg">${head}
     <p class="small muted">${P.fac ? 'Visão do facilitador. O patrocinador vê este relatório sem a venda perdida e sem os relatórios do time em rascunho.' : `Respondido em ${fmtDate(P.dados.respostas.updated_at || P.dados.respostas.created_at)}.`}</p>
     ${facExtra}${blocoDores}${blocoVisao}${blocoNumero}${blocoTime}
-    <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o relatório</h2><div class="actions"><button class="btn btn-primary btn-sm" data-act="patro-pdf" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando PDF…' : 'Baixar relatório em PDF'}</button>${!P.fac ? '<button class="btn btn-quiet btn-sm" data-act="patro-editar">Revisar as minhas respostas</button>' : ''}</div></div>
+    <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o relatório</h2><div class="actions"><button class="btn btn-primary btn-sm" data-act="patro-pdf" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando PDF…' : 'Baixar relatório em PDF'}</button>${!P.fac ? '<button class="btn btn-quiet btn-sm" data-act="patro-editar">Revisar as minhas respostas</button>' : ''}${!P.fac && store.mode === 'demo' ? '<button class="btn btn-quiet btn-sm" data-act="patro-limpar">Recomeçar o questionário em branco</button>' : ''}</div></div>
     ${voltar}</div></main>`;
 }
 // Controles do facilitador: gerar, revisar e liberar os relatórios do time para o patrocinador.
@@ -3841,16 +3915,17 @@ function viewPatroFac() {
     <div class="table-wrap"><table class="heat"><thead><tr><th>Etapa</th><th>Situação</th><th>Ações</th></tr></thead><tbody>${linhas}</tbody></table></div></div>`;
 }
 
-async function abrirPatrocinio(turma, fac) {
-  S.patro = { turma, fac: Boolean(fac), dados: null, results: null, editando: false, form: null };
+async function abrirPatrocinio(turma, fac, pessoa) {
+  S.patro = { turma, fac: Boolean(fac), pessoa: pessoa || null, dados: null, results: null, editando: false, form: null };
   go('patrocinio');
   await carregarPatrocinio();
 }
 async function carregarPatrocinio() {
   const P = S.patro; if (!P) return;
   try {
-    P.dados = await store.getPatrocinio(P.turma.id);
-    if (P.fac) P.results = await store.turmaResults(P.turma.id);
+    if (!P.turma.id) P.dados = P.fac ? await store.getPatrocinioPessoa(P.pessoa.id) : { respostas: (await store.meuPatrocinio()).respostas, relatorios: [] };
+    else P.dados = await store.getPatrocinio(P.turma.id);
+    if (P.fac && P.turma.id) P.results = await store.turmaResults(P.turma.id);
     if (!P.form) P.form = P.dados.respostas?.respostas ? { ...P.dados.respostas.respostas } : { D1: [] };
   } catch (e) { P.dados = { respostas: null, relatorios: [] }; toast(e.message); }
   render();
@@ -3891,7 +3966,7 @@ async function buildPatroPDF() {
     const b = rr * 7.5 / 11.5; color(C.azul, 'fill'); doc.circle(cx, cy, b, 'F'); color(C.ambar, 'fill'); doc.rect(cx - b - 0.05, cy - b - 0.05, b + 0.05, 2 * b + 0.1, 'F');
   };
   const rodape = () => { font(6.4, 'body', C.ink3); doc.text(T(COPYRIGHT), M, 289); font(8, 'bold', C.warm); doc.text(String(doc.getNumberOfPages()), W - M, 289, { align: 'right' }); };
-  const cabecalho = () => { simbolo(M + 2.2, 11.2, 2.2); font(7.4, 'semi', C.ink3); doc.text(T('Relatório do patrocinador'), M + 6.6, 12.4); doc.text(T(t.nome), W - M, 12.4, { align: 'right' }); color(C.line2, 'draw'); doc.setLineWidth(0.25); doc.line(M, 16, W - M, 16); };
+  const cabecalho = () => { simbolo(M + 2.2, 11.2, 2.2); font(7.4, 'semi', C.ink3); doc.text(T('Relatório do patrocinador'), M + 6.6, 12.4); doc.text(T(t.nome || 'Área do patrocinador'), W - M, 12.4, { align: 'right' }); color(C.line2, 'draw'); doc.setLineWidth(0.25); doc.line(M, 16, W - M, 16); };
   const novaPagina = () => { rodape(); doc.addPage(); cabecalho(); y = 24; };
   const precisa = h => { if (y + h > BOTTOM) novaPagina(); };
   const secao = (eb, titulo, lead, reserva = 30) => {
@@ -3914,7 +3989,7 @@ async function buildPatroPDF() {
   [[C.warmL, 0], [C.coolL, 1], [C.baseL, 2]].forEach(([c, i]) => { color(c, 'fill'); doc.roundedRect(M + i * 15, 64, 12, 1.4, 0.7, 0.7, 'F'); });
   eyebrow('Venda com Neurociência · Metodologia OQGCI', M, 74);
   font(32, 'title', C.ink); doc.text(T('Relatório do patrocinador'), M, 88);
-  font(17, 'light', C.ink); doc.text(T(t.nome), M, 97);
+  font(17, 'light', C.ink); doc.text(T(t.nome || 'Área do patrocinador'), M, 97);
   font(9.2, 'body', C.ink2); doc.text(T(`Respondido em ${fmtDate(P.dados.respostas.updated_at || P.dados.respostas.created_at)}${ultimo ? ' · leitura do time até ' + PATRO_ETAPAS.find(e => e[0] === ultimo.etapa)[1].toLowerCase() : ''}`), M, 104);
   let yc = 114;
   if (dores[0]) {
@@ -4036,7 +4111,17 @@ function viewPessoas() {
   const F = S.fac; const all = F.pessoas;
   if (all === null || all === undefined) return '<p class="muted">Carregando pessoas…</p>';
   if (F.pessoasErro && !all.length) return `<div class="msg msg-err" role="alert">${esc(F.pessoasErro)}</div>`;
-  const noFiltro = (x, k) => k === 'todos' || (k === 'pedidos' ? x.pedido_status === 'pendente' : x.motivo === k);
+  const noFiltro = (x, k) => k === 'todos' || (k === 'pedidos' ? x.pedido_status === 'pendente' : k === 'patrocinadores' ? Boolean(x.patrocinador) : x.motivo === k);
+  // Qualificação de patrocinador: potencial cliente (pré-venda) ou patrocinador de turma.
+  const patroBloco = x => {
+    const id = esc(x.id); const novo = patroNovo(x);
+    const situacao = x.patrocinador ? `<span class="small">${x.patro_turmas ? 'Patrocina: <b>' + esc(x.patro_turmas) + '</b>' : 'Qualificado, em pré-venda'}${x.patro_respondido ? ` · questionário respondido em ${fmtDate(x.patro_respondido)}` : ' · questionário ainda não respondido'}${novo ? ' <span class="flag" style="background:color-mix(in srgb, var(--accent) 22%, transparent);color:var(--accent)">novo</span>' : ''}</span>`
+      : '<span class="small muted">Qualifique para a pessoa ver a área do patrocinador, responder o questionário e ver os exemplos do programa.</span>';
+    const botoes = x.patrocinador
+      ? `${x.patro_respondido && !x.patro_turmas ? `<button type="button" class="btn btn-quiet btn-sm" data-act="patro-pessoa-abrir" data-user="${id}">Abrir o questionário</button>` : ''}<button type="button" class="btn btn-quiet btn-sm" data-act="patro-qualificar" data-user="${id}" data-valor="0">Retirar a qualificação</button>`
+      : `<button type="button" class="btn btn-quiet btn-sm" data-act="patro-qualificar" data-user="${id}" data-valor="1">Qualificar como patrocinador</button>`;
+    return `<div class="subbloco"><span class="subbloco-t">Patrocinador</span>${situacao}<div class="acesso-acoes">${botoes}</div></div>`;
+  };
   const conta = k => all.filter(x => noFiltro(x, k)).length;
   const busca = (F.busca || '').trim().toLowerCase();
   const lista = all.filter(x => noFiltro(x, F.filtro) && (!busca || (x.nome || '').toLowerCase().includes(busca) || (x.email || '').toLowerCase().includes(busca)))
@@ -4064,20 +4149,21 @@ function viewPessoas() {
     const origem = x.motivo === 'ativo' ? (x.acesso_ate && x.acesso_ate >= hojeBR() ? 'individual' : 'pela turma') : '';
     const n = x.diagnosticos || 0;
     return `<tr>
-      <td><strong>${esc(x.nome || 'Sem nome')}</strong><br><span class="muted small">${esc(x.email || '')}</span>${x.pedido_status === 'pendente' ? '<br><span class="flag" style="background:color-mix(in srgb, var(--accent) 22%, transparent);color:var(--accent)">pedido pendente</span>' : ''}</td>
+      <td><strong>${esc(x.nome || 'Sem nome')}</strong><br><span class="muted small">${esc(x.email || '')}</span>${x.patrocinador ? `<br><span class="flag">${x.patro_turmas ? 'patrocinador' : 'patrocinador · pré-venda'}</span>` : ''}${x.pedido_status === 'pendente' ? '<br><span class="flag" style="background:color-mix(in srgb, var(--accent) 22%, transparent);color:var(--accent)">pedido pendente</span>' : ''}</td>
       <td>${esc(x.turma_nome || '—')}${x.turma_expira ? `<br><span class="muted small">turma até ${fmtDia(x.turma_expira)}</span>` : ''}</td>
       <td>${chip(x.motivo)}${origem ? `<br><span class="muted small">${origem}</span>` : ''}</td>
       <td class="tnum">${fac ? '—' : x.valido_ate ? fmtDia(x.valido_ate) : (x.pode ? 'sem prazo' : '—')}</td>
       <td class="num">${n}${!fac && x.nova_execucao ? `<br><span class="muted small">limite ${x.limite_execucoes}</span>` : ''}</td>
       <td>${x.ultimo ? fmtDate(x.ultimo) : '—'}</td>
-      <td>${fac ? '<span class="muted small">—</span>' : `<div class="acesso-acoes"><input type="date" aria-label="Liberar até" data-ate="${esc(x.id)}" value="${esc(x.acesso_ate && x.acesso_ate >= hojeBR() ? x.acesso_ate : padrao)}" min="${hojeBR()}"><button type="button" class="btn btn-quiet btn-sm" data-act="acesso-liberar" data-user="${esc(x.id)}">Liberar até</button>${x.acesso_bloqueado ? `<button type="button" class="btn btn-quiet btn-sm" data-act="acesso-reativar" data-user="${esc(x.id)}">Reativar</button>` : (x.pode ? `<button type="button" class="btn btn-quiet btn-sm" data-act="acesso-encerrar" data-user="${esc(x.id)}">Encerrar</button>` : '')}</div>${execucoes(x)}`}</td></tr>`;
+      <td>${fac ? '<span class="muted small">—</span>' : `<div class="acesso-acoes"><input type="date" aria-label="Liberar até" data-ate="${esc(x.id)}" value="${esc(x.acesso_ate && x.acesso_ate >= hojeBR() ? x.acesso_ate : padrao)}" min="${hojeBR()}"><button type="button" class="btn btn-quiet btn-sm" data-act="acesso-liberar" data-user="${esc(x.id)}">Liberar até</button>${x.acesso_bloqueado ? `<button type="button" class="btn btn-quiet btn-sm" data-act="acesso-reativar" data-user="${esc(x.id)}">Reativar</button>` : (x.pode ? `<button type="button" class="btn btn-quiet btn-sm" data-act="acesso-encerrar" data-user="${esc(x.id)}">Encerrar</button>` : '')}</div>${execucoes(x)}${patroBloco(x)}`}</td></tr>`;
   }).join('');
-  const pend = pedidosPendentes();
+  const pend = pedidosPendentes(); const novos = patroNovos();
   return `<div class="card stack">
     <div class="stack" style="gap:6px">
       <p class="muted small">Todas as pessoas que criaram conta na ferramenta. Novos diagnósticos exigem acesso ativo, pela turma ou individual. Encerrar bloqueia novos diagnósticos; os relatórios já feitos continuam disponíveis para a pessoa.</p></div>
     ${pend ? `<div class="msg" role="status"><b>${pend === 1 ? '1 pedido de nova execução' : pend + ' pedidos de nova execução'}</b> ${pend === 1 ? 'aguarda' : 'aguardam'} a sua resposta. ${F.filtro !== 'pedidos' ? '<button type="button" class="link-btn" data-fac-filtro="pedidos">Ver pedidos</button>' : ''}</div>` : ''}
-    <div class="turma-chips">${['todos', 'pedidos', 'ativo', 'limite', 'expirado', 'encerrado', 'sem_acesso'].map(k => `<button data-fac-filtro="${k}" aria-pressed="${F.filtro === k}">${k === 'todos' ? 'Todos' : k === 'pedidos' ? 'Pedidos pendentes' : SIT[k][0]} · ${conta(k)}</button>`).join('')}</div>
+    ${novos ? `<div class="msg" role="status"><b>${novos === 1 ? '1 questionário de patrocinador novo' : novos + ' questionários de patrocinador novos'}</b>, de pessoas em pré-venda. ${F.filtro !== 'patrocinadores' ? '<button type="button" class="link-btn" data-fac-filtro="patrocinadores">Ver patrocinadores</button>' : ''}</div>` : ''}
+    <div class="turma-chips">${['todos', 'pedidos', 'patrocinadores', 'ativo', 'limite', 'expirado', 'encerrado', 'sem_acesso'].map(k => `<button data-fac-filtro="${k}" aria-pressed="${F.filtro === k}">${k === 'todos' ? 'Todos' : k === 'pedidos' ? 'Pedidos pendentes' : k === 'patrocinadores' ? 'Patrocinadores' : SIT[k][0]} · ${conta(k)}</button>`).join('')}</div>
     <div class="field" style="max-width:360px"><label for="ps-busca" class="sr-only">Buscar pessoa</label><input id="ps-busca" type="search" placeholder="Buscar por nome ou e-mail" value="${esc(F.busca || '')}"></div>
     ${lista.length ? `<div class="table-wrap"><table class="heat pessoas"><thead><tr><th>Pessoa</th><th>Turma</th><th>Situação</th><th>Válido até</th><th class="num">Execuções</th><th>Última</th><th>Acesso e execuções</th></tr></thead><tbody>${linhas}</tbody></table></div>` : '<p class="muted">Nenhuma pessoa neste filtro.</p>'}
     <p class="small muted">"Liberar até" dá acesso individual até a data escolhida, mesmo sem turma ou com a turma vencida. A data vale até o fim do dia, no horário de Brasília.</p>
@@ -4090,8 +4176,8 @@ function cartaoPatrocinio(t) {
   const info = (S.fac.patroInfo || {})[t.id];
   if (t.patrocinador_id && info === undefined) { S.fac.patroInfo = { ...(S.fac.patroInfo || {}), [t.id]: null }; store.patrocinadorDe(t.patrocinador_id).then(x => { S.fac.patroInfo[t.id] = x; render(); }).catch(() => {}); }
   return `<div class="card stack" style="gap:10px"><h2 class="h-sec" style="margin:0">Patrocínio</h2>
-    <div class="validade-row small"><label for="tm-patro-email"><b>Patrocinador</b></label><input type="email" id="tm-patro-email" style="max-width:280px" placeholder="E-mail da conta do patrocinador" value="${esc(info?.email || '')}"><button type="button" class="btn btn-quiet btn-sm" data-act="patro-definir">Salvar</button></div>
-    <p class="small muted">${t.patrocinador_id ? `Patrocinador: <b style="color:var(--ink)">${esc(info?.nome || info?.email || '…')}</b>. Ele encontra a área do patrocinador no painel dele.` : 'O patrocinador cria uma conta no app com este e-mail; depois de salvo, a área dele aparece no painel.'} Os relatórios do time para ele são consolidados e anônimos, com o mínimo de ${PATRO_MIN} pessoas por etapa.</p>
+    <div class="validade-row small"><label for="tm-patro-email"><b>Patrocinador</b></label><input type="email" id="tm-patro-email" list="patro-lista" style="max-width:280px" placeholder="E-mail da conta do patrocinador" value="${esc(info?.email || '')}"><datalist id="patro-lista">${(S.fac.pessoas || []).filter(p => p.patrocinador && p.email).map(p => `<option value="${esc(p.email)}">${esc(p.nome || '')}${p.patro_turmas ? '' : ' · pré-venda'}</option>`).join('')}</datalist><button type="button" class="btn btn-quiet btn-sm" data-act="patro-definir">Salvar</button></div>
+    <p class="small muted">${t.patrocinador_id ? `Patrocinador: <b style="color:var(--ink)">${esc(info?.nome || info?.email || '…')}</b>. Ele encontra a área do patrocinador no painel dele.` : 'Escolha um patrocinador qualificado em Pessoas e acessos ou informe o e-mail da conta dele. O questionário que ele já respondeu na pré-venda passa para esta turma.'} Os relatórios do time para ele são consolidados e anônimos, com o mínimo de ${PATRO_MIN} pessoas por etapa.</p>
     <div class="actions"><button type="button" class="btn btn-ghost btn-sm" data-act="patro-abrir">Abrir a área do patrocinador</button></div></div>`;
 }
 function viewFacilitador() {
@@ -4134,7 +4220,7 @@ function viewFacilitador() {
     </div>`;
   return `<main class="page"><div class="wrap stack-lg">
     <div class="stack" style="gap:6px"><span class="eyebrow">Painel do facilitador</span><h1 style="font-size:clamp(28px,5vw,40px)">${F.tab === 'pessoas' ? 'Pessoas e acessos' : F.tab === 'evolucao' ? 'Evolução da turma' : 'Turmas e resultados'}</h1></div>
-    <div class="tabs fac-tabs" role="tablist"><button role="tab" data-fac-tab="resultados" aria-selected="${F.tab === 'resultados'}">Turmas e resultados</button><button role="tab" data-fac-tab="evolucao" aria-selected="${F.tab === 'evolucao'}">Evolução</button><button role="tab" data-fac-tab="pessoas" aria-selected="${F.tab === 'pessoas'}">Pessoas e acessos${pedidosPendentes() ? ` · ${pedidosPendentes()}` : ''}</button></div>
+    <div class="tabs fac-tabs" role="tablist"><button role="tab" data-fac-tab="resultados" aria-selected="${F.tab === 'resultados'}">Turmas e resultados</button><button role="tab" data-fac-tab="evolucao" aria-selected="${F.tab === 'evolucao'}">Evolução</button><button role="tab" data-fac-tab="pessoas" aria-selected="${F.tab === 'pessoas'}">Pessoas e acessos${pedidosPendentes() + patroNovos() ? ` · ${pedidosPendentes() + patroNovos()}` : ''}</button></div>
     ${F.tab === 'pessoas' ? viewPessoas() : F.tab === 'evolucao' ? `<div class="stack" style="gap:10px"><span class="small muted">Turma</span><div class="turma-chips">${turmas.map(t => `<button data-turma="${esc(t.id)}" aria-pressed="${F.sel === t.id}">${esc(t.nome)}</button>`).join('')}<button data-turma="individuais" aria-pressed="${F.sel === 'individuais'}">Individuais</button></div></div>${viewEvolucaoTurma()}` : `
     <div class="card stack">
       <form id="f-turma" class="inline-form turma-form" novalidate><div class="field"><label for="tm-nome">Nova turma</label><input id="tm-nome" type="text" placeholder="Ex.: Workshop grupo de networking · novembro" required></div><div class="field"><label for="tm-workshop">Data do workshop</label><input id="tm-workshop" type="date" min="${hojeBR()}"></div><div class="field"><label for="tm-expira">Diagnósticos até</label><input id="tm-expira" type="date" value="${somaDias(hojeBR(), 90)}" min="${hojeBR()}"></div><button class="btn btn-primary btn-sm" type="submit">Criar turma e gerar código</button></form>
@@ -4172,7 +4258,7 @@ function render() {
 
 /* ================================ EVENTOS ================================= */
 document.addEventListener('click', async (ev) => {
-  const t = ev.target.closest('[data-go],[data-act],[data-tab],[data-ans],[data-sjt],[data-open],[data-fac-open],[data-turma],[data-copy],[data-seg],[data-modo],[data-fac-modo],[data-fac-tab],[data-fac-filtro],[data-evo-open],[data-evo-mine],[data-patro]');
+  const t = ev.target.closest('[data-go],[data-act],[data-tab],[data-ans],[data-sjt],[data-open],[data-fac-open],[data-turma],[data-copy],[data-seg],[data-modo],[data-fac-modo],[data-fac-tab],[data-fac-filtro],[data-evo-open],[data-evo-mine],[data-patro],[data-patro-pre]');
   if (!t) return;
   if (t.dataset.go) { if (t.dataset.go === 'diagnostico' && !S.quiz) startQuiz(); go(t.dataset.go); return; }
   if (t.dataset.tab) { S.authTab = t.dataset.tab; S.authMsg = null; render(); return; }
@@ -4211,6 +4297,7 @@ document.addEventListener('click', async (ev) => {
     let serie = null; if (tipoEvo(e) === 'individual') { try { serie = await store.resultadosDe(e.user_id); } catch (x) { serie = null; } }
     S.evo = { ev: e, from: 'fac', serie }; go('evolucao'); return;
   }
+  if (t.dataset.patroPre) { await abrirPatrocinio({ id: null, nome: null, pre: true }, false); return; }
   if (t.dataset.patro) { const tm = (S.patroTurmas || []).find(x => x.id === t.dataset.patro); if (tm) await abrirPatrocinio(tm, false); return; }
   if (t.dataset.evoMine) { const e = (S.minhasEvos || []).find(x => x.id === t.dataset.evoMine); if (e) { S.evo = { ev: e, from: 'painel', serie: tipoEvo(e) === 'individual' ? (S.myResults || []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at)) : null }; go('evolucao'); } return; }
   if (t.dataset.facFiltro) { S.fac.filtro = t.dataset.facFiltro; render(); return; }
@@ -4251,6 +4338,27 @@ document.addEventListener('click', async (ev) => {
   else if (act === 'patro-editar') { S.patro.editando = true; S.patro.form = { ...(S.patro.dados.respostas?.respostas || {}) }; render(); window.scrollTo(0, 0); }
   else if (act === 'patro-cancelar') { S.patro.editando = false; render(); window.scrollTo(0, 0); }
   else if (act === 'patro-pdf') { exportPatroPDF(); }
+  else if (act === 'patro-demo') { S.session = await store.signInPatrocinadorDemo(Boolean(t.dataset.pre)); go('painel'); }
+  else if (act === 'patro-limpar') {
+    const P = S.patro; if (!P || store.mode !== 'demo') return;
+    await store.limparPatrocinioDemo(P.turma.id); P.form = null; P.editando = false;
+    try { S.patroPre = await store.meuPatrocinio(); S.patroTurmas = await store.minhasTurmasPatrocinadas(); } catch (x) { /* */ }
+    await carregarPatrocinio(); window.scrollTo(0, 0); toast('Questionário em branco');
+  }
+  else if (act === 'patro-ex-individual') {
+    const A = 'assertiva', Pa = 'passiva';
+    const rec = exResult({ id: 'exemplo-individual', user_id: 'exemplo', nome: 'Exemplo', turma_id: null, dias: 2 }, { D1: 4.6, D2: 3.4, D3: 4.4, D4: 2.7, D5: 2.4, D6: 2.7, D7: 3.1, D8: 2.9 }, [Pa, Pa, Pa, A, A, A], { segmento: 'servicos', oferta: '', modo: 'conversa' });
+    rec.exemploPatro = true; S.result = rec; go('resultado'); window.scrollTo(0, 0);
+  }
+  else if (act === 'patro-qualificar') {
+    const id = t.dataset.user; const valor = t.dataset.valor === '1';
+    try { await store.definirPatrocinadorPessoa(id, valor); await loadPessoas(); render(); toast(valor ? 'Pessoa qualificada como patrocinador' : 'Qualificação retirada'); } catch (e) { toast(e.message); }
+  }
+  else if (act === 'patro-pessoa-abrir') {
+    const x = (S.fac.pessoas || []).find(p => p.id === t.dataset.user); if (!x) return;
+    const vistos = LS.get(PATRO_VISTOS) || {}; vistos[x.id] = x.patro_respondido; LS.set(PATRO_VISTOS, vistos);
+    await abrirPatrocinio({ id: null, nome: null, pre: true }, true, { id: x.id, nome: x.nome, email: x.email });
+  }
   else if (act === 'patro-abrir') { const tm = (S.fac.turmas || []).find(x => x.id === S.fac.sel); if (tm) await abrirPatrocinio(tm, true); }
   else if (act === 'patro-definir') {
     const tm = (S.fac.turmas || []).find(x => x.id === S.fac.sel); if (!tm) return;
@@ -4258,7 +4366,7 @@ document.addEventListener('click', async (ev) => {
     try {
       const r = await store.definirPatrocinador(tm.id, email);
       if (r.status === 'nao_encontrado') { toast('Nenhuma conta com este e-mail. Peça ao patrocinador para criar a conta no app com ele.'); return; }
-      S.fac.turmas = await store.listTurmas(); S.fac.patroInfo = { ...(S.fac.patroInfo || {}), [tm.id]: r.status === 'ok' ? { nome: r.nome, email: r.email } : null }; render();
+      S.fac.turmas = await store.listTurmas(); await loadPessoas(); S.fac.patroInfo = { ...(S.fac.patroInfo || {}), [tm.id]: r.status === 'ok' ? { nome: r.nome, email: r.email } : null }; render();
       toast(r.status === 'ok' ? 'Patrocinador definido: ' + (r.nome || r.email) : 'Patrocinador removido');
     } catch (e) { toast(e.message); }
   }
@@ -4428,7 +4536,7 @@ document.addEventListener('submit', async (ev) => {
     const erro = validarPatro(resp);
     if (erro) { const el = $('#pt-msg'); if (el) { el.innerHTML = `<div class="msg msg-err" role="alert">${esc(erro)}</div>`; el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } return; }
     S.busy = true; render();
-    try { await store.salvarPatrocinio(P.turma.id, resp); P.dados = await store.getPatrocinio(P.turma.id); P.editando = false; S.busy = false; try { S.patroTurmas = await store.minhasTurmasPatrocinadas(); } catch (x) { /* */ } render(); window.scrollTo(0, 0); toast('Respostas salvas'); }
+    try { await store.salvarPatrocinio(P.turma.id, resp); P.dados = P.turma.id ? await store.getPatrocinio(P.turma.id) : { respostas: (await store.meuPatrocinio()).respostas, relatorios: [] }; P.editando = false; S.busy = false; try { S.patroTurmas = await store.minhasTurmasPatrocinadas(); S.patroPre = await store.meuPatrocinio(); } catch (x) { /* */ } render(); window.scrollTo(0, 0); toast('Respostas salvas'); }
     catch (e) { S.busy = false; render(); const el = $('#pt-msg'); if (el) el.innerHTML = `<div class="msg msg-err" role="alert">${esc(e.message)}</div>`; }
   } else if (f.id === 'f-pedido') {
     const motivo = ($('#pd-motivo')?.value || '').trim();
