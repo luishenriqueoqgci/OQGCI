@@ -409,6 +409,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .evo-ponto.on b { color: var(--ink); }
 .evo-grupo { display: grid; gap: 8px; }
 .patro-resumo p:first-of-type { font-size: 17px; line-height: 1.6; }
+.modelos { display: grid; }
+.modelo-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.modelo-row > span { flex: 1 1 320px; }
+.ver-strip { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); font-size: 14px; }
+.ver-strip .wrap { padding-block: 10px; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .patro-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .patro-dado { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
 .patro-dado p { flex: 1 1 260px; }
@@ -1569,6 +1574,221 @@ const PATRO_EXEMPLO_REL = (() => {
       workshop: mk(68, 65, 68, [80, 60, 76, 67, 63, 70, 58, 70], { conselheiro: 4, desenvolvimento: 6, prestativo: 2 }, { Atendimento: 3, Conversa: 7, 'Propósito': 2 }, 4.9),
       reavaliacao: mk(64, 61, 64, [79, 58, 73, 62, 58, 66, 52, 67], { conselheiro: 5, desenvolvimento: 5, prestativo: 1, especialista: 1 }, { Atendimento: 4, Conversa: 7, 'Propósito': 1 }, 4.6) } } };
 })();
+// Visões do facilitador: navegar como participante ou patrocinador, com dados de exemplo ou de uma pessoa real.
+const VISOES = {
+  novo: ['Participante novo', 'Ainda sem diagnóstico, com acesso pela turma. Você percorre o questionário completo e vê o relatório no fim.'],
+  historico: ['Participante com histórico', 'Três diagnósticos na turma, relatório de evolução liberado e nova execução bloqueada, com o pedido de nova execução.'],
+  'patro-pre': ['Patrocinador em pré-venda', 'O questionário em branco e o relatório com os exemplos, o investimento e o próximo passo.'],
+  'patro-turma': ['Patrocinador com turma', 'O relatório com os relatórios do time liberados: prévia, workshop e 45 dias.']
+};
+// Uma pessoa real vista pelo facilitador: lê os dados dela e não grava nada.
+function visaoPessoa(real, p) {
+  const so = async () => { throw new Error('Na visão de uma pessoa, nada é gravado.'); };
+  const proprio = {
+    mode: real.mode,
+    async getSession() { return S.session; },
+    async signOut() {},
+    async myResults() { return (await real.resultadosDe(p.id)).slice().sort((a, b) => b.created_at.localeCompare(a.created_at)); },
+    async meuAcesso() { return { ...p }; },
+    async meuPedido() { return real.pedidoDe(p.id); },
+    async minhasEvolucoes() { return (await real.evolucoesDe(p.id)).filter(e => e.status === 'liberado' && tipoEvo(e) !== 'workshop' && e.inicial && e.reavaliacao).sort((a, b) => b.reavaliacao.created_at.localeCompare(a.reavaliacao.created_at)); },
+    async minhaReavaliacao() {
+      if (!p.turma_id) return [];
+      const t = (await real.listTurmas()).find(x => x.id === p.turma_id); if (!t) return [];
+      const e = (await real.evolucoesDe(p.id)).find(x => x.turma_id === t.id && tipoEvo(x) === 'completo');
+      return [{ turma_id: t.id, turma_nome: t.nome, reavaliar_em: t.reavaliar_em || null, status: e ? e.status : null }];
+    },
+    async minhasTurmasPatrocinadas() { return real.turmasPatrocinadasDe(p.id); },
+    async meuPatrocinio() { let r = { respostas: null }; try { r = await real.getPatrocinioPessoa(p.id); } catch (e) { /* */ } return { qualificado: Boolean(p.patrocinador), respostas: r.respostas }; },
+    async getPatrocinio(turmaId) { const d = await real.getPatrocinio(turmaId); return { ...d, relatorios: (d.relatorios || []).filter(r => r.status === 'liberado') }; },
+    saveResult: so, pedirExecucao: so, salvarPatrocinio: so, entrarTurma: so, limparPatrocinio: so, async updateLeitura() {}
+  };
+  return new Proxy(proprio, { get: (o, k) => (k in o ? o[k] : (typeof real[k] === 'function' ? real[k].bind(real) : real[k])) });
+}
+function limparEstadoVisao() { S.result = null; S.quiz = null; S.patro = null; S.patroPre = null; S.patroTurmas = []; S.myResults = null; S.acesso = null; S.reav = null; S.minhasEvos = null; S.pedido = null; S.evo = null; }
+async function entrarVisao(tipo, pessoa) {
+  if (S.ver) return;
+  const orig = { store, session: S.session, fac: S.fac };
+  let sess, rotulo;
+  try {
+    if (tipo === 'pessoa') { store = visaoPessoa(orig.store, pessoa); sess = { id: pessoa.id, nome: pessoa.nome, email: pessoa.email, role: 'respondente' }; rotulo = pessoa.nome || pessoa.email || 'pessoa'; }
+    else { const sx = DemoStore(true); sess = await sx.prepararVisao(tipo); store = sx; rotulo = VISOES[tipo][0].toLowerCase(); }
+  } catch (e) { store = orig.store; toast(e.message); return; }
+  S.ver = { tipo, rotulo, orig, leitura: tipo === 'pessoa' };
+  limparEstadoVisao(); S.session = sess; go('painel'); window.scrollTo(0, 0);
+}
+function sairVisao() {
+  const v = S.ver; if (!v) return;
+  store = v.orig.store; S.session = v.orig.session; S.fac = v.orig.fac; S.ver = null; limparEstadoVisao();
+  go('facilitador'); window.scrollTo(0, 0);
+}
+// Modelos em PDF: questionários em branco e relatórios com dados fictícios.
+const MODELOS = [
+  ['q-patro-conversa', 'Questionário do patrocinador · venda por conversa', 'As perguntas em branco, para o negócio em que o cliente compra conversando com o time.'],
+  ['q-patro-contato', 'Questionário do patrocinador · cliente que escolhe sozinho', 'A versão para loja, cardápio, prateleira ou site.'],
+  ['q-diag-conversa', 'Perguntas do diagnóstico · venda por conversa', 'As 33 afirmações, as seis situações nas versões A, B e C e a pergunta aberta, com a dimensão de cada uma.'],
+  ['q-diag-contato', 'Perguntas do diagnóstico · pontos de contato', 'O mesmo conjunto, na versão para quem vende pelos pontos de contato.'],
+  ['r-individual', 'Relatório individual', 'O diagnóstico completo que cada pessoa recebe ao terminar.'],
+  ['r-evo-turma', 'Relatório de evolução da turma', 'Prévia, workshop e 45 dias de uma pessoa da turma.'],
+  ['r-evo-individual', 'Relatório de evolução individual', 'Primeira, anterior e atual execução, fora de turma.'],
+  ['r-patro-pre', 'Relatório do patrocinador · pré-venda', 'Com a leitura do negócio, os exemplos, o investimento e o próximo passo.'],
+  ['r-patro-turma', 'Relatório do patrocinador · turma', 'Com os relatórios do time da prévia aos 45 dias.']
+];
+function exemploIndividual() {
+  const A = 'assertiva', Pa = 'passiva';
+  const rec = exResult({ id: 'exemplo-individual', user_id: 'exemplo', nome: 'Exemplo', turma_id: null, dias: 2 }, { D1: 4.6, D2: 3.4, D3: 4.4, D4: 2.7, D5: 2.4, D6: 2.7, D7: 3.1, D8: 2.9 }, [Pa, Pa, Pa, A, A, A], { segmento: 'servicos', oferta: '', modo: 'conversa' });
+  return rec;
+}
+async function salvarArquivo(blob, name) {
+  let dl = null;
+  try { if (window.claude && typeof window.claude.use === 'function') dl = await window.claude.use('downloads'); } catch (e) { dl = null; }
+  if (dl) { await dl.save({ filename: name, data: blob }); toast('Arquivo salvo'); }
+  else if (!window.claude) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast('PDF baixado'); }
+  else toast('O download não está disponível nesta visualização');
+}
+async function gerarModelo(k) {
+  if (S.pdfBusy) return; S.pdfBusy = true; render();
+  try {
+    const sx = DemoStore(true); let blob;
+    if (k.startsWith('q-patro')) blob = await buildQuestPatroPDF(k.endsWith('contato') ? 'contato' : 'conversa');
+    else if (k.startsWith('q-diag')) blob = await buildQuestDiagPDF(k.endsWith('contato') ? 'contato' : 'conversa');
+    else if (k === 'r-individual') blob = await buildPDF(exemploIndividual());
+    else if (k === 'r-evo-turma') { await sx.prepararVisao('historico'); const ev = (await sx.listEvolucoes('turma-evolucao')).find(e => e.user_id === 'ex-user-10' && tipoEvo(e) === 'completo'); blob = await buildEvoPDF(ev); }
+    else if (k === 'r-evo-individual') { const ev = (await sx.listEvolucoesIndividuais())[0]; blob = await buildEvoPDF(ev); }
+    else if (k.startsWith('r-patro')) {
+      const pre = k === 'r-patro-pre'; await sx.prepararVisao('patro-turma'); const d = await sx.getPatrocinio('turma-evolucao'); const antes = S.patro;
+      S.patro = { turma: pre ? { id: null, nome: null } : { id: 'turma-evolucao', nome: 'Turma de exemplo' }, fac: false, dados: { respostas: d.respostas, relatorios: pre ? [] : d.relatorios } };
+      try { blob = await buildPatroPDF(); } finally { S.patro = antes; }
+    }
+    await salvarArquivo(blob, 'modelo-' + k + '.pdf');
+  } catch (e) { toast((e && e.message && e.message.length < 120) ? e.message : 'Não foi possível gerar o PDF agora.'); }
+  finally { S.pdfBusy = false; render(); }
+}
+function viewVisoes() {
+  const card = k => `<div class="card stack" style="gap:8px"><strong>${VISOES[k][0]}</strong><p class="small muted">${VISOES[k][1]}</p><div class="actions" style="margin-top:auto"><button class="btn btn-primary btn-sm" data-act="ver-entrar" data-visao="${k}">Ver como ${VISOES[k][0].toLowerCase()}</button></div></div>`;
+  return `<div class="stack-lg">
+    <div class="stack" style="gap:12px"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Ver o sistema como…</h2><p class="muted small">Você navega como cada pessoa navega, com dados de exemplo. Nada do que você fizer nessas visões é gravado. Para ver uma pessoa real exatamente como ela vê, use "Ver como esta pessoa" em Pessoas e acessos.</p></div>
+      <div class="patro-cols">${Object.keys(VISOES).map(card).join('')}</div></div>
+    <div class="card stack"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Modelos</h2><p class="muted small">PDFs para imprimir, enviar ou revisar. Os relatórios usam dados fictícios.</p></div>
+      <div class="modelos">${MODELOS.map(([k, nome, desc]) => `<div class="modelo-row"><span><strong>${nome}</strong><br><span class="small muted">${desc}</span></span><button class="btn btn-quiet btn-sm" data-act="modelo-pdf" data-modelo="${k}" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando…' : 'Baixar PDF'}</button></div>`).join('')}</div></div>
+  </div>`;
+}
+// Base dos PDFs de questionário (modelos): mesma identidade dos relatórios, econômica em tinta.
+async function pdfQuestionario(cab, titulo, subtitulo, desenhar) {
+  const { jsPDF } = await loadJsPDF();
+  const [logo, fontes] = await Promise.all([logoDataURL(), pdfFontData()]);
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  if (fontes) { try { fontes.forEach(([file, fam, st, b64]) => { doc.addFileToVFS(file, b64); doc.addFont(file, fam, st); }); } catch (e) { /* segue com Helvetica */ } }
+  const RICO = Boolean(fontes) && doc.getFontList().Manrope;
+  const T = RICO ? pdfTextRico : pdfText;
+  const W = 210, M = 18, CW = W - 2 * M, BOTTOM = 276;
+  const C = { ink: [42, 44, 51], ink2: [86, 90, 101], ink3: [138, 142, 152], line: [216, 211, 200], line2: [233, 229, 220], white: [255, 255, 255],
+    warm: [181, 112, 26], warmL: [235, 200, 143], cool: [60, 120, 194], coolL: [169, 198, 234], baseL: [207, 209, 216], ambar: [240, 179, 94], azul: [141, 184, 238] };
+  const color = (c, kind = 'text') => kind === 'text' ? doc.setTextColor(...c) : kind === 'fill' ? doc.setFillColor(...c) : doc.setDrawColor(...c);
+  const font = (size, role = 'body', c = C.ink) => {
+    const map = RICO ? { title: ['Urbanist', 'bold'], light: ['Urbanist', 'light'], body: ['Manrope', 'normal'], semi: ['Manrope', 'semibold'], bold: ['Manrope', 'bold'] }
+      : { title: ['helvetica', 'bold'], light: ['helvetica', 'normal'], body: ['helvetica', 'normal'], semi: ['helvetica', 'bold'], bold: ['helvetica', 'bold'] };
+    doc.setFont(...map[role]); doc.setFontSize(size); color(c);
+  };
+  const lh = size => size * 0.43;
+  const linhas = (tx, size, role, width) => { font(size, role); return doc.splitTextToSize(T(tx), width); };
+  const altura = (tx, size, role, width) => linhas(tx, size, role, width).length * (lh(size) + 0.6);
+  const escrever = (tx, x, yy, size, role, c, width) => { const ls = linhas(tx, size, role, width); font(size, role, c); ls.forEach((ln, i) => doc.text(ln, x, yy + lh(size) + i * (lh(size) + 0.6))); return ls.length * (lh(size) + 0.6); };
+  const eyebrow = (tx, x, yy, c = C.warm, size = 6.8) => { font(size, 'bold', c); doc.setCharSpace(0.35); doc.text(T(tx).toUpperCase(), x, yy); doc.setCharSpace(0); };
+  const simbolo = (cx, cy, rr) => {
+    color(C.line, 'draw'); doc.setLineWidth(rr * 0.08); doc.circle(cx, cy, rr * 12.5 / 11.5, 'S');
+    color(C.ambar, 'fill'); doc.circle(cx, cy, rr, 'F'); color(C.white, 'fill'); doc.rect(cx, cy - rr - 0.2, rr + 0.3, 2 * rr + 0.4, 'F');
+    const b = rr * 7.5 / 11.5; color(C.azul, 'fill'); doc.circle(cx, cy, b, 'F'); color(C.ambar, 'fill'); doc.rect(cx - b - 0.05, cy - b - 0.05, b + 0.05, 2 * b + 0.1, 'F');
+  };
+  const ctx = { doc, C, M, CW, W, font, color, altura, escrever, eyebrow, y: 0 };
+  const rodape = () => { font(6.4, 'body', C.ink3); doc.text(T(COPYRIGHT), M, 289); font(8, 'bold', C.warm); doc.text(String(doc.getNumberOfPages()), W - M, 289, { align: 'right' }); };
+  const cabecalho = () => { simbolo(M + 2.2, 11.2, 2.2); font(7.4, 'semi', C.ink3); doc.text(T(cab), M + 6.6, 12.4); doc.text(T('Metodologia OQGCI'), W - M, 12.4, { align: 'right' }); color(C.line2, 'draw'); doc.setLineWidth(0.25); doc.line(M, 16, W - M, 16); };
+  ctx.novaPagina = () => { rodape(); doc.addPage(); cabecalho(); ctx.y = 24; };
+  ctx.precisa = h => { if (ctx.y + h > BOTTOM) ctx.novaPagina(); };
+  ctx.secao = (eb, tit, lead) => {
+    ctx.precisa(30 + (lead ? altura(lead, 9, 'body', CW) : 0)); ctx.y += 4;
+    eyebrow(eb, M, ctx.y + 3); ctx.y += 4.5; ctx.y += escrever(tit, M, ctx.y, 14, 'title', C.ink, CW) + 1; color(C.warmL, 'fill'); doc.rect(M, ctx.y, 14, 0.8, 'F'); ctx.y += 4;
+    if (lead) ctx.y += escrever(lead, M, ctx.y, 8.8, 'body', C.ink2, CW) + 3;
+  };
+  // Pergunta numerada; meta = linha pequena (dimensão, uso interno).
+  ctx.pergunta = (n, tx, meta, extra = 0) => {
+    const w = CW - 9; const h = altura(tx, 9.6, 'semi', w) + (meta ? altura(meta, 7.2, 'body', w) + 0.6 : 0) + extra;
+    ctx.precisa(h + 4);
+    font(8.6, 'bold', C.warm); doc.text(String(n), M, ctx.y + lh(9.6));
+    ctx.y += escrever(tx, M + 9, ctx.y, 9.6, 'semi', C.ink, w);
+    if (meta) ctx.y += escrever(meta, M + 9, ctx.y + 0.4, 7.2, 'body', C.ink3, w) + 0.6;
+  };
+  // Opções com caixinha de marcar (quadrada para várias, redonda para uma).
+  ctx.opcoes = (ops, multipla) => {
+    ops.forEach(op => {
+      const w = CW - 16; const h = altura(op, 8.8, 'body', w); ctx.precisa(h + 1.6);
+      color(C.ink3, 'draw'); doc.setLineWidth(0.3);
+      if (multipla) doc.roundedRect(M + 9, ctx.y + 0.9, 3, 3, 0.5, 0.5, 'S'); else doc.circle(M + 10.5, ctx.y + 2.4, 1.5, 'S');
+      ctx.y += escrever(op, M + 15, ctx.y, 8.8, 'body', C.ink, w) + 1.2;
+    });
+    ctx.y += 2.4;
+  };
+  // Escala em linha: Nunca a Sempre, mais "Não sei dizer" quando pedida.
+  ctx.escala = (comNaoSei) => {
+    const labs = [...SCALE.map((t2, i) => `${t2} · ${SCALE_SUB[i]}`), ...(comNaoSei ? ['Não sei dizer'] : [])];
+    const w = (CW - 9) / labs.length; ctx.precisa(9);
+    labs.forEach((l, i) => { const x = M + 9 + i * w; color(C.ink3, 'draw'); doc.setLineWidth(0.3); doc.circle(x + 1.6, ctx.y + 2.2, 1.4, 'S'); escrever(l, x + 4.2, ctx.y + 0.2, 6.8, 'body', C.ink2, w - 5); });
+    ctx.y += 9;
+  };
+  ctx.linhasResposta = (n) => { ctx.precisa(n * 7 + 3); for (let i = 0; i < n; i++) { color(C.line, 'draw'); doc.setLineWidth(0.25); doc.line(M + 9, ctx.y + 6 + i * 7, M + CW, ctx.y + 6 + i * 7); } ctx.y += n * 7 + 4; };
+  ctx.nota = tx => { const h = altura(tx, 8.2, 'body', CW - 9); ctx.precisa(h + 2); ctx.y += escrever(tx, M + 9, ctx.y, 8.2, 'body', C.ink2, CW - 9) + 2; };
+
+  // Capa resumida na primeira página
+  if (logo) { try { doc.addImage(logo, 'PNG', W - M - 15, 14, 15, 16.6); } catch (e) { /* */ } }
+  [[C.warmL, 0], [C.coolL, 1], [C.baseL, 2]].forEach(([c, i]) => { color(c, 'fill'); doc.roundedRect(M + i * 15, 18, 12, 1.4, 0.7, 0.7, 'F'); });
+  eyebrow('Venda com Neurociência · Metodologia OQGCI', M, 28);
+  font(22, 'title', C.ink); doc.text(T(titulo), M, 40);
+  ctx.y = 44; ctx.y += escrever(subtitulo, M, ctx.y, 9.4, 'body', C.ink2, CW - 20) + 4;
+  color(C.line2, 'draw'); doc.setLineWidth(0.25); doc.line(M, ctx.y, W - M, ctx.y); ctx.y += 4;
+  desenhar(ctx);
+  rodape();
+  return doc.output('blob');
+}
+
+async function buildQuestPatroPDF(modo) {
+  const contato = modo === 'contato';
+  return pdfQuestionario('Questionário do patrocinador', 'Questionário do patrocinador',
+    `${contato ? 'Versão para o negócio em que o cliente escolhe sozinho, diante de produtos, cardápio, loja ou site.' : 'Versão para o negócio em que o cliente compra conversando com alguém do time.'} Cerca de 10 minutos. As respostas mostram como você enxerga o time e o que mais pesa no resultado do negócio.`, c => {
+    let n = 1;
+    c.secao('Parte 1', 'Contexto do time');
+    c.pergunta(n++, 'Quantas pessoas do time vão participar do workshop?', null); c.linhasResposta(1);
+    PATRO_CTX.forEach(q => {
+      c.pergunta(n++, q.t, null); c.opcoes(q.ops.map(o => o[1]), false);
+      if (q.id === 'C2') { c.pergunta(n++, 'O que a sua empresa vende, em poucas palavras? (obrigatório quando o tipo é "Outro")', null); c.linhasResposta(1); }
+    });
+    c.secao('Parte 2', 'O que você vê no time', contato ? 'Pense nas últimas semanas do negócio. Em quantos de cada 10 atendimentos ou visitas você vê isso acontecer?' : 'Pense nas últimas semanas de venda do time. Em quantas de cada 10 vendas você vê isso acontecer?');
+    PATRO_ITENS[modo].forEach(([, d, inv, t2]) => { c.pergunta(n++, t2, `${d} · ${DIM[d].nome}${inv ? ' · afirmação invertida' : ''}`); c.escala(true); });
+    c.secao('Parte 3', 'Dores e resultados esperados');
+    c.pergunta(n++, 'Quais destas situações mais pesam no resultado do seu negócio hoje? Escolha até três.', null); c.opcoes(PATRO_DORES.map(x => x.t), true);
+    c.pergunta(n++, 'Entre as que você escolheu, qual custa mais ao negócio hoje?', null); c.linhasResposta(1);
+    c.pergunta(n++, 'Que número você quer ver mudar depois do workshop?', null); c.opcoes(PATRO_METRICAS.map(m => m[1]), false);
+    c.nota('Valor de hoje, se souber, e meta:'); c.linhasResposta(1);
+    c.pergunta(n++, 'Conte uma venda recente que o time perdeu e que, na sua leitura, não deveria ter perdido.', null); c.linhasResposta(4);
+    c.pergunta(n++, 'O que você quer ver o time fazendo diferente depois do workshop? (opcional)', null); c.linhasResposta(3);
+  });
+}
+
+async function buildQuestDiagPDF(modo) {
+  const pk = pack({ modo }); const contato = modo === 'contato'; const voc = vocabOf(null); const v = t => V(t, voc);
+  const nomePost = { assertiva: 'assertiva', passiva: 'passiva', agressiva: 'agressiva' };
+  return pdfQuestionario('Perguntas do Diagnóstico OQGCI', 'Perguntas do Diagnóstico OQGCI',
+    `${contato ? 'Versão pontos de contato, para negócios em que o cliente escolhe sozinho.' : 'Versão conversa, para negócios em que o cliente compra conversando com o dono ou a equipe.'} Modelo de uso interno: cada pergunta traz a dimensão, e cada resposta das situações traz a postura que ela representa. A pessoa responde no aplicativo, sem essas marcações.`, c => {
+    c.secao('Parte 1', 'Sua prática', v(pk.ancora));
+    ITEMS_SHOWN.forEach((it, i) => { c.pergunta(i + 1, v(pk.T[it.c]), `${it.c} · ${DIM[it.d].nome}${it.inv ? ' · afirmação invertida' : ''}`); c.escala(false); });
+    ['A', 'B', 'C'].forEach(versao => {
+      c.secao('Parte 2', `Situações · versão ${versao}`, versao === 'A' ? 'Cada pessoa recebe uma das três versões, equivalentes entre si, conforme a execução. A ordem das respostas muda a cada vez.' : null);
+      pk.sjtDe(versao).forEach((sc, k) => { c.pergunta(`S${k + 1}`, v(sc.t), `${(pk.nomeSit || {})[sc.id] || ''}`.trim() || null); c.opcoes(sc.ops.map(o => `${v(o.t)}  (${nomePost[o.k] || o.k})`), false); });
+    });
+    c.secao('Parte 3', 'Sua história');
+    c.pergunta(ITEMS.length + SJT.length + 1, v(pk.hist.q), null); c.nota(v(pk.hist.hint)); c.linhasResposta(5);
+  });
+}
+
 // Questionários de pré-venda que o facilitador já abriu (guardado neste aparelho).
 const PATRO_VISTOS = 'oqgci-patro-vistos';
 const patroNovo = x => Boolean(x.patrocinador && x.role !== 'facilitador' && x.patro_respondido && !x.patro_turmas && (LS.get(PATRO_VISTOS) || {})[x.id] !== x.patro_respondido);
@@ -1625,9 +1845,10 @@ const PATRO_INCLUI = [
 ];
 const modoPatro = r => r?.C3 === 'contato' ? 'contato' : 'conversa';
 
-function DemoStore() {
+// memoria = true: cópia isolada dos dados de exemplo, usada nas visões do facilitador; nada é gravado no aparelho.
+function DemoStore(memoria) {
   const KEY = 'oqgci-demo-v1';
-  let db = LS.get(KEY);
+  let db = memoria ? null : LS.get(KEY);
   if (db && db.v === 1) { db.results = [...db.results.filter(x => !x.exemplo), ...seedExamples()]; db.v = 2; }
   if (!db || ![2, 3, 4, 5, 6].includes(db.v)) {
     db = { v: 2, users: [], session: null, results: seedExamples(), turmas: [{ id: 'turma-exemplo', nome: 'Exemplo · Workshop de vendas', codigo: 'OQG-DEMO', created_at: new Date().toISOString(), exemplo: true }] };
@@ -1660,7 +1881,7 @@ function DemoStore() {
   }
   db.patrocinios = db.patrocinios || {}; db.relPatro = db.relPatro || []; db.patroPre = db.patroPre || {};
   db.evolucoes = db.evolucoes || [];
-  const save = () => LS.set(KEY, db);
+  const save = () => { if (!memoria) LS.set(KEY, db); };
   save();
   const pub = u => u ? { id: u.id, nome: u.nome, email: u.email, role: u.role } : null;
   const userOf = id => db.users.find(x => x.id === id);
@@ -1785,7 +2006,7 @@ function DemoStore() {
     async patrocinadorDe(userId) { const u = userOf(userId); return u ? { nome: u.nome, email: u.email } : null; },
     async getPatrocinio(turmaId) { const fac = userOf(db.session)?.role === 'facilitador'; const t = db.turmas.find(x => x.id === turmaId); const pr = db.patrocinios[turmaId]; return { respostas: pr && (!t?.patrocinador_id || pr.user_id === t.patrocinador_id) ? pr : null, relatorios: db.relPatro.filter(r => r.turma_id === turmaId && (fac || r.status === 'liberado')) }; },
     async salvarPatrocinio(turmaId, respostas) { const agora = new Date().toISOString();
-      if (!turmaId) { if (!userOf(db.session)?.patrocinador && userOf(db.session)?.role !== 'facilitador') throw new Error('A área do patrocinador ainda não foi liberada para você.'); db.patroPre[db.session] = { turma_id: null, user_id: db.session, respostas, created_at: db.patroPre[db.session]?.created_at || agora, updated_at: agora }; save(); return db.patroPre[db.session]; }
+      if (!turmaId) { if (!userOf(db.session)?.patrocinador) throw new Error('A área do patrocinador ainda não foi liberada para você.'); db.patroPre[db.session] = { turma_id: null, user_id: db.session, respostas, created_at: db.patroPre[db.session]?.created_at || agora, updated_at: agora }; save(); return db.patroPre[db.session]; }
       db.patrocinios[turmaId] = { turma_id: turmaId, user_id: db.session, respostas, created_at: db.patrocinios[turmaId]?.created_at || agora, updated_at: agora }; save(); return db.patrocinios[turmaId]; },
     async salvarRelatorioPatro(turmaId, etapa, dados) {
       let r = db.relPatro.find(x => x.turma_id === turmaId && x.etapa === etapa);
@@ -1794,13 +2015,31 @@ function DemoStore() {
     },
     async atualizarRelatorioPatro(id, patch) { const r = db.relPatro.find(x => x.id === id); if (r) { Object.assign(r, patch); save(); } return r; },
     async signInPatrocinadorDemo(pre) { db.session = pre ? 'ex-patro-pre' : 'ex-patro'; save(); return pub(userOf(db.session)); },
-    async meuPatrocinio() { const u = userOf(db.session); return { qualificado: Boolean(u?.patrocinador) || u?.role === 'facilitador', respostas: db.patroPre[db.session] || null }; },
+    async meuPatrocinio() { const u = userOf(db.session); return { qualificado: Boolean(u?.patrocinador), respostas: db.patroPre[db.session] || null }; },
     async getPatrocinioPessoa(userId) { return { respostas: db.patroPre[userId] || null, relatorios: [] }; },
     async definirPatrocinadorPessoa(userId, valor) {
       const u = userOf(userId); if (!u) throw new Error('Na prévia, só pessoas com conta podem ser qualificadas como patrocinador.');
       u.patrocinador = Boolean(valor); u.patrocinador_em = valor ? (u.patrocinador_em || new Date().toISOString()) : null; save();
     },
     async limparPatrocinio(turmaId) { return this.limparPatrocinioDemo(turmaId); },
+    async evolucoesDe(userId) { return db.evolucoes.filter(e => e.user_id === userId).map(juntar).filter(e => e.inicial && e.reavaliacao); },
+    async pedidoDe(userId) { return ultimoPedido(userId); },
+    async turmasPatrocinadasDe(userId) { return db.turmas.filter(t => t.patrocinada && t.patrocinador_id === userId).map(t => ({ id: t.id, nome: t.nome, data_workshop: t.data_workshop || null, reavaliar_em: t.reavaliar_em || null, respondido_em: db.patrocinios[t.id]?.user_id === userId ? db.patrocinios[t.id].updated_at : null })); },
+    // Prepara a pessoa de exemplo de cada visão e entra com ela.
+    async prepararVisao(tipo) {
+      const agora = new Date().toISOString();
+      const id = { novo: 'ver-novo', historico: 'ex-user-10', 'patro-pre': 'ex-patro-pre', 'patro-turma': 'ex-patro' }[tipo];
+      if (tipo === 'novo' && !userOf(id)) db.users.push({ id, nome: 'Participante de exemplo', email: 'participante@exemplo', pw: '', role: 'respondente', created_at: agora, turma_id: 'turma-exemplo', acesso_ate: null, acesso_bloqueado: false });
+      if (tipo === 'historico') {
+        if (!userOf(id)) { const rs = db.results.filter(r => r.user_id === id); db.users.push({ id, nome: rs[0]?.nome || 'Exemplo 10', email: 'exemplo10@exemplo', pw: '', role: 'respondente', created_at: rs[0]?.created_at || agora, turma_id: rs[0]?.turma_id || null, acesso_ate: null, acesso_bloqueado: false }); }
+        db.evolucoes.filter(e => e.user_id === id && tipoEvo(e) === 'completo').forEach(e => { e.status = 'liberado'; e.liberado_em = e.liberado_em || agora; e.comentario = e.comentario || 'Você manteve o ganho em Espelho e Virada. Nas próximas semanas, leve o Custo para as conversas de preço.'; });
+      }
+      if (tipo === 'patro-turma') {
+        const E = PATRO_EXEMPLO_REL.dados.etapas; const ord = ['previa', 'workshop', 'reavaliacao'];
+        db.relPatro.filter(r => r.turma_id === 'turma-evolucao').forEach(r => { const i = ord.indexOf(r.etapa); r.dados = { ...r.dados, etapas: Object.fromEntries(ord.slice(0, i + 1).map(e => [e, E[e]])) }; r.status = 'liberado'; r.liberado_em = r.liberado_em || agora; if (r.etapa === 'reavaliacao') r.comentario = PATRO_EXEMPLO_REL.comentario; });
+      }
+      db.session = id; return pub(userOf(id));
+    },
     async limparPatrocinioDemo(turmaId) { if (turmaId) { if (db.patrocinios[turmaId]?.user_id === db.session) delete db.patrocinios[turmaId]; } else delete db.patroPre[db.session]; save(); },
     async listEvolucoesIndividuais() { return db.evolucoes.filter(e => tipoEvo(e) === 'individual').map(juntar).filter(e => e.inicial && e.reavaliacao); },
     async resultadosDe(userId) { return db.results.filter(r => r.user_id === userId).sort((a, b) => a.created_at.localeCompare(b.created_at)); },
@@ -1975,8 +2214,6 @@ function LiveStore() {
     },
     async salvarPatrocinio(turmaId, respostas) {
       const uidAtual = S.session?.id;
-      // O facilitador usa a área do patrocinador para testar e demonstrar: a própria conta fica qualificada.
-      if (!turmaId && S.session?.role === 'facilitador') { const q0 = await sb.rpc('definir_patrocinador_pessoa', { p_user: uidAtual, p_valor: true }); if (q0.error) throw errPt(q0.error); }
       let q = sb.from('patrocinio_respostas').select('id').eq('user_id', uidAtual);
       q = turmaId ? q.eq('turma_id', turmaId) : q.is('turma_id', null);
       const atual = await q.maybeSingle();
@@ -1992,12 +2229,25 @@ function LiveStore() {
       const id = S.session?.id; if (!id) return { qualificado: false, respostas: null };
       const [p, r] = await Promise.all([sb.from('profiles').select('patrocinador').eq('id', id).maybeSingle(), sb.from('patrocinio_respostas').select('*').eq('user_id', id).is('turma_id', null).maybeSingle()]);
       if (p.error) return { qualificado: false, respostas: null };
-      return { qualificado: Boolean(p.data?.patrocinador) || S.session?.role === 'facilitador', respostas: r.error ? null : (r.data || null) };
+      return { qualificado: Boolean(p.data?.patrocinador), respostas: r.error ? null : (r.data || null) };
     },
     async limparPatrocinio(turmaId) {
       let q = sb.from('patrocinio_respostas').delete().eq('user_id', S.session?.id);
       q = turmaId ? q.eq('turma_id', turmaId) : q.is('turma_id', null);
       const { error } = await q; if (error) throw errPt(error);
+    },
+    async evolucoesDe(userId) {
+      const { data, error } = await sb.from('evolucoes').select('*, profiles(nome)').eq('user_id', userId);
+      if (error) return []; return juntarEvolucoes(data);
+    },
+    async pedidoDe(userId) {
+      const { data, error } = await sb.from('pedidos_execucao').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1);
+      if (error) return null; return (data && data[0]) || null;
+    },
+    async turmasPatrocinadasDe(userId) {
+      const [t, r] = await Promise.all([sb.from('turmas').select('id, nome, data_workshop, reavaliar_em, patrocinada').eq('patrocinador_id', userId), sb.from('patrocinio_respostas').select('turma_id, updated_at').eq('user_id', userId)]);
+      if (t.error) return [];
+      return (t.data || []).filter(x => x.patrocinada).map(x => ({ id: x.id, nome: x.nome, data_workshop: x.data_workshop, reavaliar_em: x.reavaliar_em, respondido_em: (r.data || []).find(y => y.turma_id === x.id)?.updated_at || null }));
     },
     async getPatrocinioPessoa(userId) {
       const { data, error } = await sb.from('patrocinio_respostas').select('*').eq('user_id', userId).is('turma_id', null).maybeSingle();
@@ -2043,7 +2293,7 @@ function LiveStore() {
   };
 }
 
-const store = LIVE ? LiveStore() : DemoStore();
+let store = LIVE ? LiveStore() : DemoStore();
 
 /* ================================ ESTADO ================================== */
 const DRAFT_KEY = 'oqgci-rascunho';
@@ -2133,7 +2383,7 @@ function topBar() {
     ? `<button data-go="painel">Meu painel</button>${s.role === 'facilitador' ? '<button data-go="facilitador">Facilitador</button>' : ''}<button class="hide-sm" data-go="referencias">Referências</button><button data-act="sair">Sair</button>`
     : `<button class="hide-sm" data-go="referencias">Referências</button><button data-go="entrar">Entrar</button>`;
   return `<header class="top"><div class="wrap"><a class="brand" href="#inicio" aria-label="Diagnóstico OQGCI">${LOGO}<span><span class="hide-xs">Diagnóstico </span>OQGCI</span></a><nav class="nav" aria-label="Principal">${links}</nav></div></header>
-  ${store.mode === 'demo' ? `<div class="demo-strip"><div class="wrap"><span class="demo-dot"></span><span>Prévia em modo demonstração: contas e respostas ficam salvas só neste aparelho.</span></div></div>` : ''}`;
+  ${S.ver ? `<div class="ver-strip no-print"><div class="wrap"><span>Você está vendo como <b>${esc(S.ver.rotulo)}</b>. ${S.ver.leitura ? 'Só leitura: nada do que você fizer é gravado.' : 'Dados de exemplo: nada do que você fizer é gravado.'}</span><button class="btn btn-primary btn-sm" data-act="ver-sair" style="width:auto">Voltar ao facilitador</button></div></div>` : store.mode === 'demo' ? `<div class="demo-strip"><div class="wrap"><span class="demo-dot"></span><span>Prévia em modo demonstração: contas e respostas ficam salvas só neste aparelho.</span></div></div>` : ''}`;
 }
 
 function viewInicio() {
@@ -2256,7 +2506,7 @@ function viewPainel() {
   const rows = list === null ? '<p class="muted">Carregando seus diagnósticos…</p>'
     : list.length === 0 ? `<div class="empty"><strong>Você ainda não fez nenhum diagnóstico</strong><span class="small">O primeiro leva cerca de 15 minutos. O resultado aparece aqui e fica salvo para você comparar depois.</span>${!S.acesso || S.acesso.pode ? '<button class="btn btn-primary btn-sm" data-go="diagnostico">Iniciar diagnóstico</button>' : ''}</div>`
     : `<div class="list">${list.map(r => `<button class="row-btn" data-open="${esc(r.id)}"><span><strong>Índice ${r.resultado.indice} · ${esc(r.resultado.nivel)}</strong><br><span class="row-meta">${fmtDate(r.created_at)} · perfil ${esc(PROFILES[r.resultado.perfil].nome)}</span></span><span aria-hidden="true" class="muted">→</span></button>`).join('')}</div>`;
-  const draft = LS.get(DRAFT_KEY);
+  const draft = S.ver ? null : LS.get(DRAFT_KEY);
   const a = S.acesso;
   // Pedido de nova execução: a pessoa explica o motivo; a resposta do facilitador aparece aqui.
   const pd = S.pedido; const ultimaExec = (S.myResults || [])[0]?.created_at || '';
@@ -2294,9 +2544,9 @@ function viewPainel() {
   // Área do patrocinador: aparece para quem foi indicado como patrocinador de uma turma.
   const pts = S.patroTurmas || [];
   // Patrocinador qualificado antes de existir turma (pré-venda).
-  const pre = S.patroPre && S.patroPre.qualificado && !pts.length ? S.patroPre : null;
+  const pre = S.patroPre && S.patroPre.qualificado && !pts.length && s.role !== 'facilitador' ? S.patroPre : null;
   const soPatro = (pts.length > 0 || Boolean(pre)) && !(S.myResults || []).length && !(a && a.pode);
-  const preCard = pre ? `<div class="card stack evo-chamada" style="gap:10px"><span class="eyebrow">Área do patrocinador${s.role === 'facilitador' ? ' · visão do patrocinador, para testar e demonstrar' : ''}</span><h2 style="font-size:22px">O seu time e o seu negócio</h2>
+  const preCard = pre ? `<div class="card stack evo-chamada" style="gap:10px"><span class="eyebrow">Área do patrocinador</span><h2 style="font-size:22px">O seu time e o seu negócio</h2>
     <p class="muted small">${pre.respostas ? `Questionário respondido em ${fmtDate(pre.respostas.updated_at || pre.respostas.created_at)}. O relatório traz as dores que você apontou, a sua visão do time e exemplos do que você recebe ao longo do programa.` : 'Cerca de 10 minutos de perguntas sobre o seu time e o seu negócio. O relatório sai na hora, com as dores que mais pesam e exemplos do que você recebe ao longo do programa.'}</p>
     <div class="actions"><button class="btn btn-primary btn-sm" data-patro-pre="1">${pre.respostas ? 'Abrir o relatório' : 'Responder o questionário'} <span aria-hidden="true">→</span></button></div></div>` : '';
   const patroCard = pts.map(t => `<div class="card stack evo-chamada" style="gap:10px"><span class="eyebrow">Área do patrocinador</span><h2 style="font-size:22px">${esc(t.nome)}</h2>
@@ -2319,12 +2569,12 @@ function viewPainel() {
 /* ============================== QUESTIONÁRIO ============================== */
 const HIST_MIN = 20;
 function startQuiz() {
-  const d = LS.get(DRAFT_KEY);
+  const d = S.ver ? null : LS.get(DRAFT_KEY);
   S.quiz = d && d.v === 3 && (!d.uid || d.uid === S.session?.id) ? d : { v: 3, uid: S.session?.id, step: 0, items: {}, sjt: {}, historia: '', meta: {}, turma: null, code: '' };
   if (!S.quiz.meta) S.quiz.meta = {};
 }
 const TOTAL = ITEMS.length + SJT.length + 1;
-function saveDraft() { LS.set(DRAFT_KEY, S.quiz); }
+function saveDraft() { if (S.ver) return; LS.set(DRAFT_KEY, S.quiz); }
 function keyOfStep(step) {
   const idx = step - 1;
   if (idx < 0) return null;
@@ -2497,7 +2747,7 @@ async function quizFinish() {
   const resultado = scoreAnswers(q.items, q.sjt, q.meta);
   try {
     const rec = await store.saveResult({ turma_id: q.turma?.id, respostas: { items: q.items, sjt: q.sjt, sjt_versao: q.versao || 'A', historia: q.historia.trim(), meta: q.meta, negocio: q.negocio || null }, resultado });
-    LS.del(DRAFT_KEY); S.quiz = null; S.busy = false; S.result = rec; go('resultado');
+    if (!S.ver) LS.del(DRAFT_KEY); S.quiz = null; S.busy = false; S.result = rec; go('resultado');
   } catch (e) { S.busy = false; render(); toast(e.message || 'Não foi possível salvar. Tente de novo.'); }
 }
 
@@ -4003,7 +4253,7 @@ function viewPatrocinio() {
   return `<main class="page"><div class="wrap stack-lg">${head}
     <p class="small muted">${P.fac ? 'Visão do facilitador. O patrocinador vê este relatório sem a venda perdida e sem os relatórios do time em rascunho.' : `Respondido em ${fmtDate(P.dados.respostas.updated_at || P.dados.respostas.created_at)}.`}</p>
     ${facExtra}${blocoResumo}${blocoDores}${blocoNumero}${blocoVisao}${blocoLogica}${blocoDesenvolve}${blocoPrograma}${blocoTime}${blocoConf}${blocoInvest}
-    <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o relatório</h2><div class="actions"><button class="btn btn-primary btn-sm" data-act="patro-pdf" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando PDF…' : 'Baixar relatório em PDF'}</button>${!P.fac ? '<button class="btn btn-quiet btn-sm" data-act="patro-editar">Revisar as minhas respostas</button>' : ''}${!P.fac && (store.mode === 'demo' || S.session?.role === 'facilitador') ? '<button class="btn btn-quiet btn-sm" data-act="patro-limpar">Recomeçar o questionário em branco</button>' : ''}</div></div>
+    <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o relatório</h2><div class="actions"><button class="btn btn-primary btn-sm" data-act="patro-pdf" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando PDF…' : 'Baixar relatório em PDF'}</button>${!P.fac ? '<button class="btn btn-quiet btn-sm" data-act="patro-editar">Revisar as minhas respostas</button>' : ''}${!P.fac && store.mode === 'demo' ? '<button class="btn btn-quiet btn-sm" data-act="patro-limpar">Recomeçar o questionário em branco</button>' : ''}</div></div>
     ${voltar}</div></main>`;
 }
 // Controles do facilitador: gerar, revisar e liberar os relatórios do time para o patrocinador.
@@ -4310,7 +4560,7 @@ function viewPessoas() {
     const origem = x.motivo === 'ativo' ? (x.acesso_ate && x.acesso_ate >= hojeBR() ? 'individual' : 'pela turma') : '';
     const n = x.diagnosticos || 0;
     return `<tr>
-      <td><strong>${esc(x.nome || 'Sem nome')}</strong><br><span class="muted small">${esc(x.email || '')}</span>${x.patrocinador && x.role !== 'facilitador' ? `<br><span class="flag">${x.patro_turmas ? 'patrocinador' : 'patrocinador · pré-venda'}</span>` : ''}${x.pedido_status === 'pendente' ? '<br><span class="flag" style="background:color-mix(in srgb, var(--accent) 22%, transparent);color:var(--accent)">pedido pendente</span>' : ''}</td>
+      <td><strong>${esc(x.nome || 'Sem nome')}</strong><br><span class="muted small">${esc(x.email || '')}</span>${x.role !== 'facilitador' ? `<br><button type="button" class="link-btn small" data-act="ver-pessoa" data-user="${esc(x.id)}">Ver como esta pessoa</button>` : ''}${x.patrocinador && x.role !== 'facilitador' ? `<br><span class="flag">${x.patro_turmas ? 'patrocinador' : 'patrocinador · pré-venda'}</span>` : ''}${x.pedido_status === 'pendente' ? '<br><span class="flag" style="background:color-mix(in srgb, var(--accent) 22%, transparent);color:var(--accent)">pedido pendente</span>' : ''}</td>
       <td>${esc(x.turma_nome || '—')}${x.turma_expira ? `<br><span class="muted small">turma até ${fmtDia(x.turma_expira)}</span>` : ''}</td>
       <td>${chip(x.motivo)}${origem ? `<br><span class="muted small">${origem}</span>` : ''}</td>
       <td class="tnum">${fac ? '—' : x.valido_ate ? fmtDia(x.valido_ate) : (x.pode ? 'sem prazo' : '—')}</td>
@@ -4380,9 +4630,9 @@ function viewFacilitador() {
       <p class="small muted" style="margin-top:10px">Cor mais intensa indica pontuação mais alta. Toque no nome para abrir o relatório da pessoa.</p>
     </div>`;
   return `<main class="page"><div class="wrap stack-lg">
-    <div class="stack" style="gap:6px"><span class="eyebrow">Painel do facilitador</span><h1 style="font-size:clamp(28px,5vw,40px)">${F.tab === 'pessoas' ? 'Pessoas e acessos' : F.tab === 'evolucao' ? 'Evolução da turma' : 'Turmas e resultados'}</h1></div>
-    <div class="tabs fac-tabs" role="tablist"><button role="tab" data-fac-tab="resultados" aria-selected="${F.tab === 'resultados'}">Turmas e resultados</button><button role="tab" data-fac-tab="evolucao" aria-selected="${F.tab === 'evolucao'}">Evolução</button><button role="tab" data-fac-tab="pessoas" aria-selected="${F.tab === 'pessoas'}">Pessoas e acessos${pedidosPendentes() + patroNovos() ? ` · ${pedidosPendentes() + patroNovos()}` : ''}</button></div>
-    ${F.tab === 'pessoas' ? viewPessoas() : F.tab === 'evolucao' ? `<div class="stack" style="gap:10px"><span class="small muted">Turma</span><div class="turma-chips">${turmas.map(t => `<button data-turma="${esc(t.id)}" aria-pressed="${F.sel === t.id}">${esc(t.nome)}</button>`).join('')}<button data-turma="individuais" aria-pressed="${F.sel === 'individuais'}">Individuais</button></div></div>${viewEvolucaoTurma()}` : `
+    <div class="stack" style="gap:6px"><span class="eyebrow">Painel do facilitador</span><h1 style="font-size:clamp(28px,5vw,40px)">${F.tab === 'pessoas' ? 'Pessoas e acessos' : F.tab === 'evolucao' ? 'Evolução da turma' : F.tab === 'ver' ? 'Visões e modelos' : 'Turmas e resultados'}</h1></div>
+    <div class="tabs fac-tabs" role="tablist"><button role="tab" data-fac-tab="resultados" aria-selected="${F.tab === 'resultados'}">Turmas e resultados</button><button role="tab" data-fac-tab="evolucao" aria-selected="${F.tab === 'evolucao'}">Evolução</button><button role="tab" data-fac-tab="pessoas" aria-selected="${F.tab === 'pessoas'}">Pessoas e acessos${pedidosPendentes() + patroNovos() ? ` · ${pedidosPendentes() + patroNovos()}` : ''}</button><button role="tab" data-fac-tab="ver" aria-selected="${F.tab === 'ver'}">Visões e modelos</button></div>
+    ${F.tab === 'ver' ? viewVisoes() : F.tab === 'pessoas' ? viewPessoas() : F.tab === 'evolucao' ? `<div class="stack" style="gap:10px"><span class="small muted">Turma</span><div class="turma-chips">${turmas.map(t => `<button data-turma="${esc(t.id)}" aria-pressed="${F.sel === t.id}">${esc(t.nome)}</button>`).join('')}<button data-turma="individuais" aria-pressed="${F.sel === 'individuais'}">Individuais</button></div></div>${viewEvolucaoTurma()}` : `
     <div class="card stack">
       <form id="f-turma" class="inline-form turma-form" novalidate><div class="field"><label for="tm-nome">Nova turma</label><input id="tm-nome" type="text" placeholder="Ex.: Workshop grupo de networking · novembro" required></div><div class="field"><label for="tm-workshop">Data do workshop</label><input id="tm-workshop" type="date" min="${hojeBR()}"></div><div class="field"><label for="tm-expira">Diagnósticos até</label><input id="tm-expira" type="date" value="${somaDias(hojeBR(), 90)}" min="${hojeBR()}"></div><button class="btn btn-primary btn-sm" type="submit">Criar turma e gerar código</button></form>
       <label class="check" for="tm-patro"><input id="tm-patro" type="checkbox"><span>Turma patrocinada: uma empresa contratou a avaliação e o desenvolvimento do time.</span></label>
@@ -4429,7 +4679,11 @@ function render() {
 document.addEventListener('click', async (ev) => {
   const t = ev.target.closest('[data-go],[data-act],[data-tab],[data-ans],[data-sjt],[data-open],[data-fac-open],[data-turma],[data-copy],[data-seg],[data-modo],[data-fac-modo],[data-fac-tab],[data-fac-filtro],[data-evo-open],[data-evo-mine],[data-patro],[data-patro-pre]');
   if (!t) return;
-  if (t.dataset.go) { if (t.dataset.go === 'diagnostico' && !S.quiz) startQuiz(); go(t.dataset.go); return; }
+  if (t.dataset.go) {
+    if (t.dataset.go === 'diagnostico' && S.ver?.leitura) { toast('Na visão de uma pessoa real, o diagnóstico não pode ser respondido.'); return; }
+    if (t.dataset.go === 'facilitador' && S.ver) { sairVisao(); return; }
+    if (t.dataset.go === 'diagnostico' && !S.quiz) startQuiz(); go(t.dataset.go); return;
+  }
   if (t.dataset.tab) { S.authTab = t.dataset.tab; S.authMsg = null; render(); return; }
   if (t.dataset.copy) { copyText(t.dataset.copy); return; }
   if (t.dataset.seg) { const q = S.quiz; q.negocio = { ...(q.negocio || {}), segmento: t.dataset.seg, oferta: ($('#qz-oferta')?.value || '').trim() }; saveDraft(); render(); return; }
@@ -4474,6 +4728,10 @@ document.addEventListener('click', async (ev) => {
   const act = t.dataset.act;
   if (act === 'criar') { S.authTab = 'criar'; S.authMsg = null; go('entrar'); }
   else if (act === 'esqueci') { S.authTab = 'esqueci'; S.authMsg = null; render(); }
+  else if (act === 'ver-sair' || (act === 'sair' && S.ver)) { sairVisao(); }
+  else if (act === 'ver-entrar') { await entrarVisao(t.dataset.visao); }
+  else if (act === 'ver-pessoa') { const x = (S.fac.pessoas || []).find(p => p.id === t.dataset.user); if (x) await entrarVisao('pessoa', x); }
+  else if (act === 'modelo-pdf') { gerarModelo(t.dataset.modelo); }
   else if (act === 'sair') { await store.signOut(); S.session = null; S.result = null; S.quiz = null; S.fac = { turmas: null, sel: null, results: null, newCode: null, tab: 'resultados', pessoas: null, filtro: 'todos', busca: '', evos: null }; S.acesso = null; S.evo = null; S.reav = null; S.minhasEvos = null; S.pedido = null; go('inicio'); }
   else if (act === 'fac-demo') { S.session = await store.signInFacilitatorDemo(); go('facilitador'); }
   else if (act === 'qz-start') { quizStart(); }
@@ -4509,14 +4767,13 @@ document.addEventListener('click', async (ev) => {
   else if (act === 'patro-pdf') { exportPatroPDF(); }
   else if (act === 'patro-demo') { S.session = await store.signInPatrocinadorDemo(Boolean(t.dataset.pre)); go('painel'); }
   else if (act === 'patro-limpar') {
-    const P = S.patro; if (!P || !(store.mode === 'demo' || S.session?.role === 'facilitador')) return;
+    const P = S.patro; if (!P || store.mode !== 'demo') return;
     try { await store.limparPatrocinio(P.turma.id); } catch (x) { toast(x.message); return; } P.form = null; P.editando = false;
     try { S.patroPre = await store.meuPatrocinio(); S.patroTurmas = await store.minhasTurmasPatrocinadas(); } catch (x) { /* */ }
     await carregarPatrocinio(); window.scrollTo(0, 0); toast('Questionário em branco');
   }
   else if (act === 'patro-ex-individual') {
-    const A = 'assertiva', Pa = 'passiva';
-    const rec = exResult({ id: 'exemplo-individual', user_id: 'exemplo', nome: 'Exemplo', turma_id: null, dias: 2 }, { D1: 4.6, D2: 3.4, D3: 4.4, D4: 2.7, D5: 2.4, D6: 2.7, D7: 3.1, D8: 2.9 }, [Pa, Pa, Pa, A, A, A], { segmento: 'servicos', oferta: '', modo: 'conversa' });
+    const rec = exemploIndividual();
     rec.exemploPatro = true; S.result = rec; go('resultado'); window.scrollTo(0, 0);
   }
   else if (act === 'patro-qualificar') {
