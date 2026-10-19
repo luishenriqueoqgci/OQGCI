@@ -1571,7 +1571,7 @@ const PATRO_EXEMPLO_REL = (() => {
 })();
 // Questionários de pré-venda que o facilitador já abriu (guardado neste aparelho).
 const PATRO_VISTOS = 'oqgci-patro-vistos';
-const patroNovo = x => Boolean(x.patrocinador && x.patro_respondido && !x.patro_turmas && (LS.get(PATRO_VISTOS) || {})[x.id] !== x.patro_respondido);
+const patroNovo = x => Boolean(x.patrocinador && x.role !== 'facilitador' && x.patro_respondido && !x.patro_turmas && (LS.get(PATRO_VISTOS) || {})[x.id] !== x.patro_respondido);
 const patroNovos = () => (S.fac.pessoas || []).filter(patroNovo).length;
 // O que o time pratica no workshop para cada dor e o que o patrocinador acompanha depois.
 const PATRO_DORES_PROG = {
@@ -1785,7 +1785,7 @@ function DemoStore() {
     async patrocinadorDe(userId) { const u = userOf(userId); return u ? { nome: u.nome, email: u.email } : null; },
     async getPatrocinio(turmaId) { const fac = userOf(db.session)?.role === 'facilitador'; const t = db.turmas.find(x => x.id === turmaId); const pr = db.patrocinios[turmaId]; return { respostas: pr && (!t?.patrocinador_id || pr.user_id === t.patrocinador_id) ? pr : null, relatorios: db.relPatro.filter(r => r.turma_id === turmaId && (fac || r.status === 'liberado')) }; },
     async salvarPatrocinio(turmaId, respostas) { const agora = new Date().toISOString();
-      if (!turmaId) { if (!userOf(db.session)?.patrocinador) throw new Error('A área do patrocinador ainda não foi liberada para você.'); db.patroPre[db.session] = { turma_id: null, user_id: db.session, respostas, created_at: db.patroPre[db.session]?.created_at || agora, updated_at: agora }; save(); return db.patroPre[db.session]; }
+      if (!turmaId) { if (!userOf(db.session)?.patrocinador && userOf(db.session)?.role !== 'facilitador') throw new Error('A área do patrocinador ainda não foi liberada para você.'); db.patroPre[db.session] = { turma_id: null, user_id: db.session, respostas, created_at: db.patroPre[db.session]?.created_at || agora, updated_at: agora }; save(); return db.patroPre[db.session]; }
       db.patrocinios[turmaId] = { turma_id: turmaId, user_id: db.session, respostas, created_at: db.patrocinios[turmaId]?.created_at || agora, updated_at: agora }; save(); return db.patrocinios[turmaId]; },
     async salvarRelatorioPatro(turmaId, etapa, dados) {
       let r = db.relPatro.find(x => x.turma_id === turmaId && x.etapa === etapa);
@@ -1794,12 +1794,13 @@ function DemoStore() {
     },
     async atualizarRelatorioPatro(id, patch) { const r = db.relPatro.find(x => x.id === id); if (r) { Object.assign(r, patch); save(); } return r; },
     async signInPatrocinadorDemo(pre) { db.session = pre ? 'ex-patro-pre' : 'ex-patro'; save(); return pub(userOf(db.session)); },
-    async meuPatrocinio() { const u = userOf(db.session); return { qualificado: Boolean(u?.patrocinador), respostas: db.patroPre[db.session] || null }; },
+    async meuPatrocinio() { const u = userOf(db.session); return { qualificado: Boolean(u?.patrocinador) || u?.role === 'facilitador', respostas: db.patroPre[db.session] || null }; },
     async getPatrocinioPessoa(userId) { return { respostas: db.patroPre[userId] || null, relatorios: [] }; },
     async definirPatrocinadorPessoa(userId, valor) {
       const u = userOf(userId); if (!u) throw new Error('Na prévia, só pessoas com conta podem ser qualificadas como patrocinador.');
       u.patrocinador = Boolean(valor); u.patrocinador_em = valor ? (u.patrocinador_em || new Date().toISOString()) : null; save();
     },
+    async limparPatrocinio(turmaId) { return this.limparPatrocinioDemo(turmaId); },
     async limparPatrocinioDemo(turmaId) { if (turmaId) { if (db.patrocinios[turmaId]?.user_id === db.session) delete db.patrocinios[turmaId]; } else delete db.patroPre[db.session]; save(); },
     async listEvolucoesIndividuais() { return db.evolucoes.filter(e => tipoEvo(e) === 'individual').map(juntar).filter(e => e.inicial && e.reavaliacao); },
     async resultadosDe(userId) { return db.results.filter(r => r.user_id === userId).sort((a, b) => a.created_at.localeCompare(b.created_at)); },
@@ -1974,6 +1975,8 @@ function LiveStore() {
     },
     async salvarPatrocinio(turmaId, respostas) {
       const uidAtual = S.session?.id;
+      // O facilitador usa a área do patrocinador para testar e demonstrar: a própria conta fica qualificada.
+      if (!turmaId && S.session?.role === 'facilitador') { const q0 = await sb.rpc('definir_patrocinador_pessoa', { p_user: uidAtual, p_valor: true }); if (q0.error) throw errPt(q0.error); }
       let q = sb.from('patrocinio_respostas').select('id').eq('user_id', uidAtual);
       q = turmaId ? q.eq('turma_id', turmaId) : q.is('turma_id', null);
       const atual = await q.maybeSingle();
@@ -1989,7 +1992,12 @@ function LiveStore() {
       const id = S.session?.id; if (!id) return { qualificado: false, respostas: null };
       const [p, r] = await Promise.all([sb.from('profiles').select('patrocinador').eq('id', id).maybeSingle(), sb.from('patrocinio_respostas').select('*').eq('user_id', id).is('turma_id', null).maybeSingle()]);
       if (p.error) return { qualificado: false, respostas: null };
-      return { qualificado: Boolean(p.data?.patrocinador), respostas: r.error ? null : (r.data || null) };
+      return { qualificado: Boolean(p.data?.patrocinador) || S.session?.role === 'facilitador', respostas: r.error ? null : (r.data || null) };
+    },
+    async limparPatrocinio(turmaId) {
+      let q = sb.from('patrocinio_respostas').delete().eq('user_id', S.session?.id);
+      q = turmaId ? q.eq('turma_id', turmaId) : q.is('turma_id', null);
+      const { error } = await q; if (error) throw errPt(error);
     },
     async getPatrocinioPessoa(userId) {
       const { data, error } = await sb.from('patrocinio_respostas').select('*').eq('user_id', userId).is('turma_id', null).maybeSingle();
@@ -2288,7 +2296,7 @@ function viewPainel() {
   // Patrocinador qualificado antes de existir turma (pré-venda).
   const pre = S.patroPre && S.patroPre.qualificado && !pts.length ? S.patroPre : null;
   const soPatro = (pts.length > 0 || Boolean(pre)) && !(S.myResults || []).length && !(a && a.pode);
-  const preCard = pre ? `<div class="card stack evo-chamada" style="gap:10px"><span class="eyebrow">Área do patrocinador</span><h2 style="font-size:22px">O seu time e o seu negócio</h2>
+  const preCard = pre ? `<div class="card stack evo-chamada" style="gap:10px"><span class="eyebrow">Área do patrocinador${s.role === 'facilitador' ? ' · visão do patrocinador, para testar e demonstrar' : ''}</span><h2 style="font-size:22px">O seu time e o seu negócio</h2>
     <p class="muted small">${pre.respostas ? `Questionário respondido em ${fmtDate(pre.respostas.updated_at || pre.respostas.created_at)}. O relatório traz as dores que você apontou, a sua visão do time e exemplos do que você recebe ao longo do programa.` : 'Cerca de 10 minutos de perguntas sobre o seu time e o seu negócio. O relatório sai na hora, com as dores que mais pesam e exemplos do que você recebe ao longo do programa.'}</p>
     <div class="actions"><button class="btn btn-primary btn-sm" data-patro-pre="1">${pre.respostas ? 'Abrir o relatório' : 'Responder o questionário'} <span aria-hidden="true">→</span></button></div></div>` : '';
   const patroCard = pts.map(t => `<div class="card stack evo-chamada" style="gap:10px"><span class="eyebrow">Área do patrocinador</span><h2 style="font-size:22px">${esc(t.nome)}</h2>
@@ -3995,7 +4003,7 @@ function viewPatrocinio() {
   return `<main class="page"><div class="wrap stack-lg">${head}
     <p class="small muted">${P.fac ? 'Visão do facilitador. O patrocinador vê este relatório sem a venda perdida e sem os relatórios do time em rascunho.' : `Respondido em ${fmtDate(P.dados.respostas.updated_at || P.dados.respostas.created_at)}.`}</p>
     ${facExtra}${blocoResumo}${blocoDores}${blocoNumero}${blocoVisao}${blocoLogica}${blocoDesenvolve}${blocoPrograma}${blocoTime}${blocoConf}${blocoInvest}
-    <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o relatório</h2><div class="actions"><button class="btn btn-primary btn-sm" data-act="patro-pdf" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando PDF…' : 'Baixar relatório em PDF'}</button>${!P.fac ? '<button class="btn btn-quiet btn-sm" data-act="patro-editar">Revisar as minhas respostas</button>' : ''}${!P.fac && store.mode === 'demo' ? '<button class="btn btn-quiet btn-sm" data-act="patro-limpar">Recomeçar o questionário em branco</button>' : ''}</div></div>
+    <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o relatório</h2><div class="actions"><button class="btn btn-primary btn-sm" data-act="patro-pdf" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando PDF…' : 'Baixar relatório em PDF'}</button>${!P.fac ? '<button class="btn btn-quiet btn-sm" data-act="patro-editar">Revisar as minhas respostas</button>' : ''}${!P.fac && (store.mode === 'demo' || S.session?.role === 'facilitador') ? '<button class="btn btn-quiet btn-sm" data-act="patro-limpar">Recomeçar o questionário em branco</button>' : ''}</div></div>
     ${voltar}</div></main>`;
 }
 // Controles do facilitador: gerar, revisar e liberar os relatórios do time para o patrocinador.
@@ -4264,7 +4272,7 @@ function viewPessoas() {
   const F = S.fac; const all = F.pessoas;
   if (all === null || all === undefined) return '<p class="muted">Carregando pessoas…</p>';
   if (F.pessoasErro && !all.length) return `<div class="msg msg-err" role="alert">${esc(F.pessoasErro)}</div>`;
-  const noFiltro = (x, k) => k === 'todos' || (k === 'pedidos' ? x.pedido_status === 'pendente' : k === 'patrocinadores' ? Boolean(x.patrocinador) : x.motivo === k);
+  const noFiltro = (x, k) => k === 'todos' || (k === 'pedidos' ? x.pedido_status === 'pendente' : k === 'patrocinadores' ? Boolean(x.patrocinador && x.role !== 'facilitador') : x.motivo === k);
   // Qualificação de patrocinador: potencial cliente (pré-venda) ou patrocinador de turma.
   const patroBloco = x => {
     const id = esc(x.id); const novo = patroNovo(x);
@@ -4302,7 +4310,7 @@ function viewPessoas() {
     const origem = x.motivo === 'ativo' ? (x.acesso_ate && x.acesso_ate >= hojeBR() ? 'individual' : 'pela turma') : '';
     const n = x.diagnosticos || 0;
     return `<tr>
-      <td><strong>${esc(x.nome || 'Sem nome')}</strong><br><span class="muted small">${esc(x.email || '')}</span>${x.patrocinador ? `<br><span class="flag">${x.patro_turmas ? 'patrocinador' : 'patrocinador · pré-venda'}</span>` : ''}${x.pedido_status === 'pendente' ? '<br><span class="flag" style="background:color-mix(in srgb, var(--accent) 22%, transparent);color:var(--accent)">pedido pendente</span>' : ''}</td>
+      <td><strong>${esc(x.nome || 'Sem nome')}</strong><br><span class="muted small">${esc(x.email || '')}</span>${x.patrocinador && x.role !== 'facilitador' ? `<br><span class="flag">${x.patro_turmas ? 'patrocinador' : 'patrocinador · pré-venda'}</span>` : ''}${x.pedido_status === 'pendente' ? '<br><span class="flag" style="background:color-mix(in srgb, var(--accent) 22%, transparent);color:var(--accent)">pedido pendente</span>' : ''}</td>
       <td>${esc(x.turma_nome || '—')}${x.turma_expira ? `<br><span class="muted small">turma até ${fmtDia(x.turma_expira)}</span>` : ''}</td>
       <td>${chip(x.motivo)}${origem ? `<br><span class="muted small">${origem}</span>` : ''}</td>
       <td class="tnum">${fac ? '—' : x.valido_ate ? fmtDia(x.valido_ate) : (x.pode ? 'sem prazo' : '—')}</td>
@@ -4329,7 +4337,7 @@ function cartaoPatrocinio(t) {
   const info = (S.fac.patroInfo || {})[t.id];
   if (t.patrocinador_id && info === undefined) { S.fac.patroInfo = { ...(S.fac.patroInfo || {}), [t.id]: null }; store.patrocinadorDe(t.patrocinador_id).then(x => { S.fac.patroInfo[t.id] = x; render(); }).catch(() => {}); }
   return `<div class="card stack" style="gap:10px"><h2 class="h-sec" style="margin:0">Patrocínio</h2>
-    <div class="validade-row small"><label for="tm-patro-email"><b>Patrocinador</b></label><input type="email" id="tm-patro-email" list="patro-lista" style="max-width:280px" placeholder="E-mail da conta do patrocinador" value="${esc(info?.email || '')}"><datalist id="patro-lista">${(S.fac.pessoas || []).filter(p => p.patrocinador && p.email).map(p => `<option value="${esc(p.email)}">${esc(p.nome || '')}${p.patro_turmas ? '' : ' · pré-venda'}</option>`).join('')}</datalist><button type="button" class="btn btn-quiet btn-sm" data-act="patro-definir">Salvar</button></div>
+    <div class="validade-row small"><label for="tm-patro-email"><b>Patrocinador</b></label><input type="email" id="tm-patro-email" list="patro-lista" style="max-width:280px" placeholder="E-mail da conta do patrocinador" value="${esc(info?.email || '')}"><datalist id="patro-lista">${(S.fac.pessoas || []).filter(p => p.patrocinador && p.email && p.role !== 'facilitador').map(p => `<option value="${esc(p.email)}">${esc(p.nome || '')}${p.patro_turmas ? '' : ' · pré-venda'}</option>`).join('')}</datalist><button type="button" class="btn btn-quiet btn-sm" data-act="patro-definir">Salvar</button></div>
     <p class="small muted">${t.patrocinador_id ? `Patrocinador: <b style="color:var(--ink)">${esc(info?.nome || info?.email || '…')}</b>. Ele encontra a área do patrocinador no painel dele.` : 'Escolha um patrocinador qualificado em Pessoas e acessos ou informe o e-mail da conta dele. O questionário que ele já respondeu na pré-venda passa para esta turma.'} Os relatórios do time para ele são consolidados e anônimos, com o mínimo de ${PATRO_MIN} pessoas por etapa.</p>
     <div class="actions"><button type="button" class="btn btn-ghost btn-sm" data-act="patro-abrir">Abrir a área do patrocinador</button></div></div>`;
 }
@@ -4501,8 +4509,8 @@ document.addEventListener('click', async (ev) => {
   else if (act === 'patro-pdf') { exportPatroPDF(); }
   else if (act === 'patro-demo') { S.session = await store.signInPatrocinadorDemo(Boolean(t.dataset.pre)); go('painel'); }
   else if (act === 'patro-limpar') {
-    const P = S.patro; if (!P || store.mode !== 'demo') return;
-    await store.limparPatrocinioDemo(P.turma.id); P.form = null; P.editando = false;
+    const P = S.patro; if (!P || !(store.mode === 'demo' || S.session?.role === 'facilitador')) return;
+    try { await store.limparPatrocinio(P.turma.id); } catch (x) { toast(x.message); return; } P.form = null; P.editando = false;
     try { S.patroPre = await store.meuPatrocinio(); S.patroTurmas = await store.minhasTurmasPatrocinadas(); } catch (x) { /* */ }
     await carregarPatrocinio(); window.scrollTo(0, 0); toast('Questionário em branco');
   }
