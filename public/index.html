@@ -173,7 +173,7 @@ p { margin: 0; }
 .stack-lg { display: grid; gap: 28px; grid-template-columns: minmax(0, 1fr); }
 .field { display: grid; gap: 6px; }
 .field label { font-size: 14px; font-weight: 600; color: var(--ink-2); }
-.field input[type=text], .field input[type=email], .field input[type=password], .field input[type=search], .field input[type=date] { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 13px 14px; font-size: 16px; }
+.field input[type=text], .field input[type=email], .field input[type=password], .field input[type=search], .field input[type=date], .field input[type=number] { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 13px 14px; font-size: 16px; }
 .field input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
 .check { display: grid; grid-template-columns: 22px minmax(0,1fr); gap: 10px; font-size: 14px; color: var(--ink-2); align-items: start; }
 .check input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent); }
@@ -440,6 +440,31 @@ table.pessoas .acesso-acoes { flex-wrap: wrap; }
 .patro-q legend { font-weight: 600; font-size: 15px; line-height: 1.45; margin-bottom: 8px; padding: 0; }
 .patro-q + .patro-q { border-top: 1px solid var(--line); padding-top: 16px; }
 .patro-ops { display: grid; gap: 8px; }
+.pf-lista { display: grid; gap: 8px; }
+.pf-item { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; display: grid; gap: 2px; }
+.pf-linha { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pf-linha input { width: 76px; flex: none; text-align: center; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 8px; font-size: 16px; }
+.pf-linha input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.pf-item summary { cursor: pointer; color: var(--accent); width: fit-content; padding: 2px 0; }
+.pf-item details p { margin-top: 6px; color: var(--ink-2); }
+.pf-rel { display: grid; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+.pf-rel-row { display: grid; grid-template-columns: minmax(0, 1fr) repeat(var(--n), 72px); gap: 6px 10px; padding: 12px 14px; align-items: start; }
+.pf-rel-row + .pf-rel-row { border-top: 1px solid var(--line); }
+.pf-rel-row.hl { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.pf-rel-head { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); padding-top: 9px; padding-bottom: 9px; }
+.pf-rel-nome p { margin-top: 4px; }
+.pf-rel-v { text-align: right; font-variant-numeric: tabular-nums; }
+.pf-rel-v b { font-size: 17px; }
+.pf-rel-v.voce b { color: var(--accent); }
+.pf-rel-v small { display: block; font-size: 12px; color: var(--ink-3); }
+.pf-rel-lab { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 600px) {
+  .pf-rel-row { grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
+  .pf-rel-nome { grid-column: 1 / -1; }
+  .pf-rel-head { display: none; }
+  .pf-rel-v { text-align: left; }
+  .pf-rel-lab { position: static; width: auto; height: auto; overflow: visible; clip: auto; display: block; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
+}
 .patro-escala { display: flex; flex-wrap: wrap; gap: 6px; }
 .pill-radio { position: relative; }
 .pill-radio input { position: absolute; opacity: 0; pointer-events: none; }
@@ -1800,7 +1825,11 @@ async function buildQuestPatroPDF(modo) {
     });
     c.secao('Parte 2', 'O que você vê no time', contato ? 'Pense nas últimas semanas do negócio. Em quantos de cada 10 atendimentos ou visitas você vê isso acontecer?' : 'Pense nas últimas semanas de venda do time. Em quantas de cada 10 vendas você vê isso acontecer?');
     PATRO_ITENS[modo].forEach(([, d, inv, t2]) => { c.pergunta(n++, t2, `${d} · ${DIM[d].nome}${inv ? ' · afirmação invertida' : ''}`); c.escala(true); });
-    c.secao('Parte 3', 'Dores e resultados esperados');
+    c.secao('Parte 3', 'Perfis do time de vendas', 'Pense em cada pessoa do time de vendas e no jeito como ela conduz a venda hoje. A soma das quantidades deve ser igual ao total do time.');
+    c.pergunta(n++, 'Quantas pessoas tem o time de vendas?', null); c.linhasResposta(1);
+    c.pergunta(n++, 'Quantas dessas pessoas se encaixam em cada perfil?', null);
+    PATRO_PERFIS.forEach(([k, d]) => { c.nota(`${PROFILES[k].nome} · ${d}`); c.nota('Quantidade: ________'); });
+    c.secao('Parte 4', 'Dores e resultados esperados');
     c.pergunta(n++, 'Quais destas situações mais pesam no resultado do seu negócio hoje? Escolha até três.', null); c.opcoes(PATRO_DORES.map(x => x.t), true);
     c.pergunta(n++, 'Entre as que você escolheu, qual custa mais ao negócio hoje?', null); c.linhasResposta(1);
     c.pergunta(n++, 'Que número você quer ver mudar depois do workshop?', null); c.opcoes(PATRO_METRICAS.map(m => m[1]), false);
@@ -1844,6 +1873,44 @@ const PATRO_DORES_PROG = {
   10: { workshop: 'O time pratica identificar quem decide e combinar um próximo passo com data em cada negociação, o que deixa o andamento de cada venda visível.', sinal: 'Negociações com quem decide mapeado e próximo passo registrado.' }
 };
 PATRO_DORES.forEach(d => Object.assign(d, PATRO_DORES_PROG[d.id] || {}));
+// Perfis do time de vendas na visão do patrocinador: os mesmos seis perfis do diagnóstico, descritos para quem observa o vendedor.
+const PATRO_PERFIS = [
+  ['conselheiro', 'Traz ao cliente uma leitura nova, mostra o custo com ética e recomenda com firmeza.'],
+  ['especialista', 'Domina o produto ou serviço e fala dele cedo. O cliente não se reconhece na conversa.'],
+  ['prestativo', 'Escuta muito bem e agrada. Evita dizer ao cliente o que ele ainda não quer ouvir, cede no preço e perde a venda na decisão.'],
+  ['reativo', 'Responde ao que o cliente pergunta e espera a decisão acontecer.'],
+  ['insistente', 'Conduz com força e gera resistência. Fecha a venda e perde a indicação.'],
+  ['desenvolvimento', 'Combina pontos fortes e lacunas, sem um padrão dominante.']
+];
+const pfNum = v => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : 0; };
+const pfSoma = f => PATRO_PERFIS.reduce((s, [k]) => s + pfNum(f['PF_' + k]), 0);
+function pfSomaHtml(f) {
+  const tot = pfNum(f.T0); const s = pfSoma(f);
+  if (tot < 1) return '<span class="muted">Informe quantas pessoas tem o time para distribuí-las pelos perfis.</span>';
+  if (s === tot) return `<b style="color:var(--good)">${s} de ${tot} distribuídos.</b> <span class="muted">A distribuição fecha com o time.</span>`;
+  return s < tot ? `<b>${s} de ${tot} distribuídos.</b> <span class="muted">${tot - s === 1 ? 'Falta 1 pessoa.' : `Faltam ${tot - s} pessoas.`}</span>` : `<b style="color:var(--warn)">${s} de ${tot} distribuídos.</b> <span class="muted">A soma passou do total em ${s - tot}.</span>`;
+}
+const ETAPA_EM = { previa: 'na prévia', workshop: 'no workshop', reavaliacao: 'aos 45 dias' };
+// A visão do patrocinador ao lado da distribuição que o diagnóstico calculou para o time, em percentuais.
+function perfisPatro(resp, rel) {
+  const tot = pfNum(resp.T0);
+  if (tot < 1 || pfSoma(resp) !== tot) return null;
+  const pc = (n, t) => t ? Math.round(100 * n / t) : 0;
+  const es = rel ? PATRO_ETAPAS.filter(([e]) => rel.dados.etapas[e]) : [];
+  const linhas = PATRO_PERFIS.map(([k, desc]) => {
+    const n = pfNum(resp['PF_' + k]);
+    return { k, nome: PROFILES[k].nome, desc, n, p: pc(n, tot), etapas: es.map(([e]) => { const a = rel.dados.etapas[e]; const m = a.perfis[k] || 0; return { n: m, p: pc(m, a.n) }; }) };
+  });
+  const frases = [];
+  if (es.length) {
+    const base = rel.dados.etapas[es[0][0]]; const em = ETAPA_EM[es[0][0]];
+    const difs = linhas.map(l => ({ ...l, d: l.p - l.etapas[0].p })).filter(l => Math.abs(l.d) >= 15).sort((a, b) => Math.abs(b.d) - Math.abs(a.d)).slice(0, 2);
+    difs.forEach(l => frases.push(`Você enxerga ${l.n} de ${tot} ${tot === 1 ? 'pessoa' : 'pessoas'} no perfil ${l.nome} (${l.p}%). O diagnóstico encontra ${l.etapas[0].n} de ${base.n} (${l.etapas[0].p}%) ${em}.`));
+    if (!difs.length) frases.push(`A sua visão e o diagnóstico ${em} ficam próximos em todos os perfis, com diferença abaixo de 15 pontos percentuais.`);
+    if (es.length > 1) { const c = linhas[0].etapas; frases.push(`No perfil Conselheiro, o diagnóstico do time passa de ${c[0].p}% ${em} para ${c.at(-1).p}% ${ETAPA_EM[es.at(-1)[0]]}.`); }
+  }
+  return { tot, es, linhas, frases };
+}
 // A pergunta do cliente em cada dimensão (a mesma da página inicial).
 const DIM_PERGUNTA = { D1: 'Essa pessoa quer o meu bem?', D2: 'Por que eu confiaria antes mesmo de conversar?', D3: 'Ele entende a minha situação?', D4: 'O que eu ainda não sabia sobre isso?', D7: 'Como eu decido com quem decide comigo?', D5: 'Quanto me custa deixar como está?', D6: 'Qual é o próximo passo seguro?', D8: 'Posso decidir sem me sentir pressionado?' };
 // Argumentos do programa no relatório do patrocinador (os mesmos da apresentação comercial).
@@ -1887,7 +1954,7 @@ function DemoStore(memoria) {
   const KEY = 'oqgci-demo-v1';
   let db = memoria ? null : LS.get(KEY);
   if (db && db.v === 1) { db.results = [...db.results.filter(x => !x.exemplo), ...seedExamples()]; db.v = 2; }
-  if (!db || ![2, 3, 4, 5, 6].includes(db.v)) {
+  if (!db || ![2, 3, 4, 5, 6, 7].includes(db.v)) {
     db = { v: 2, users: [], session: null, results: seedExamples(), turmas: [{ id: 'turma-exemplo', nome: 'Exemplo · Workshop de vendas', codigo: 'OQG-DEMO', created_at: new Date().toISOString(), exemplo: true }] };
   }
   if (db.v === 2 || db.v === 3) {
@@ -1915,6 +1982,12 @@ function DemoStore(memoria) {
     db.users = db.users.filter(u => u.id !== 'ex-patro-pre');
     db.users.push({ id: 'ex-patro-pre', nome: 'Patrocinador em pré-venda', email: 'potencial@demo', pw: hashStr('patrocinador'), role: 'respondente', created_at: agora, turma_id: null, acesso_ate: null, acesso_bloqueado: false, patrocinador: true, patrocinador_em: agora, exemplo: true });
     db.patroPre = {}; db.v = 6;
+  }
+  if (db.v === 6) {
+    // Perfis do time de vendas na visão do patrocinador de exemplo (12 pessoas).
+    const pe = db.patrocinios['turma-evolucao'];
+    if (pe) Object.assign(pe.respostas, { T0: '12', PF_conselheiro: '3', PF_especialista: '3', PF_prestativo: '2', PF_reativo: '2', PF_insistente: '1', PF_desenvolvimento: '1' });
+    db.v = 7;
   }
   db.patrocinios = db.patrocinios || {}; db.relPatro = db.relPatro || []; db.patroPre = db.patroPre || {};
   db.evolucoes = db.evolucoes || [];
@@ -2724,6 +2797,7 @@ function viewDiagnostico() {
 function patroFormMudou(ev) {
   if (!S.patro || !ev.target.closest('#f-patro')) return false;
   const nome = ev.target.name; S.patro.form = lerFormPatro();
+  if (nome === 'T0' || /^PF_/.test(nome || '')) { const el = $('#pt-pf-soma'); if (el) el.innerHTML = pfSomaHtml(S.patro.form); }
   if (ev.type === 'change' && ['C2', 'C3', 'D1', 'D3'].includes(nome)) { const y0 = window.scrollY; render(); window.scrollTo(0, y0); }
   return true;
 }
@@ -4135,7 +4209,13 @@ function viewPatroForm() {
       <p class="small muted">${modo === 'contato' ? 'Pense nas últimas semanas do negócio. Em quantos de cada 10 atendimentos ou visitas você vê isso acontecer?' : 'Pense nas últimas semanas de venda do time. Em quantas de cada 10 vendas você vê isso acontecer?'}</p>
       ${itens}
     </div>
-    <div class="card stack"><span class="eyebrow">Parte 3 · Dores e resultados esperados</span>
+    <div class="card stack"><span class="eyebrow">Parte 3 · Perfis do time de vendas</span>
+      <p class="small muted">Pense em cada pessoa do time de vendas e no jeito como ela conduz a venda hoje. Informe quantas pessoas o time tem e quantas se encaixam em cada perfil. Toque em "Ver como é" para abrir a descrição de cada um.</p>
+      <div class="field" style="max-width:280px"><label for="pt-T0">Quantas pessoas tem o time de vendas?</label><input id="pt-T0" name="T0" type="number" inputmode="numeric" min="1" max="500" value="${esc(f.T0 || '')}"></div>
+      <div class="pf-lista">${PATRO_PERFIS.map(([k, d]) => `<div class="pf-item"><div class="pf-linha"><label for="pt-PF_${k}"><strong>${PROFILES[k].nome}</strong></label><input id="pt-PF_${k}" name="PF_${k}" type="number" inputmode="numeric" min="0" max="500" placeholder="0" value="${esc(f['PF_' + k] ?? '')}" aria-describedby="pf-d-${k}"></div><details><summary class="small">Ver como é</summary><p class="small" id="pf-d-${k}">${esc(V(d, vocF))}</p></details></div>`).join('')}</div>
+      <p id="pt-pf-soma" class="small" role="status" aria-live="polite">${pfSomaHtml(f)}</p>
+    </div>
+    <div class="card stack"><span class="eyebrow">Parte 4 · Dores e resultados esperados</span>
       <fieldset class="patro-q"><legend>Quais destas situações mais pesam no resultado do seu negócio hoje? Escolha até três.</legend><div class="patro-ops">${PATRO_DORES.map(x => `<label class="check"><input type="checkbox" name="D1" value="${x.id}" ${d1.includes(String(x.id)) ? 'checked' : ''}><span>${esc(V(x.t, vocF))}</span></label>`).join('')}</div></fieldset>
       <fieldset class="patro-q"><legend>Entre as que você escolheu, qual custa mais ao negócio hoje?</legend>${d1.length ? radio('D2', PATRO_DORES.filter(x => d1.includes(String(x.id))).map(x => [String(x.id), V(x.t, vocF)])) : '<p class="small muted">Escolha as situações acima para responder.</p>'}</fieldset>
       <fieldset class="patro-q"><legend>Que número você quer ver mudar nos 90 dias depois do workshop?</legend>${radio('D3', PATRO_METRICAS.map(([k, t]) => [k, V(t, vocF)]))}
@@ -4161,6 +4241,11 @@ function validarPatro(f) {
   if (f.C2 === 'outro' && !(f.C8 || '').trim()) return 'Conte em poucas palavras o que a sua empresa vende.';
   const faltam = PATRO_ITENS[modoPatro(f)].filter(i => f[i[0]] == null || f[i[0]] === '').length;
   if (faltam) return `Faltam ${faltam} ${faltam === 1 ? 'afirmação' : 'afirmações'} na Parte 2. Se não souber, marque "Não sei dizer".`;
+  const tot = pfNum(f.T0);
+  if (tot < 1) return 'Informe quantas pessoas tem o time de vendas.';
+  if (PATRO_PERFIS.some(([k]) => pfNum(f['PF_' + k]) < 0)) return 'As quantidades por perfil não podem ser negativas.';
+  const soma = pfSoma(f);
+  if (soma !== tot) return `A distribuição pelos perfis soma ${soma}, e o time tem ${tot} ${tot === 1 ? 'pessoa' : 'pessoas'}. Ajuste as quantidades para que a soma seja ${tot}.`;
   if (!f.D1.length) return 'Escolha ao menos uma situação que pesa no resultado.';
   if (f.D1.length > 3) return 'Escolha no máximo três situações.';
   if (!f.D2 || !f.D1.includes(f.D2)) return 'Indique qual das situações escolhidas custa mais ao negócio.';
@@ -4262,6 +4347,13 @@ function viewPatrocinio() {
     <div class="evo-rows">${visRows}</div>${time ? `<div class="legend"><span><i class="swatch" style="background:var(--ink-3);opacity:.5"></i>O time sobre si</span><span><i class="swatch" style="background:var(--accent)"></i>A sua visão</span></div>` : ''}
     ${K.lacunas.length ? `<div class="subbloco" style="justify-items:stretch"><span class="subbloco-t">As maiores lacunas na sua visão</span>${K.lacunas.map(d => `<p class="small"><b>${d.nome}</b> · <span class="muted">o cliente pergunta</span> “${esc(v(DIM_PERGUNTA[d.id]))}” <span class="muted">· ${esc(v(d.mede))}</span></p>`).join('')}</div>` : ''}</div>`;
 
+  const PF = perfisPatro(K.resp, rels[0] || null);
+  const blocoPerfis = PF ? `<div class="card stack"><h2 class="h-sec" style="margin:0">Os perfis do time de vendas</h2>
+    <p class="small muted">${PF.es.length ? 'Os mesmos seis perfis do método. A sua visão vem da distribuição que você declarou; o diagnóstico vem das respostas do próprio time, consolidadas e anônimas. A comparação usa percentuais, porque nem todo o time responde em cada etapa.' : `A distribuição que você declarou para as ${PF.tot} pessoas do time, nos mesmos seis perfis que o diagnóstico usa. ${K.pre ? 'Com o workshop, a distribuição que sai do diagnóstico do time entra ao lado da sua, na prévia, no workshop e aos 45 dias.' : 'A comparação com o diagnóstico do time entra quando o relatório da prévia for liberado.'}`}</p>
+    <div class="pf-rel" style="--n:${1 + PF.es.length}"><div class="pf-rel-row pf-rel-head" aria-hidden="true"><span class="pf-rel-nome">Perfil</span><span class="pf-rel-v">Sua visão</span>${PF.es.map(([, nome]) => `<span class="pf-rel-v">${nome}</span>`).join('')}</div>
+    ${PF.linhas.map(l => `<div class="pf-rel-row${l.k === 'conselheiro' ? ' hl' : ''}"><div class="pf-rel-nome"><strong>${l.nome}</strong>${l.k === 'conselheiro' ? ' <span class="tag">o perfil que o workshop desenvolve</span>' : ''}<p class="small muted">${esc(v(l.desc))}</p></div><span class="pf-rel-v voce"><span class="pf-rel-lab">Sua visão</span><b>${l.n}</b><small>${l.p}%</small></span>${l.etapas.map((e, i) => `<span class="pf-rel-v"><span class="pf-rel-lab">${PF.es[i][1]}</span><b>${e.n}</b><small>${e.p}%</small></span>`).join('')}</div>`).join('')}</div>
+    ${PF.frases.length ? `<div class="subbloco" style="justify-items:stretch"><span class="subbloco-t">O que a comparação mostra</span>${PF.frases.map(x => `<p class="small">${esc(x)}</p>`).join('')}</div>` : ''}</div>` : '';
+
   const blocoLogica = `<div class="stack">${secTitulo('A lógica do método', 'Todo cliente decide com uma pergunta: o que eu ganho com isto?', v('O cliente se aproxima do que lhe faz bem e se afasta do que lhe faz mal. O time que conduz a conversa por essa pergunta mostra ao cliente o ganho, o custo de deixar como está e um caminho seguro para decidir.'))}
     <div class="patro-cols">${PATRO_EIXOS.map(e => `<div class="card stack" style="gap:6px;border-top:3px solid ${e.cor}"><strong style="color:${e.cor}">${e.nome}</strong><p class="small">${esc(v(e.t))}</p><p class="small muted">${e.dims}</p></div>`).join('')}</div>
     <div class="card patro-dado"><b class="patro-big tnum">40% a 60%</b><div class="stack" style="gap:4px"><p>das negociações terminam sem decisão. A principal causa é o medo de o cliente escolher errado, e é nesse ponto que a condução do time faz a diferença.</p><p class="small muted">Análise de 2,5 milhões de conversas de venda (Dixon e McKenna, 2022).</p></div></div></div>`;
@@ -4294,7 +4386,7 @@ function viewPatrocinio() {
       <p class="small muted">Contexto: ${esc(K.resp.C1)} pessoas · ${esc(K.negocio || '')} · ${esc(PATRO_CTX[1].ops.find(o => o[0] === K.resp.C3)?.[1] || '')} · decisão ${esc((PATRO_CTX[2].ops.find(o => o[0] === K.resp.C4)?.[1] || '').toLowerCase())} · venda média ${esc((PATRO_CTX[3].ops.find(o => o[0] === K.resp.C5)?.[1] || '').toLowerCase())} · ${esc((PATRO_CTX[4].ops.find(o => o[0] === K.resp.C6)?.[1] || '').toLowerCase())} na decisão · clientes novos por ${esc((PATRO_CTX[5].ops.find(o => o[0] === K.resp.C7)?.[1] || '').toLowerCase())}.</p></div>${t.id ? viewPatroFac() : ''}` : '';
   return `<main class="page"><div class="wrap stack-lg">${head}
     <p class="small muted">${P.fac ? 'Visão do facilitador. O patrocinador vê este relatório sem a venda perdida e sem os relatórios do time em rascunho.' : `Respondido em ${fmtDate(P.dados.respostas.updated_at || P.dados.respostas.created_at)}.`}</p>
-    ${facExtra}${blocoResumo}${blocoDores}${blocoNumero}${blocoVisao}${blocoLogica}${blocoDesenvolve}${blocoPrograma}${blocoTime}${blocoConf}${blocoInvest}
+    ${facExtra}${blocoResumo}${blocoDores}${blocoNumero}${blocoVisao}${blocoPerfis}${blocoLogica}${blocoDesenvolve}${blocoPrograma}${blocoTime}${blocoConf}${blocoInvest}
     <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o relatório</h2><div class="actions"><button class="btn btn-primary btn-sm" data-act="patro-pdf" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando PDF…' : 'Baixar relatório em PDF'}</button>${!P.fac ? '<button class="btn btn-quiet btn-sm" data-act="patro-editar">Revisar as minhas respostas</button>' : ''}${!P.fac && store.mode === 'demo' ? '<button class="btn btn-quiet btn-sm" data-act="patro-limpar">Recomeçar o questionário em branco</button>' : ''}</div></div>
     ${voltar}</div></main>`;
 }
@@ -4450,6 +4542,27 @@ async function buildPatroPDF() {
     y += 3;
     const partes = [{ eb: 'As maiores lacunas na sua visão' }, ...K.lacunas.map((d, i) => ({ t: `${d.nome} · o cliente pergunta "${v(DIM_PERGUNTA[d.id])}". ${v(d.mede)}`, size: 8.6, gap: i === K.lacunas.length - 1 ? 0 : 1.8 }))];
     const h = alturaCartao(CW, partes); precisa(h + 4); cartao(M, y, CW, partes, { fill: C.baseT, stroke: null }); y += h + 4;
+  }
+
+  // Perfis do time de vendas: a visão do patrocinador e o diagnóstico do time
+  const PF = perfisPatro(resp, ultimo || null);
+  if (PF) {
+    secao('Sua leitura', 'Os perfis do time de vendas', PF.es.length ? 'Os mesmos seis perfis do método. A sua visão vem da distribuição que você declarou; o diagnóstico vem das respostas do próprio time, consolidadas e anônimas. A comparação usa percentuais, porque nem todo o time responde em cada etapa.' : `A distribuição que você declarou para as ${PF.tot} pessoas do time, nos mesmos seis perfis que o diagnóstico usa. ${K.pre ? 'Com o workshop, a distribuição que sai do diagnóstico do time entra ao lado da sua, na prévia, no workshop e aos 45 dias.' : 'A comparação com o diagnóstico do time entra quando o relatório da prévia for liberado.'}`, 60);
+    const cols = ['Sua visão', ...PF.es.map(e => e[1])]; const lw = CW - 28 * cols.length; const cw = 28;
+    font(7.4, 'bold', C.ink3); cols.forEach((nome, i) => doc.text(T(nome), M + lw + i * cw + cw - 2, y + 3, { align: 'right' })); y += 5.5;
+    PF.linhas.forEach(l => {
+      const desc = v(l.desc); const h = Math.max(9, 4.6 + altura(desc, 7.6, 'body', lw - 6) + 2); precisa(h + 1); const hl = l.k === 'conselheiro';
+      if (hl) caixa(M, y - 0.5, CW, h, C.warmT, null);
+      font(9, 'semi', C.ink); doc.text(T(l.nome), M + 3, y + 4); escrever(desc, M + 3, y + 5, 7.6, 'body', C.ink2, lw - 6);
+      font(8.8, 'bold', C.ink); doc.text(T(`${l.n} (${l.p}%)`), M + lw + cw - 2, y + 4, { align: 'right' });
+      l.etapas.forEach((e, i) => { font(8.8, 'body', C.ink2); doc.text(T(`${e.n} (${e.p}%)`), M + lw + (i + 1) * cw + cw - 2, y + 4, { align: 'right' }); });
+      if (!hl) { color(C.line2, 'draw'); doc.setLineWidth(0.2); doc.line(M, y + h - 0.5, M + CW, y + h - 0.5); }
+      y += h;
+    });
+    if (PF.frases.length) {
+      y += 3; const partes = [{ eb: 'O que a comparação mostra' }, ...PF.frases.map((x, i) => ({ t: x, size: 8.6, gap: i === PF.frases.length - 1 ? 0 : 1.8 }))];
+      const h = alturaCartao(CW, partes); precisa(h + 4); cartao(M, y, CW, partes, { fill: C.baseT, stroke: null }); y += h + 4;
+    }
   }
 
   // Lógica do método
