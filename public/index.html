@@ -1622,16 +1622,37 @@ function visaoPessoa(real, p) {
   return new Proxy(proprio, { get: (o, k) => (k in o ? o[k] : (typeof real[k] === 'function' ? real[k].bind(real) : real[k])) });
 }
 function limparEstadoVisao() { S.result = null; S.quiz = null; S.patro = null; S.patroPre = null; S.patroTurmas = []; S.myResults = null; S.acesso = null; S.reav = null; S.minhasEvos = null; S.pedido = null; S.evo = null; }
-async function entrarVisao(tipo, pessoa) {
+const VISOES_EXTRA = { individual: ['Participante fora de turma'], 'patro-pre-resp': ['Patrocinador em pré-venda'] };
+async function entrarVisao(tipo, pessoa, semPainel) {
   if (S.ver) return;
   const orig = { store, session: S.session, fac: S.fac };
   let sess, rotulo;
   try {
     if (tipo === 'pessoa') { store = visaoPessoa(orig.store, pessoa); sess = { id: pessoa.id, nome: pessoa.nome, email: pessoa.email, role: 'respondente' }; rotulo = pessoa.nome || pessoa.email || 'pessoa'; }
-    else { const sx = DemoStore(true); sess = await sx.prepararVisao(tipo); store = sx; rotulo = VISOES[tipo][0].toLowerCase(); }
+    else { const sx = DemoStore(true); sess = await sx.prepararVisao(tipo); store = sx; rotulo = (VISOES[tipo] || VISOES_EXTRA[tipo])[0].toLowerCase(); }
   } catch (e) { store = orig.store; toast(e.message); return; }
   S.ver = { tipo, rotulo, orig, leitura: tipo === 'pessoa' };
-  limparEstadoVisao(); S.session = sess; go('painel'); window.scrollTo(0, 0);
+  limparEstadoVisao(); S.session = sess; if (!semPainel) go('painel'); window.scrollTo(0, 0);
+}
+// Abre cada modelo na tela, dentro da visão da pessoa que o recebe.
+async function verModelo(k) {
+  const tipo = { 'q-patro-conversa': 'patro-pre', 'q-patro-contato': 'patro-pre', 'q-diag-conversa': 'novo', 'q-diag-contato': 'novo', 'r-individual': 'historico', 'r-evo-turma': 'historico', 'r-evo-individual': 'individual', 'r-patro-pre': 'patro-pre-resp', 'r-patro-turma': 'patro-turma' }[k];
+  if (!tipo) return;
+  await entrarVisao(tipo, null, true); if (!S.ver) return;
+  try {
+    if (k.startsWith('q-patro')) { await abrirPatrocinio({ id: null, nome: null, pre: true }, false); if (k.endsWith('contato')) { S.patro.form = { ...(S.patro.form || {}), C3: 'contato', D1: [] }; render(); } }
+    else if (k.startsWith('q-diag')) { startQuiz(); if (k.endsWith('contato')) S.quiz.negocio = { modo: 'contato' }; go('diagnostico'); }
+    else if (k === 'r-individual') { const rs = await store.myResults(); S.result = rs[0]; go('resultado'); }
+    else if (k.startsWith('r-evo')) {
+      const rs = await store.myResults(); S.myResults = rs;
+      const e = (await store.minhasEvolucoes()).find(x => tipoEvo(x) === (k === 'r-evo-turma' ? 'completo' : 'individual'));
+      if (!e) { go('painel'); return; }
+      S.evo = { ev: e, from: 'painel', serie: tipoEvo(e) === 'individual' ? rs.slice().sort((a, b) => a.created_at.localeCompare(b.created_at)) : null }; go('evolucao');
+    }
+    else if (k === 'r-patro-pre') { await abrirPatrocinio({ id: null, nome: null, pre: true }, false); }
+    else if (k === 'r-patro-turma') { const ts = await store.minhasTurmasPatrocinadas(); if (ts[0]) await abrirPatrocinio(ts[0], false); else go('painel'); }
+  } catch (e) { toast(e.message); go('painel'); }
+  window.scrollTo(0, 0);
 }
 function sairVisao() {
   const v = S.ver; if (!v) return;
@@ -1685,8 +1706,8 @@ function viewVisoes() {
   return `<div class="stack-lg">
     <div class="stack" style="gap:12px"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Ver o sistema como…</h2><p class="muted small">Você navega como cada pessoa navega, com dados de exemplo. Nada do que você fizer nessas visões é gravado. Para ver uma pessoa real exatamente como ela vê, use "Ver como esta pessoa" em Pessoas e acessos.</p></div>
       <div class="patro-cols">${Object.keys(VISOES).map(card).join('')}</div></div>
-    <div class="card stack"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Modelos</h2><p class="muted small">PDFs para imprimir, enviar ou revisar. Os relatórios usam dados fictícios.</p></div>
-      <div class="modelos">${MODELOS.map(([k, nome, desc]) => `<div class="modelo-row"><span><strong>${nome}</strong><br><span class="small muted">${desc}</span></span><button class="btn btn-quiet btn-sm" data-act="modelo-pdf" data-modelo="${k}" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando…' : 'Baixar PDF'}</button></div>`).join('')}</div></div>
+    <div class="card stack"><div class="stack" style="gap:6px"><h2 class="h-sec" style="margin:0">Modelos</h2><p class="muted small">Veja cada modelo na tela, como a pessoa recebe, ou baixe o PDF para imprimir, enviar ou revisar. Os relatórios usam dados fictícios.</p></div>
+      <div class="modelos">${MODELOS.map(([k, nome, desc]) => `<div class="modelo-row"><span><strong>${nome}</strong><br><span class="small muted">${desc}</span></span><span class="actions" style="flex-wrap:nowrap"><button class="btn btn-ghost btn-sm" data-act="modelo-ver" data-modelo="${k}" style="width:auto">Ver em tela</button><button class="btn btn-quiet btn-sm" data-act="modelo-pdf" data-modelo="${k}" style="width:auto" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando…' : 'Baixar PDF'}</button></span></div>`).join('')}</div></div>
   </div>`;
 }
 // Base dos PDFs de questionário (modelos): mesma identidade dos relatórios, econômica em tinta.
@@ -2044,7 +2065,12 @@ function DemoStore(memoria) {
     // Prepara a pessoa de exemplo de cada visão e entra com ela.
     async prepararVisao(tipo) {
       const agora = new Date().toISOString();
-      const id = { novo: 'ver-novo', historico: 'ex-user-10', 'patro-pre': 'ex-patro-pre', 'patro-turma': 'ex-patro' }[tipo];
+      const id = { novo: 'ver-novo', historico: 'ex-user-10', individual: 'ex-user-16', 'patro-pre': 'ex-patro-pre', 'patro-pre-resp': 'ex-patro-pre', 'patro-turma': 'ex-patro' }[tipo];
+      if (tipo === 'individual') {
+        if (!userOf(id)) { const rs = db.results.filter(r => r.user_id === id); db.users.push({ id, nome: rs[0]?.nome || 'Exemplo 16', email: 'exemplo16@exemplo', pw: '', role: 'respondente', created_at: rs[0]?.created_at || agora, turma_id: null, acesso_ate: null, acesso_bloqueado: false }); }
+        db.evolucoes.filter(e => e.user_id === id && tipoEvo(e) === 'individual').forEach(e => { e.status = 'liberado'; e.liberado_em = e.liberado_em || agora; });
+      }
+      if (tipo === 'patro-pre-resp' && db.patrocinios['turma-evolucao']) db.patroPre[id] = { ...db.patrocinios['turma-evolucao'], turma_id: null, user_id: id };
       if (tipo === 'novo' && !userOf(id)) db.users.push({ id, nome: 'Participante de exemplo', email: 'participante@exemplo', pw: '', role: 'respondente', created_at: agora, turma_id: 'turma-exemplo', acesso_ate: null, acesso_bloqueado: false });
       if (tipo === 'historico') {
         if (!userOf(id)) { const rs = db.results.filter(r => r.user_id === id); db.users.push({ id, nome: rs[0]?.nome || 'Exemplo 10', email: 'exemplo10@exemplo', pw: '', role: 'respondente', created_at: rs[0]?.created_at || agora, turma_id: rs[0]?.turma_id || null, acesso_ate: null, acesso_bloqueado: false }); }
@@ -4748,6 +4774,7 @@ document.addEventListener('click', async (ev) => {
   else if (act === 'ver-entrar') { await entrarVisao(t.dataset.visao); }
   else if (act === 'ver-pessoa') { const x = (S.fac.pessoas || []).find(p => p.id === t.dataset.user); if (x) await entrarVisao('pessoa', x); }
   else if (act === 'modelo-pdf') { gerarModelo(t.dataset.modelo); }
+  else if (act === 'modelo-ver') { await verModelo(t.dataset.modelo); }
   else if (act === 'sair') { await store.signOut(); S.session = null; S.result = null; S.quiz = null; S.fac = { turmas: null, sel: null, results: null, newCode: null, tab: 'resultados', pessoas: null, filtro: 'todos', busca: '', evos: null }; S.acesso = null; S.evo = null; S.reav = null; S.minhasEvos = null; S.pedido = null; go('inicio'); }
   else if (act === 'fac-demo') { S.session = await store.signInFacilitatorDemo(); go('facilitador'); }
   else if (act === 'qz-start') { quizStart(); }
