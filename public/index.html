@@ -447,6 +447,7 @@ table.pessoas .acesso-acoes { flex-wrap: wrap; }
 .pf-linha input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
 .pf-item summary { cursor: pointer; color: var(--accent); width: fit-content; padding: 2px 0; }
 .pf-item details p { margin-top: 6px; color: var(--ink-2); }
+.patro-fora { display: grid; gap: 4px; border-left: 2px solid var(--warn); padding: 2px 0 2px 12px; }
 .pf-rel { display: grid; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
 .pf-rel-row { display: grid; grid-template-columns: minmax(0, 1fr) repeat(var(--n), 72px); gap: 6px 10px; padding: 12px 14px; align-items: start; }
 .pf-rel-row + .pf-rel-row { border-top: 1px solid var(--line); }
@@ -1642,7 +1643,7 @@ function visaoPessoa(real, p) {
     async minhasTurmasPatrocinadas() { return real.turmasPatrocinadasDe(p.id); },
     async meuPatrocinio() { let r = { respostas: null }; try { r = await real.getPatrocinioPessoa(p.id); } catch (e) { /* */ } return { qualificado: Boolean(p.patrocinador), respostas: r.respostas }; },
     async getPatrocinio(turmaId) { const d = await real.getPatrocinio(turmaId); return { ...d, relatorios: (d.relatorios || []).filter(r => r.status === 'liberado') }; },
-    saveResult: so, pedirExecucao: so, salvarPatrocinio: so, entrarTurma: so, limparPatrocinio: so, async updateLeitura() {}
+    saveResult: so, pedirExecucao: so, salvarPatrocinio: so, entrarTurma: so, limparPatrocinio: so, apagarPatrocinioFac: so, async updateLeitura() {}
   };
   return new Proxy(proprio, { get: (o, k) => (k in o ? o[k] : (typeof real[k] === 'function' ? real[k].bind(real) : real[k])) });
 }
@@ -1822,6 +1823,7 @@ async function buildQuestPatroPDF(modo) {
     PATRO_CTX.forEach(q => {
       c.pergunta(n++, q.t, null); c.opcoes(q.ops.map(o => o[1]), false);
       if (q.id === 'C2') { c.pergunta(n++, 'O que a sua empresa vende, em poucas palavras? (obrigatório quando o tipo é "Outro")', null); c.linhasResposta(1); }
+      if (q.id === 'C6') PATRO_APLIC.forEach(a => { c.pergunta(n++, a.t + ' (opcional)', null); c.opcoes(a.ops.map(o => o[1]), false); });
     });
     c.secao('Parte 2', 'O que você vê no time', contato ? 'Pense nas últimas semanas do negócio. Em quantos de cada 10 atendimentos ou visitas você vê isso acontecer?' : 'Pense nas últimas semanas de venda do time. Em quantas de cada 10 vendas você vê isso acontecer?');
     PATRO_ITENS[modo].forEach(([, d, inv, t2]) => { c.pergunta(n++, t2, `${d} · ${DIM[d].nome}${inv ? ' · afirmação invertida' : ''}`); c.escala(true); });
@@ -1911,6 +1913,161 @@ function perfisPatro(resp, rel) {
   }
   return { tot, es, linhas, frases };
 }
+// Leitura do patrocinador · versão 2 das regras (aprovada pelo autor em 20/10/2026). A versão 1 segue no código para os questionários antigos.
+const REGRAS_ATUAL = 2;
+const PATRO_APLIC = [
+  { id: 'A1', t: 'As vendas passam por orçamento, cotação ou proposta?', ops: [['sim', 'Sim, na maior parte das vendas'], ['parte', 'Em parte das vendas'], ['nao', 'Não, a compra acontece na hora']] },
+  { id: 'A2', t: 'O cliente compra de novo ou renova com vocês?', ops: [['freq', 'Sim, com frequência'], ['vezes', 'De tempos em tempos'], ['unica', 'Raramente, a compra costuma ser única']] },
+  { id: 'A3', t: 'O time registra as vendas em andamento numa lista, funil ou carteira?', ops: [['sim', 'Sim'], ['parte', 'Em parte'], ['nao', 'Não']] }
+];
+const LEITURA_V2 = (() => {
+  const longo = r => ['mes', 'mais'].includes(r.C4); const n2 = r => ['2', '3'].includes(String(r.C6)); const n3 = r => String(r.C6) === '3';
+  const prop = r => ['sim', 'parte'].includes(r.A1); const rec = r => ['freq', 'vezes'].includes(r.A2); const reg = r => ['sim', 'parte'].includes(r.A3);
+  return {
+    ciclo: { 'dia': "A decisão informada acontece no mesmo dia do primeiro contato.", 'semana': "A decisão informada acontece em até uma semana.", 'mes': "A decisão informada leva de uma a quatro semanas.", 'mais': "A decisão informada leva mais de um mês." },
+    decide: { '1': "Uma pessoa decide pelo cliente. Vale confirmar se ela também usa, paga e aprova a compra, quando essas funções pesam.", '2': "Duas pessoas participam da decisão. Identificar o papel e os critérios de cada uma ajuda a conduzir a venda.", '3': "Três ou mais pessoas participam da decisão. Mapear quem patrocina, quem usa, quem compra e quem aprova mostra a ordem em que cada um entra." },
+    origem: { 'indicacao': "A indicação é a principal origem declarada de clientes novos. Acompanhe quanto ela representa, quanto converte e a experiência de quem indica.", 'redes': "Redes sociais e conteúdo são a principal origem declarada. Vale verificar a expectativa que esse contato cria e a conversão em cada canal.", 'anuncios': "Anúncios são a principal origem declarada. Qualidade dos contatos, custo de aquisição e conversão são as medidas centrais desse canal.", 'ponto': "O movimento do ponto físico é a principal origem declarada. Experiência no local, disponibilidade e atendimento tendem a pesar na conversão.", 'prospeccao': "A prospecção ativa do time é a principal origem declarada. Abordagem, aderência ao perfil de cliente e conversão das oportunidades são os pontos a verificar." },
+    compra: { 'conversa': "A maior parte das compras acontece com participação do time. A condução comercial pesa nos momentos em que o profissional influencia a decisão.", 'contato': "A maior parte das compras acontece sem conversa com o time. A clareza da oferta e a jornada que o cliente percorre sozinho pesam na conversão junto com o atendimento.", 'ambos': "Compras com atendimento e compras autônomas têm peso parecido. Cada percurso pede métricas e práticas próprias." },
+    fixa: "O workshop trabalha a condução da venda pelo time. Questões de preço, abastecimento, crédito, regulação e capacidade de entrega pedem ações próprias do negócio, além do workshop.",
+    frases: {
+      2: [[r => prop(r) && longo(r), "Com proposta formal e decisão acima de uma semana, acompanhar as devolutivas e as etapas de aprovação mostra onde a negociação para."], [r => prop(r) && n2(r), "Com mais de uma pessoa na decisão, vale confirmar se a proposta responde aos critérios de cada uma."]],
+      3: [[r => n3(r), "Com três ou mais pessoas na decisão, aprovações e alinhamento entre elas são hipóteses a investigar."]],
+      4: [[r => r.C3 === 'contato', "Na compra autônoma, a proposta de valor e os critérios de comparação precisam ficar claros sem conversa com o time."], [r => ['anuncios', 'redes'].includes(r.C7), "Em canais digitais, vale testar se a apresentação da oferta já mostra as diferenças relevantes antes do contato com o time."]],
+      6: [[r => r.C7 === 'indicacao', "Com a indicação já como principal origem, a prioridade pode ser medir a qualidade e a constância das indicações."], [r => r.C7 === 'anuncios', "Com a aquisição apoiada em anúncios, vale avaliar se a indicação pode complementar o canal, comparando custo e qualidade dos dois."]],
+      7: [[r => n3(r), "Com três ou mais pessoas na decisão, verificar papéis, critérios e a sequência de aprovação ajuda a definir o obstáculo."], [r => r.C6 === '2', "Com duas pessoas na decisão, vale confirmar quem aprova e que informação cada uma precisa."]],
+      8: [[r => rec(r) && r.C7 === 'anuncios', "Com clientes vindos de anúncio e recompra esperada, vale relacionar a retenção ao custo de aquisição medido."], [r => rec(r), "Com nova compra ou renovação prevista no modelo, vale comparar o retorno real com o ciclo esperado da categoria."]],
+      10: [[r => reg(r) && n3(r), "Com várias pessoas na decisão, registrar a situação das aprovações qualifica a previsão até a confirmação do negócio."], [r => reg(r) && longo(r), "Com ciclo de semanas, etapas, probabilidades e datas do funil precisam refletir as evidências de cada negociação."]]
+    },
+    fora: {
+      2: [r => r.A1 === 'nao', "Você indicou que a compra acontece na hora, sem orçamento ou proposta. Vale confirmar em que momento esta dor aparece na operação, para medir com o indicador certo."],
+      7: [r => r.C6 === '1', "Você indicou que uma pessoa decide pelo cliente. Vale confirmar em que situações outra pessoa entra na decisão."],
+      8: [r => r.A2 === 'unica', "Você indicou que a compra costuma ser única. Nesse modelo, indicação e relacionamento são as medidas mais adequadas da relação com o cliente."],
+      10: [r => r.A3 === 'nao', "Você indicou que o time ainda não registra as vendas em andamento. A previsão ganha base quando a demanda, as encomendas ou as negociações passam a ser registradas."]
+    },
+    wsContato: {
+      1: "O time pratica sustentar o preço no balcão e no caixa, com respostas preparadas para \"achei caro\" e \"faz desconto?\", e revisa o que fica à vista: o que está incluído, a comparação honesta e as vantagens ligadas à recompra.",
+      2: "O time pratica responder pedidos de orçamento e de encomenda com uma sugestão clara, duas ou três opções e uma data para retomar, e revisa como esses pedidos chegam pelos canais digitais.",
+      3: "O time revisa os pontos de contato para deixar uma sugestão clara à vista, reduzir o excesso de opções em destaque e oferecer formas de experimentar com menos risco, como provar, tamanho menor ou troca.",
+      4: "O time escreve, para os produtos principais, o que o cliente ainda não sabe sobre origem, preparo, uso ou cuidado, e coloca essas informações nos pontos de contato onde a comparação acontece.",
+      5: "O time define complementos que melhoram o uso ou a experiência e os coloca à vista na jornada, de acordo com o que o cliente procura.",
+      6: "O time pratica pedir avaliação e indicação no fim da experiência, por QR code, mensagem ou pessoalmente, e revisa a apresentação do negócio no perfil e nas redes.",
+      7: "O time prepara um material fácil de compartilhar, como cardápio digital, fotos ou link, para pedidos de grupo, família ou empresa, e combina o próximo passo com quem organiza.",
+      8: "O time cria um próximo passo para o cliente voltar, como fidelidade, novidades ou encomenda, e cuida do final da experiência, no caixa, na embalagem e na despedida.",
+      9: "O time inteiro aprende o mesmo jeito de atender e de cuidar dos pontos de contato, e cada pessoa sai com um plano de três semanas a partir do próprio diagnóstico.",
+      10: "O time pratica registrar encomendas, pedidos de grupo e orçamentos com data e próximo passo, o que dá base para prever a demanda."
+    },
+    seg: {
+      terapia: {
+        1: { jogo: "Em saúde, preço, acesso e critério clínico pedem leituras separadas. Descontos afetam a sustentabilidade do atendimento, e a resistência ao preço pode ter causas diferentes do valor percebido.", proc: "descontos concedidos e o critério de cada um; motivos registrados de não contratação.", res: "margem por modalidade de atendimento, quando disponível." },
+        2: { jogo: "Uma avaliação sem agendamento posterior pode refletir dúvida, preferência, outra indicação clínica ou a decisão de não começar agora. Entender o motivo vem antes de qualquer retomada.", proc: "retornos a planos apresentados e tempo até a resposta.", res: "planos que viram atendimento e motivos de não continuidade, em dados agregados e com consentimento quando aplicável." },
+        3: { jogo: "O tempo até o início pode depender de agenda, encaminhamento, cobertura, disponibilidade ou escolha do paciente. O papel comercial é reduzir barreiras de informação, com respeito ao tempo clínico de cada caso.", proc: "motivos de espera e cancelamentos por etapa.", res: "tempo entre contato, avaliação e início, quando indicado." },
+        4: { jogo: "A comparação entre serviços considera qualificação, indicação profissional, condições de atendimento e clareza das informações. Resultados individuais não podem ser garantidos, e a comunicação precisa refletir isso.", proc: "dúvidas recorrentes sobre o serviço e clareza das informações fornecidas.", res: "motivos registrados de perda." },
+        5: { jogo: "Ampliar sessões ou serviços faz sentido quando há indicação clínica e aceite do paciente. O objetivo é o acesso e a adesão ao cuidado apropriado.", proc: "comparecimento e descontinuidade justificada.", res: "adesão ao plano clinicamente indicado, sem metas de consumo de sessões." },
+        6: { jogo: "Indicações de pacientes e de outros profissionais geram novos contatos e dependem de confiança, confidencialidade e das regras éticas da profissão.", proc: "conformidade dos procedimentos de divulgação.", res: "origem informada dos novos contatos e proporção de indicações, quando mensurável." },
+        7: { jogo: "Familiares, responsáveis, operadoras ou profissionais de encaminhamento podem participar, conforme o caso e as regras de consentimento. A decisão sobre o cuidado pertence ao paciente ou ao responsável legal.", proc: "autorizações pendentes e participação de responsáveis, quando legalmente pertinente.", res: "barreiras administrativas identificadas e resolvidas." },
+        8: { jogo: "A falta de retorno pode significar alta, conclusão do cuidado ou decisão do paciente. A continuidade se avalia quando há indicação e expectativa de acompanhamento.", proc: "faltas, cancelamentos e seguimento, quando indicado.", res: "satisfação e experiência, com as altas registradas como conclusão do cuidado." },
+        9: { jogo: "A concentração de avaliações em alguns profissionais pode refletir especialização, agenda ou preferência dos pacientes. Padronizar acolhimento e informação preserva a autonomia técnica de cada profissional.", proc: "distribuição das agendas e causas da concentração.", res: "tempo de espera por profissional e indicadores de acesso." },
+        10: { jogo: "A previsão de ocupação distingue primeiras consultas, retornos, faltas e capacidade disponível, com os dados de saúde restritos ao necessário.", proc: "cancelamentos e capacidade disponível.", res: "ocupação agregada da agenda e variação entre o previsto e o realizado." }
+      },
+      beleza: {
+        1: { jogo: "Descontos influenciam a margem e a referência de preço, e também podem fazer parte de campanhas planejadas. Política comercial, custo do procedimento e percepção de valor entram juntos na análise.", proc: "descontos por motivo e concessões fora da política definida.", res: "margem por serviço." },
+        2: { jogo: "A falta de retorno depois do orçamento pode envolver custo, agenda, dúvidas sobre adequação ou sobre os riscos do procedimento. Entender o motivo e respeitar o tempo de decisão do cliente orienta a retomada.", proc: "resposta aos orçamentos e motivos de perda ou adiamento.", res: "conversão por serviço." },
+        3: { jogo: "Em procedimentos de maior envolvimento, o cliente pode precisar de informação sobre etapas, riscos, recuperação e alternativas. A clareza dessa informação ajuda a decidir com segurança.", proc: "dúvidas registradas e desistências justificadas.", res: "tempo entre avaliação e agendamento, por tipo de serviço." },
+        4: { jogo: "A disputa por preço pode vir de ofertas pouco diferenciadas ou de pouca transparência sobre técnica, condições e segurança. A comparação se apoia em promessas verificáveis.", proc: "razões declaradas de escolha ou perda.", res: "conversão por categoria e margem realizada." },
+        5: { jogo: "Serviços e produtos complementares agregam valor quando adequados ao objetivo e ao perfil de cada pessoa. Aumentar o ticket sem benefício perceptível pode desgastar a confiança e a retenção.", proc: "aceitação dos complementos indicados.", res: "margem incremental, reclamações e trocas." },
+        6: { jogo: "Indicações refletem satisfação, experiência e qualidade percebida, e cada uma tem uma origem própria a ser medida.", proc: "avaliações espontâneas recebidas.", res: "clientes novos por indicação e retenção por origem." },
+        7: { jogo: "A participação de outra pessoa em procedimentos ou pacotes acontece em parte dos casos e vale ser confirmada com o próprio cliente.", proc: "orçamentos que dependem da aprovação de outra pessoa.", res: "tempo de aprovação, quando aplicável." },
+        8: { jogo: "A frequência de retorno muda com o serviço, a preferência e a necessidade real. O retorno se compara ao intervalo esperado de cada modalidade, e procedimentos pontuais seguem a lógica deles.", proc: "cancelamentos e satisfação pós-serviço.", res: "retorno dentro do intervalo esperado por categoria." },
+        9: { jogo: "Resultados concentrados em alguns profissionais podem refletir especialidade, carteira, horários ou habilidade. Separar essas causas orienta o que vale replicar.", proc: "ocupação e concentração por profissional.", res: "receita e margem ajustadas por agenda e tipo de serviço." },
+        10: { jogo: "O planejamento exige prever agenda, duração dos procedimentos, insumos e faltas, além do volume de avaliações.", proc: "cancelamentos e uso de insumos.", res: "diferença entre a ocupação prevista e a realizada." }
+      },
+      varejo: {
+        1: { jogo: "Descontos podem preservar o giro ou seguir uma campanha planejada; fora desses casos, pressionam a margem. Regras por categoria e a autonomia do vendedor entram na análise.", proc: "descontos fora da política e conversão com e sem desconto.", res: "margem de contribuição por categoria." },
+        2: { jogo: "Esta dor aparece nas vendas com orçamento, encomenda ou carrinho que pode ser retomado. Nessas vendas, o tempo de resposta e o motivo do não fechamento mostram onde a venda para.", proc: "tempo de resposta e motivos de não fechamento.", res: "conversão de orçamentos e de carrinhos retomáveis." },
+        3: { jogo: "Na compra de bens duráveis, a demora pode vir de pesquisa, crédito, disponibilidade ou decisão pessoal. No consumo imediato, a medida adequada é o abandono do atendimento.", proc: "abandono de atendimento e motivo da saída sem compra, quando disponível.", res: "tempo de fechamento por categoria." },
+        4: { jogo: "Produtos equivalentes disputam preço de forma legítima. A diferença que pesa na escolha é real e verificável: disponibilidade, conveniência, serviço, garantia ou orientação pertinente.", proc: "perdas por preço, por categoria.", res: "margem e conversão por canal." },
+        5: { jogo: "Itens adicionais fazem sentido quando melhoram o uso ou atendem à necessidade do cliente. O aumento de itens por venda se lê junto com a margem e as devoluções.", proc: "aceitação dos complementos.", res: "itens por venda, margem da cesta e devoluções." },
+        6: { jogo: "O peso da indicação varia com a localização, a marca e o modelo físico ou digital da loja. A origem de cada cliente novo mostra a contribuição real desse canal.", proc: "avaliações de experiência.", res: "clientes novos e conversão por origem." },
+        7: { jogo: "Compras de maior envolvimento podem incluir outras pessoas, e grande parte das compras do varejo é individual. Vale confirmar em quais vendas a decisão é compartilhada.", proc: "vendas que dependem da aprovação de outra pessoa.", res: "retorno depois da participação dessa pessoa." },
+        8: { jogo: "A recompra segue o ciclo natural de cada categoria, com prazos diferentes para roupas, móveis e eletrodomésticos. Nas compras raras, relacionamento e indicação medem melhor a relação com o cliente.", proc: "relacionamento e indicações nas categorias de compra rara.", res: "recompra por coorte e categoria no prazo esperado e valor do cliente, quando estimável." },
+        9: { jogo: "A concentração de vendas em alguns vendedores pode vir de turno, fluxo, sortimento e carteira. A comparação justa considera a exposição de cada um às oportunidades.", proc: "horas, tráfego e mix atendidos por vendedor.", res: "conversão e margem por vendedor." },
+        10: { jogo: "No varejo, a previsão depende de demanda, estoque, sazonalidade e encomendas.", proc: "pedidos em aberto e ruptura de estoque.", res: "erro de previsão de demanda e de vendas." }
+      },
+      alimentacao: {
+        1: { jogo: "A política de descontos considera custo dos ingredientes, desperdício, canal e margem por pedido. Em eventos, a análise parte da proposta; no consumo imediato, de combos e promoções planejadas.", proc: "descontos fora do previsto e desperdício.", res: "margem por pedido e por canal." },
+        2: { jogo: "Esta dor aparece em eventos, catering e encomendas com orçamento. Nesses pedidos, o prazo de resposta e o motivo da perda mostram onde a venda para.", proc: "prazo de resposta e motivos de perda.", res: "conversão de orçamentos de eventos e encomendas." },
+        3: { jogo: "Em eventos e encomendas, a decisão pode depender de data, convidados, orçamento e disponibilidade. No consumo imediato, a medida adequada é o tempo de escolha ou o abandono do pedido.", proc: "abandono de pedidos nos canais pertinentes.", res: "tempo até a confirmação de eventos e encomendas." },
+        4: { jogo: "Conveniência, qualidade, porção, serviço e experiência pesam na escolha junto com o preço do prato. Deixar essas diferenças visíveis ajuda o cliente a comparar.", proc: "avaliações que citam preço e qualidade.", res: "margem por linha e conversão por canal." },
+        5: { jogo: "Sugestões de acompanhamento melhoram a conveniência e a experiência quando respeitam preferências, restrições alimentares e orçamento do cliente.", proc: "satisfação e reclamações.", res: "itens por pedido e margem por cesta." },
+        6: { jogo: "Indicação e avaliações públicas contribuem com pesos diferentes no salão, no delivery e nos eventos.", proc: "avaliações qualificadas recebidas.", res: "origem dos pedidos, quando mensurável, e retorno por canal." },
+        7: { jogo: "A decisão compartilhada aparece sobretudo em eventos e pedidos coletivos.", proc: "propostas de grupo com aprovação pendente e os motivos.", res: "tempo de confirmação dos pedidos de grupo." },
+        8: { jogo: "A frequência esperada muda entre restaurante, delivery, buffet de eventos e catering. O cliente eventual se avalia pela referência de recorrência do próprio canal.", proc: "intervalo entre pedidos e satisfação.", res: "retorno por coorte e por canal." },
+        9: { jogo: "A dependência de poucas pessoas aparece em eventos e pedidos especiais; na operação de salão, escala e capacidade tendem a pesar mais.", proc: "concentração das negociações especiais e desempenho por turno.", res: "pedidos perdidos por indisponibilidade." },
+        10: { jogo: "A previsão combina reservas, eventos confirmados, pedidos, sazonalidade, perecibilidade e capacidade de atendimento.", proc: "ocupação e capacidade planejadas.", res: "erro na previsão de demanda e perdas por desperdício." }
+      },
+      servicos: {
+        1: { jogo: "Descontos reduzem a rentabilidade e também podem refletir escopo menor ou condições contratuais legítimas. Separar redução de preço de redução de escopo orienta a análise.", proc: "descontos fora da política.", res: "margem por contrato e horas realizadas frente às previstas." },
+        2: { jogo: "Uma proposta sem resposta pode indicar prioridade, falta de orçamento, escopo pouco claro ou processo de contratação pendente. Conhecer o motivo orienta o acompanhamento.", proc: "idade das propostas por etapa, respostas e motivos de perda.", res: "conversão de propostas." },
+        3: { jogo: "Os prazos de decisão variam com o serviço, a urgência, o risco, a alçada e o calendário de contratação. Cada oportunidade se compara ao ciclo esperado da modalidade.", proc: "tempo parado por etapa.", res: "mediana do ciclo por tipo de serviço." },
+        4: { jogo: "O preço se compara com escopo, experiência, entregáveis, responsabilidade e risco. Diferenças de honorários pedem a leitura desses fatores antes de qualquer conclusão sobre valor percebido.", proc: "razões documentadas de seleção.", res: "taxa de sucesso por tipo de proposta e margem." },
+        5: { jogo: "Etapas adicionais agregam valor quando são necessárias ao problema e aceitas pelo cliente, com clareza contratual.", proc: "adoção dos serviços pertinentes e satisfação.", res: "rentabilidade dos escopos complementares." },
+        6: { jogo: "Indicações variam com a profissão, a reputação e as regras de publicidade aplicáveis. A origem de cada contrato mostra o peso real desse canal.", proc: "qualidade das oportunidades por origem.", res: "origem dos contratos e conversão por origem." },
+        7: { jogo: "Sócios, compras, jurídico ou responsáveis podem participar da aprovação. Identificar o papel de cada um mostra quem pode vetar e por qual critério.", proc: "propostas pendentes por alçada.", res: "tempo de aprovação por etapa." },
+        8: { jogo: "A recontratação é esperada quando existe necessidade recorrente ou continuidade legítima. Um serviço pontual bem concluído encerra o ciclo daquela necessidade.", proc: "satisfação pós-entrega e recontratações pertinentes.", res: "renovação dos contratos recorrentes." },
+        9: { jogo: "A concentração em profissionais seniores pode vir de credenciais, relacionamento ou autonomia de decisão. O desenvolvimento comercial do time respeita requisitos técnicos e alçadas.", proc: "propostas por origem e por profissional.", res: "conversão ajustada e capacidade de atendimento." },
+        10: { jogo: "A previsão depende do estágio real de cada proposta, da capacidade de entrega, das aprovações e da data provável de assinatura.", proc: "probabilidade histórica por etapa e projetos com capacidade confirmada.", res: "acurácia da previsão por período." }
+      },
+      educacao: {
+        1: { jogo: "Bolsas, descontos e campanhas podem cumprir objetivos de acesso e de ocupação das turmas. A análise considera a sustentabilidade financeira de cada concessão.", proc: "concessões dentro e fora da política.", res: "receita líquida por matrícula e ocupação das turmas." },
+        2: { jogo: "O interesse sem matrícula pode envolver disponibilidade, critérios de elegibilidade, financiamento ou adequação pedagógica. Entender o motivo orienta o que fazer em cada caso.", proc: "tempo até a decisão e motivos de não matrícula.", res: "conversão dos interessados elegíveis." },
+        3: { jogo: "Decisões educacionais podem depender de calendário, processo seletivo, empresa pagadora e carga horária. Cada oferta tem o seu ciclo esperado.", proc: "desistências e motivos.", res: "tempo de conversão por curso e por período de matrícula." },
+        4: { jogo: "Preço e mensalidade se avaliam junto com a proposta pedagógica, a duração, o suporte e as condições de acesso. Resultados profissionais não podem ser garantidos, e a comunicação reflete isso.", proc: "perdas documentadas por critério e satisfação com a clareza da oferta.", res: "conversão por curso." },
+        5: { jogo: "Módulos adicionais fazem sentido quando alinhados ao percurso e ao objetivo do aluno. Matrícula sem aderência eleva o risco de evasão.", proc: "progressão pedagógica indicada e satisfação.", res: "conclusão e abandono depois da matrícula." },
+        6: { jogo: "Indicações podem vir de alunos, responsáveis ou empresas, com peso diferente em cada formato de curso.", proc: "satisfação dos alunos.", res: "inscrições, matrículas e conversão por origem." },
+        7: { jogo: "A aprovação de pais, responsáveis ou da empresa patrocinadora se aplica a determinados públicos e contratos.", proc: "matrículas pendentes de responsável ou de patrocinador.", res: "tempo de aprovação." },
+        8: { jogo: "Evasão durante o curso, não rematrícula e conclusão são fenômenos diferentes. O aluno que concluiu um curso único cumpriu o percurso dele.", proc: "evasão e progressão acadêmica.", res: "conclusão e rematrícula, quando cabível." },
+        9: { jogo: "Conversões concentradas em alguns coordenadores podem refletir demanda por área, turma ou especialidade. A comparação considera a origem e o perfil dos interessados.", proc: "ocupação por turma.", res: "conversão ajustada por curso, canal e pessoa da equipe." },
+        10: { jogo: "A previsão de matrículas considera calendário, vagas, bolsas, cancelamentos e as condições de formação de turmas.", proc: "cancelamentos antes do início e ocupação.", res: "erro de previsão de matrículas por turma." }
+      },
+      imobiliario: {
+        1: { jogo: "O preço negociado do imóvel e a comissão do intermediador são componentes diferentes, definidos por partes e condições próprias. Cada um se acompanha em separado.", proc: "comissão negociada, quando aplicável.", res: "desconto do imóvel em relação ao preço pedido e margem por transação." },
+        2: { jogo: "Propostas sem retorno podem vir de financiamento, documentação, avaliação, preferência ou negociação entre as partes. Identificar a etapa e o responsável orienta o próximo passo.", proc: "motivos de interrupção e tempo em financiamento e documentação.", res: "retorno às propostas." },
+        3: { jogo: "O ciclo varia entre locação, venda, lançamento e tipo de imóvel. A duração se compara ao ciclo próprio da carteira e às condições de crédito.", proc: "etapa de maior demora e desistências.", res: "tempo até a proposta e até o fechamento, por operação." },
+        4: { jogo: "Preço, localização, liquidez, estado do imóvel e condições de financiamento entram na comparação. O papel do profissional é apoiar uma decisão informada, sem promessa de valorização.", proc: "satisfação com a orientação recebida.", res: "negócios perdidos por motivo e relação entre o preço ofertado e o fechado." },
+        5: { jogo: "Serviços associados agregam quando desejados e adequados ao cliente; financiamento, seguros e outros produtos têm regras e escolhas próprias.", proc: "adesão voluntária aos serviços pertinentes.", res: "reclamações e satisfação no pós-negócio." },
+        6: { jogo: "Indicações e novas captações nascem da confiança construída e, em transações de baixa frequência, aparecem ao longo do tempo.", proc: "qualidade das oportunidades por origem.", res: "novas oportunidades e captações por indicação." },
+        7: { jogo: "Compra, locação e venda podem envolver coparticipantes, proprietários, financiadores ou representantes. Vale mapear quem efetivamente aprova cada etapa.", proc: "etapas com aprovação pendente.", res: "tempo gasto com documentação e com os participantes." },
+        8: { jogo: "Uma transação imobiliária tem ciclo de recompra muito longo. Relacionamento, indicações e novas necessidades se avaliam num horizonte compatível com esse ciclo.", proc: "relacionamento pós-entrega.", res: "indicações e novas transações no horizonte pertinente." },
+        9: { jogo: "A concentração de negócios pode refletir carteira de imóveis, região, contatos recebidos e especialidade. A comparação considera a qualidade e o volume das oportunidades de cada corretor.", proc: "carteira ajustada por região e perfil.", res: "conversão por corretor e por origem e comissão realizada." },
+        10: { jogo: "A previsão de fechamentos e comissões considera proposta, aceite, crédito, documentação e o evento contratual definido.", proc: "avanço por etapa.", res: "acurácia da data prevista de fechamento e comissões realizadas." }
+      },
+      consultoria: {
+        1: { jogo: "Descontos em projetos reduzem a margem, e renegociar escopo, fases ou forma de contratação produz efeitos próprios. A análise considera a rentabilidade e as condições do projeto junto com o preço nominal.", proc: "descontos com e sem ajuste de escopo.", res: "margem prevista e realizada e horas consumidas." },
+        2: { jogo: "O silêncio depois da proposta pode refletir patrocínio insuficiente, orçamento, prioridades concorrentes, processo de compras ou escopo. São hipóteses a validar com o cliente.", proc: "tempo em aprovação e motivo documentado de não contratação.", res: "taxa de avanço das propostas." },
+        3: { jogo: "O ciclo pode envolver diagnóstico, patrocínio, business case e aquisição, conforme o projeto. Conhecer o processo real de cada cliente mostra onde o tempo se acumula.", proc: "tempo por etapa e perdas por falta de prioridade.", res: "ciclo por porte e modelo de projeto." },
+        4: { jogo: "O valor da consultoria se relaciona ao problema, ao escopo, aos riscos, às evidências de capacidade e aos resultados esperados. Promessas de retorno precisam de premissas explícitas.", proc: "qualidade do business case, quando existente.", res: "perdas por critério e margem." },
+        5: { jogo: "Implantação e acompanhamento adicionais se recomendam quando relevantes ao resultado e contratualmente claros. O sucesso se mede pelo resultado acordado.", proc: "adoção das etapas necessárias.", res: "resultados acordados e satisfação do patrocinador depois da entrega." },
+        6: { jogo: "Indicações de clientes e parceiros facilitam o acesso a oportunidades, com eficácia que varia com o posicionamento, a reputação e a maturidade do relacionamento.", proc: "taxa de avanço por canal.", res: "oportunidades e valor dos contratos vindos de indicação." },
+        7: { jogo: "Patrocinador executivo, compras, financeiro e áreas usuárias podem ter critérios distintos. Identificar o poder de decisão e o risco de implementação de cada um amplia a leitura para além do preço.", proc: "presença de patrocinador identificado nos projetos em aprovação.", res: "tempo de decisão por etapa." },
+        8: { jogo: "Um projeto concluído gera nova contratação quando há demanda real do cliente.", proc: "novas necessidades identificadas e satisfação final.", res: "repetição pertinente de contratos." },
+        9: { jogo: "A dependência de sócios ou especialistas pode estar ligada a credibilidade, geração de demanda e aprovação técnica. O desenvolvimento comercial do time preserva o rigor do diagnóstico técnico.", proc: "participação dos principais profissionais nas oportunidades.", res: "conversão por oportunidade, receita e capacidade disponível." },
+        10: { jogo: "A previsão reflete marcos de aprovação, início contratual e disponibilidade para execução, além do valor potencial do pipeline.", proc: "disponibilidade de equipe para os projetos previstos.", res: "acurácia da previsão trimestral e contratos assinados frente aos previstos." }
+      },
+      seguros: {
+        1: { jogo: "Em seguros, prêmio, cobertura, franquia e remuneração da intermediação são conceitos distintos; em outros serviços financeiros, tarifas, taxas e remuneração seguem lógicas próprias. O efeito de um desconto na comissão depende de cada produto.", proc: "concessões autorizadas por produto.", res: "rentabilidade, quando disponível, e adequação da oferta ao cliente." },
+        2: { jogo: "Cotações de seguro e propostas de produtos financeiros têm processos de análise diferentes. A falta de resposta pode vir de elegibilidade, aprovação, preferência ou momento do cliente.", proc: "tempo por etapa e cotações pendentes de análise.", res: "conversão por produto e motivos de não contratação." },
+        3: { jogo: "Decisões sobre proteção, crédito ou investimento envolvem riscos, condições e necessidades muito distintos. O prazo, isoladamente, ainda não indica objeção comercial.", proc: "situação das aprovações e motivos documentados de adiamento.", res: "tempo de decisão por produto." },
+        4: { jogo: "A comparação considera as condições completas: em seguros, coberturas, exclusões e franquias; em crédito e investimento, custos, riscos, adequação e regras aplicáveis.", proc: "entendimento do produto pelo cliente.", res: "perdas por motivo, com indicadores próprios de cada categoria." },
+        5: { jogo: "Produtos adicionais entram na conversa quando adequados às necessidades, ao perfil e às autorizações aplicáveis.", proc: "aceitação informada das ofertas complementares.", res: "reclamações e cancelamentos." },
+        6: { jogo: "Indicações contribuem para a confiança, com peso que varia por produto, regulação e relacionamento, sempre dentro das regras de confidencialidade e de comercialização.", proc: "conformidade das ações de indicação com os dados e as políticas aplicáveis.", res: "clientes por origem e conversão por categoria." },
+        7: { jogo: "Em produtos empresariais ou familiares pode haver responsáveis diferentes, e operações financeiras passam também por verificações regulatórias. A aprovação do cliente e a aprovação institucional se acompanham em separado.", proc: "negócios pendentes por decisor, instituição ou conformidade.", res: "tempos e motivos de cada pendência." },
+        8: { jogo: "A renovação é central nos seguros renováveis e segue outra lógica em investimentos e empréstimos. A retenção se define pela vigência e pela natureza de cada produto.", proc: "contato ao longo da vigência e revisões feitas.", res: "renovação das apólices elegíveis e permanência nos produtos financeiros, conforme a modalidade." },
+        9: { jogo: "A concentração da produção pode vir de carteiras, ramos de seguro, especialização e qualificação dos clientes, sempre dentro dos requisitos de habilitação e aconselhamento.", proc: "conversão por etapa.", res: "produção ajustada por carteira e mix de produtos e concentração de resultados." },
+        10: { jogo: "A previsão depende da situação da cotação, da aceitação pela instituição, dos documentos, da vigência e da conclusão contratual, com critérios que variam por produto.", proc: "taxa de aprovação por categoria.", res: "acurácia da previsão e diferença entre a data esperada e a realizada." }
+      }
+    }
+  };
+})();
 // A pergunta do cliente em cada dimensão (a mesma da página inicial).
 const DIM_PERGUNTA = { D1: 'Essa pessoa quer o meu bem?', D2: 'Por que eu confiaria antes mesmo de conversar?', D3: 'Ele entende a minha situação?', D4: 'O que eu ainda não sabia sobre isso?', D7: 'Como eu decido com quem decide comigo?', D5: 'Quanto me custa deixar como está?', D6: 'Qual é o próximo passo seguro?', D8: 'Posso decidir sem me sentir pressionado?' };
 // Argumentos do programa no relatório do patrocinador (os mesmos da apresentação comercial).
@@ -1954,7 +2111,7 @@ function DemoStore(memoria) {
   const KEY = 'oqgci-demo-v1';
   let db = memoria ? null : LS.get(KEY);
   if (db && db.v === 1) { db.results = [...db.results.filter(x => !x.exemplo), ...seedExamples()]; db.v = 2; }
-  if (!db || ![2, 3, 4, 5, 6, 7].includes(db.v)) {
+  if (!db || ![2, 3, 4, 5, 6, 7, 8].includes(db.v)) {
     db = { v: 2, users: [], session: null, results: seedExamples(), turmas: [{ id: 'turma-exemplo', nome: 'Exemplo · Workshop de vendas', codigo: 'OQG-DEMO', created_at: new Date().toISOString(), exemplo: true }] };
   }
   if (db.v === 2 || db.v === 3) {
@@ -1988,6 +2145,12 @@ function DemoStore(memoria) {
     const pe = db.patrocinios['turma-evolucao'];
     if (pe) Object.assign(pe.respostas, { T0: '12', PF_conselheiro: '3', PF_especialista: '3', PF_prestativo: '2', PF_reativo: '2', PF_insistente: '1', PF_desenvolvimento: '1' });
     db.v = 7;
+  }
+  if (db.v === 7) {
+    // Versão 2 da leitura: perguntas de operação e versão das regras no patrocinador de exemplo.
+    const pe = db.patrocinios['turma-evolucao'];
+    if (pe) Object.assign(pe.respostas, { A1: 'sim', A2: 'vezes', A3: 'parte', regras: 2, regras_em: pe.updated_at || new Date().toISOString() });
+    db.v = 8;
   }
   db.patrocinios = db.patrocinios || {}; db.relPatro = db.relPatro || []; db.patroPre = db.patroPre || {};
   db.evolucoes = db.evolucoes || [];
@@ -2154,6 +2317,11 @@ function DemoStore(memoria) {
         db.relPatro.filter(r => r.turma_id === 'turma-evolucao').forEach(r => { const i = ord.indexOf(r.etapa); r.dados = { ...r.dados, etapas: Object.fromEntries(ord.slice(0, i + 1).map(e => [e, E[e]])) }; r.status = 'liberado'; r.liberado_em = r.liberado_em || agora; if (r.etapa === 'reavaliacao') r.comentario = PATRO_EXEMPLO_REL.comentario; });
       }
       db.session = id; return pub(userOf(id));
+    },
+    async apagarPatrocinioFac(row) {
+      if (userOf(db.session)?.role !== 'facilitador') throw new Error('Só o facilitador pode apagar as respostas.');
+      if (row.turma_id) { if (db.patrocinios[row.turma_id]?.user_id === row.user_id) delete db.patrocinios[row.turma_id]; } else delete db.patroPre[row.user_id];
+      save();
     },
     async limparPatrocinioDemo(turmaId) { if (turmaId) { if (db.patrocinios[turmaId]?.user_id === db.session) delete db.patrocinios[turmaId]; } else delete db.patroPre[db.session]; save(); },
     async listEvolucoesIndividuais() { return db.evolucoes.filter(e => tipoEvo(e) === 'individual').map(juntar).filter(e => e.inicial && e.reavaliacao); },
@@ -2363,6 +2531,11 @@ function LiveStore() {
       const [t, r] = await Promise.all([sb.from('turmas').select('id, nome, data_workshop, reavaliar_em, patrocinada').eq('patrocinador_id', userId), sb.from('patrocinio_respostas').select('turma_id, updated_at').eq('user_id', userId)]);
       if (t.error) return [];
       return (t.data || []).filter(x => x.patrocinada).map(x => ({ id: x.id, nome: x.nome, data_workshop: x.data_workshop, reavaliar_em: x.reavaliar_em, respondido_em: (r.data || []).find(y => y.turma_id === x.id)?.updated_at || null }));
+    },
+    async apagarPatrocinioFac(row) {
+      const { data, error } = await sb.from('patrocinio_respostas').delete().eq('id', row.id).select('id');
+      if (error) throw errPt(error);
+      if (!data || !data.length) throw new Error('Não foi possível apagar as respostas. Confira se você entrou como facilitador.');
     },
     async getPatrocinioPessoa(userId) {
       const { data, error } = await sb.from('patrocinio_respostas').select('*').eq('user_id', userId).is('turma_id', null).maybeSingle();
@@ -4203,7 +4376,7 @@ function viewPatroForm() {
   return `<form id="f-patro" class="stack-lg" novalidate>
     <div class="card stack"><span class="eyebrow">Parte 1 · Contexto do time</span>
       <div class="field" style="max-width:280px"><label for="pt-C1">Quantas pessoas do time vão participar do workshop?</label><input id="pt-C1" name="C1" type="number" min="1" max="500" value="${esc(f.C1 || '')}"></div>
-      ${PATRO_CTX.map(q => `<fieldset class="patro-q"><legend>${esc(q.t)}</legend>${radio(q.id, q.ops)}</fieldset>` + (q.id === 'C2' ? `<div class="field"><label for="pt-C8">O que a sua empresa vende, em poucas palavras${f.C2 === 'outro' ? '' : ' <span class="muted">(opcional)</span>'}</label><input id="pt-C8" name="C8" type="text" maxlength="80" autocomplete="off" placeholder="Ex.: seguros empresariais e de vida" value="${esc(f.C8 || '')}"></div>` : '')).join('')}
+      ${PATRO_CTX.map(q => `<fieldset class="patro-q"><legend>${esc(q.t)}</legend>${radio(q.id, q.ops)}</fieldset>` + (q.id === 'C2' ? `<div class="field"><label for="pt-C8">O que a sua empresa vende, em poucas palavras${f.C2 === 'outro' ? '' : ' <span class="muted">(opcional)</span>'}</label><input id="pt-C8" name="C8" type="text" maxlength="80" autocomplete="off" placeholder="Ex.: seguros empresariais e de vida" value="${esc(f.C8 || '')}"></div>` : '') + (q.id === 'C6' ? PATRO_APLIC.map(a => `<fieldset class="patro-q"><legend>${esc(V(a.t, vocF))} <span class="muted" style="font-weight:400">(opcional)</span></legend>${radio(a.id, a.ops.map(([k, t2]) => [k, V(t2, vocF)]))}</fieldset>`).join('') : '')).join('')}
     </div>
     <div class="card stack"><span class="eyebrow">Parte 2 · O que você vê no time</span>
       <p class="small muted">${modo === 'contato' ? 'Pense nas últimas semanas do negócio. Em quantos de cada 10 atendimentos ou visitas você vê isso acontecer?' : 'Pense nas últimas semanas de venda do time. Em quantas de cada 10 vendas você vê isso acontecer?'}</p>
@@ -4304,7 +4477,20 @@ function conteudoPatro(P) {
     lacunas.length ? `Na sua visão do time, as maiores lacunas estão em ${lista(lacunas.map(d => d.nome))}.` : '',
     numero ? `O número que você quer ver mudar: ${lc(numero)}.` : ''
   ].filter(Boolean).join(' ');
-  return { resp, voc, v, dores, doresDims, nomesDims, vis, lacunas, metr, numero, negocio, resumo, pre: !P.turma.id };
+  const versao = Number(resp.regras) >= 2 ? Number(resp.regras) : 1;
+  const L2 = versao >= 2 ? LEITURA_V2 : null;
+  const modoC = resp.C3 === 'contato' ? 'contato' : resp.C3 === 'ambos' ? 'ambos' : 'conversa';
+  const doresL = dores.map(x => {
+    if (!L2) return { ...x, jogoTxt: x.jogo, fora: null, ind: { sinal: x.sinal }, ws: [[null, x.workshop]] };
+    const sg = (L2.seg[resp.C2] || {})[x.id];
+    const fr = L2.fora[x.id]; const fora = fr && fr[0](resp) ? fr[1] : null;
+    const ctx = fora ? null : ((L2.frases[x.id] || []).find(([c]) => c(resp)) || [])[1] || null;
+    const ws = modoC === 'contato' ? [[null, L2.wsContato[x.id]]] : modoC === 'ambos' ? [['Na conversa', x.workshop], ['Na compra autônoma', L2.wsContato[x.id]]] : [[null, x.workshop]];
+    return { ...x, jogoTxt: [sg ? sg.jogo : x.jogo, ctx].filter(Boolean).join(' '), fora, ind: sg ? { proc: sg.proc, res: sg.res } : { sinal: x.sinal }, ws };
+  });
+  const comoDecide = L2 ? [L2.ciclo[resp.C4], L2.decide[String(resp.C6 || '')], L2.origem[resp.C7], L2.compra[resp.C3]].filter(Boolean).join(' ') : '';
+  const regrasTxt = `Leitura gerada com a versão ${versao} das regras${resp.regras_em ? ', em ' + fmtDate(resp.regras_em) : ''}.`;
+  return { resp, voc, v, dores: doresL, doresDims, nomesDims, vis, lacunas, metr, numero, negocio, resumo, comoDecide, versao, regrasTxt, fixa: L2 ? L2.fixa : '', pre: !P.turma.id };
 }
 
 function viewPatrocinio() {
@@ -4327,13 +4513,15 @@ function viewPatrocinio() {
   const time = relPrevia ? relPrevia.dados.etapas.previa.dims : null;
   const secTitulo = (eb, h, lead) => `<div class="stack" style="gap:6px"><span class="eyebrow">${eb}</span><h2 class="h-sec" style="margin:0">${h}</h2>${lead ? `<p class="muted small">${lead}</p>` : ''}</div>`;
 
-  const blocoResumo = `<div class="card stack evo-chamada patro-resumo" style="gap:10px"><span class="eyebrow">Em resumo</span><p>${esc(K.resumo)}</p>${K.negocio ? `<p class="small muted">Seu negócio: ${esc(K.negocio)}</p>` : ''}</div>`;
+  const blocoResumo = `<div class="card stack evo-chamada patro-resumo" style="gap:10px"><span class="eyebrow">Em resumo</span><p>${esc(K.resumo)}</p>${K.comoDecide ? `<div class="subbloco" style="justify-items:stretch"><span class="subbloco-t">Como o seu cliente decide</span><p class="small">${esc(v(K.comoDecide))}</p></div>` : ''}${K.negocio ? `<p class="small muted">Seu negócio: ${esc(K.negocio)}</p>` : ''}</div>`;
 
-  const blocoDores = `<div class="stack">${secTitulo('O que você apontou', 'As dores do negócio', 'Cada dor mostra o que está em jogo, o que o time pratica no workshop para mudar esse ponto e o que acompanhar depois.')}
+  const blocoDores = `<div class="stack">${secTitulo('O que você apontou', 'As dores do negócio', K.versao >= 2 ? 'Cada dor mostra o que está em jogo, o que o time pratica no workshop e indicadores sugeridos para acompanhar. Use os que o negócio já mede; os demais pedem instrumentação.' : 'Cada dor mostra o que está em jogo, o que o time pratica no workshop para mudar esse ponto e o que acompanhar depois.')}
+    ${K.fixa ? `<p class="small muted">${esc(K.fixa)}</p>` : ''}
     ${dores.map((x, i) => `<div class="card stack${i === 0 ? ' evo-chamada' : ''}" style="gap:10px">${i === 0 ? '<span class="eyebrow">A que mais custa hoje</span>' : ''}<strong style="font-size:17px">${esc(v(x.t))}</strong>
-      <p class="small"><span class="muted">O que está em jogo:</span> ${esc(v(x.jogo))}</p>
-      <p class="small"><span class="muted">O que o time pratica no workshop:</span> ${esc(v(x.workshop))}</p>
-      <p class="small"><span class="muted">O que acompanhar:</span> ${esc(v(x.sinal))}</p>
+      ${x.fora ? `<div class="patro-fora"><span class="subbloco-t">Ponto a confirmar</span><p class="small">${esc(v(x.fora))}</p></div>` : ''}
+      <p class="small"><span class="muted">O que está em jogo:</span> ${esc(v(x.jogoTxt))}</p>
+      ${x.ws.map(([rot, tx]) => `<p class="small"><span class="muted">O que o time pratica no workshop${rot ? ' · ' + rot.toLowerCase() : ''}:</span> ${esc(v(tx))}</p>`).join('')}
+      ${x.ind.sinal ? `<p class="small"><span class="muted">O que acompanhar:</span> ${esc(v(x.ind.sinal))}</p>` : `<p class="small"><span class="muted">Indicadores sugeridos · processo:</span> ${esc(v(x.ind.proc))}</p><p class="small"><span class="muted">Indicadores sugeridos · resultado:</span> ${esc(v(x.ind.res))}</p>`}
       <p class="small muted">Dimensões ligadas: ${esc(K.nomesDims(x.dims))}</p></div>`).join('')}</div>`;
 
   const blocoNumero = K.numero ? `<div class="card stack" style="gap:8px"><h2 class="h-sec" style="margin:0">O número que você quer ver mudar</h2><p><strong>${esc(K.numero)}</strong></p><p class="small muted">Hoje: ${esc(K.resp.D3_atual || 'não informado')} · Meta: ${esc(K.resp.D3_meta || 'não informada')}. É a referência de negócio para a conversa de acompanhamento do time depois do workshop.</p></div>` : '';
@@ -4383,9 +4571,12 @@ function viewPatrocinio() {
 
   const facExtra = P.fac ? `<div class="card stack" style="gap:10px"><div><h2 class="h-sec" style="margin:0">Só para você</h2><span class="tag" style="display:inline-block;margin-top:8px">Visível só para o facilitador</span></div>
       <p class="small"><span class="muted">Venda perdida:</span> ${esc(K.resp.D4 || '—')}</p>${K.resp.D5 ? `<p class="small"><span class="muted">O que espera ver de diferente:</span> ${esc(K.resp.D5)}</p>` : ''}
-      <p class="small muted">Contexto: ${esc(K.resp.C1)} pessoas · ${esc(K.negocio || '')} · ${esc(PATRO_CTX[1].ops.find(o => o[0] === K.resp.C3)?.[1] || '')} · decisão ${esc((PATRO_CTX[2].ops.find(o => o[0] === K.resp.C4)?.[1] || '').toLowerCase())} · venda média ${esc((PATRO_CTX[3].ops.find(o => o[0] === K.resp.C5)?.[1] || '').toLowerCase())} · ${esc((PATRO_CTX[4].ops.find(o => o[0] === K.resp.C6)?.[1] || '').toLowerCase())} na decisão · clientes novos por ${esc((PATRO_CTX[5].ops.find(o => o[0] === K.resp.C7)?.[1] || '').toLowerCase())}.</p></div>${t.id ? viewPatroFac() : ''}` : '';
+      <p class="small muted">Contexto: ${esc(K.resp.C1)} pessoas · ${esc(K.negocio || '')} · ${esc(PATRO_CTX[1].ops.find(o => o[0] === K.resp.C3)?.[1] || '')} · decisão ${esc((PATRO_CTX[2].ops.find(o => o[0] === K.resp.C4)?.[1] || '').toLowerCase())} · venda média ${esc((PATRO_CTX[3].ops.find(o => o[0] === K.resp.C5)?.[1] || '').toLowerCase())} · ${esc((PATRO_CTX[4].ops.find(o => o[0] === K.resp.C6)?.[1] || '').toLowerCase())} na decisão · clientes novos por ${esc((PATRO_CTX[5].ops.find(o => o[0] === K.resp.C7)?.[1] || '').toLowerCase())}.</p>
+      ${PATRO_APLIC.some(a => K.resp[a.id]) ? `<p class="small muted">Operação: ${PATRO_APLIC.map(a => `${a.t.replace('?', '')}: ${(a.ops.find(o => o[0] === K.resp[a.id])?.[1] || 'sem resposta').toLowerCase()}`).map(esc).join(' · ')}.</p>` : ''}
+      <div class="subbloco"><span class="subbloco-t">Questionário deste patrocinador</span><p class="small muted">Apagar remove as respostas e o relatório dele. Ele pode responder de novo pela área do patrocinador.</p>
+        <div class="actions">${P.confirmApagar ? `<button type="button" class="btn btn-quiet btn-sm" data-act="patro-apagar-ok" style="border-color:var(--crit);color:var(--crit)" ${S.busy ? 'disabled' : ''}>Confirmar: apagar as respostas</button><button type="button" class="btn btn-ghost btn-sm" data-act="patro-apagar-cancel">Cancelar</button>` : '<button type="button" class="btn btn-quiet btn-sm" data-act="patro-apagar">Apagar as respostas deste patrocinador</button>'}</div></div></div>${t.id ? viewPatroFac() : ''}` : '';
   return `<main class="page"><div class="wrap stack-lg">${head}
-    <p class="small muted">${P.fac ? 'Visão do facilitador. O patrocinador vê este relatório sem a venda perdida e sem os relatórios do time em rascunho.' : `Respondido em ${fmtDate(P.dados.respostas.updated_at || P.dados.respostas.created_at)}.`}</p>
+    <p class="small muted">${P.fac ? 'Visão do facilitador. O patrocinador vê este relatório sem a venda perdida e sem os relatórios do time em rascunho.' : `Respondido em ${fmtDate(P.dados.respostas.updated_at || P.dados.respostas.created_at)}.`} ${esc(K.regrasTxt)}</p>
     ${facExtra}${blocoResumo}${blocoDores}${blocoNumero}${blocoVisao}${blocoPerfis}${blocoLogica}${blocoDesenvolve}${blocoPrograma}${blocoTime}${blocoConf}${blocoInvest}
     <div class="card stack no-print" style="gap:12px"><h2 class="h-sec" style="margin:0">Leve o relatório</h2><div class="actions"><button class="btn btn-primary btn-sm" data-act="patro-pdf" ${S.pdfBusy ? 'disabled' : ''}>${S.pdfBusy ? 'Gerando PDF…' : 'Baixar relatório em PDF'}</button>${!P.fac ? '<button class="btn btn-quiet btn-sm" data-act="patro-editar">Revisar as minhas respostas</button>' : ''}${!P.fac && store.mode === 'demo' ? '<button class="btn btn-quiet btn-sm" data-act="patro-limpar">Recomeçar o questionário em branco</button>' : ''}</div></div>
     ${voltar}</div></main>`;
@@ -4503,7 +4694,7 @@ async function buildPatroPDF() {
   font(17, 'light', C.ink); doc.text(T(t.nome || 'Workshop OQGCI'), M, 97);
   font(9.2, 'body', C.ink2); doc.text(T(`${K.negocio ? K.negocio + ' · ' : ''}respondido em ${fmtDate(P.dados.respostas.updated_at || P.dados.respostas.created_at)}${ultimo ? ' · leitura do time até ' + PATRO_ETAPAS.find(e => e[0] === ultimo.etapa)[1].toLowerCase() : ''}`), M, 104);
   y = 114;
-  if (K.resumo) { y += cartao(M, y, CW, [{ eb: 'Em resumo' }, { t: K.resumo, size: 10.2, gap: 0 }], { fill: C.warmT, stroke: null, barra: C.warmL }) + 6; }
+  if (K.resumo) { y += cartao(M, y, CW, [{ eb: 'Em resumo' }, { t: K.resumo, size: 10.2, gap: K.comoDecide ? 3 : 0 }, ...(K.comoDecide ? [{ eb: 'Como o seu cliente decide' }, { t: v(K.comoDecide), size: 8.8, c: C.ink2, gap: 0 }] : [])], { fill: C.warmT, stroke: null, barra: C.warmL }) + 6; }
   if (K.numero) { y += cartao(M, y, CW, [{ eb: 'O número que você quer ver mudar' }, { t: K.numero, size: 12, role: 'title', gap: 1 }, { t: `Hoje: ${resp.D3_atual || 'não informado'} · Meta: ${resp.D3_meta || 'não informada'}`, size: 8.4, c: C.ink2, gap: 0 }]) + 6; }
   if (ultimo) {
     const es = PATRO_ETAPAS.filter(([e]) => ultimo.dados.etapas[e]);
@@ -4517,10 +4708,14 @@ async function buildPatroPDF() {
 
   // Dores
   doc.addPage(); cabecalho(); y = 24;
-  secao('O que você apontou', 'As dores do negócio', 'Cada dor mostra o que está em jogo, o que o time pratica no workshop para mudar esse ponto e o que acompanhar depois.');
+  secao('O que você apontou', 'As dores do negócio', K.versao >= 2 ? 'Cada dor mostra o que está em jogo, o que o time pratica no workshop e indicadores sugeridos para acompanhar. Use os que o negócio já mede; os demais pedem instrumentação.' : 'Cada dor mostra o que está em jogo, o que o time pratica no workshop para mudar esse ponto e o que acompanhar depois.');
+  if (K.fixa) { precisa(altura(K.fixa, 8.6, 'body', CW) + 4); y += escrever(K.fixa, M, y, 8.6, 'body', C.ink2, CW) + 3; }
   dores.forEach((x, i) => {
     const partes = [...(i === 0 ? [{ eb: 'A que mais custa hoje' }] : []), { t: v(x.t), size: 10.5, role: 'title', gap: 1.6 },
-      { t: 'O que está em jogo: ' + v(x.jogo), c: C.ink2 }, { t: 'O que o time pratica no workshop: ' + v(x.workshop), c: C.ink }, { t: 'O que acompanhar: ' + v(x.sinal), c: C.ink2 },
+      ...(x.fora ? [{ eb: 'Ponto a confirmar', c: C.warn }, { t: v(x.fora), c: C.ink, gap: 2 }] : []),
+      { t: 'O que está em jogo: ' + v(x.jogoTxt), c: C.ink2 },
+      ...x.ws.map(([rot, tx]) => ({ t: `O que o time pratica no workshop${rot ? ' · ' + rot.toLowerCase() : ''}: ` + v(tx), c: C.ink })),
+      ...(x.ind.sinal ? [{ t: 'O que acompanhar: ' + v(x.ind.sinal), c: C.ink2 }] : [{ t: 'Indicadores sugeridos · processo: ' + v(x.ind.proc), c: C.ink2 }, { t: 'Indicadores sugeridos · resultado: ' + v(x.ind.res), c: C.ink2 }]),
       { t: 'Dimensões ligadas: ' + K.nomesDims(x.dims), size: 8, role: 'semi', c: C.warm, gap: 0 }];
     const h = alturaCartao(CW, partes, { barra: i === 0 ? C.warmL : null }); precisa(h + 4);
     cartao(M, y, CW, partes, { barra: i === 0 ? C.warmL : null }); y += h + 4;
@@ -4628,7 +4823,7 @@ async function buildPatroPDF() {
   }
   // A nota final usa a margem de baixo antes de abrir uma página só para ela.
   y += 3; if (y + 7 > BOTTOM + 8) novaPagina();
-  escrever('Os dados do time são consolidados e anônimos. O instrumento está em fase de validação; use a leitura como ferramenta de desenvolvimento.', M, y, 7.6, 'body', C.ink3, CW);
+  escrever('Os dados do time são consolidados e anônimos. O instrumento está em fase de validação; use a leitura como ferramenta de desenvolvimento. ' + K.regrasTxt, M, y, 7.6, 'body', C.ink3, CW);
   rodape();
   return doc.output('blob');
 }
@@ -4919,6 +5114,14 @@ document.addEventListener('click', async (ev) => {
     try { await store.definirAcesso(id, t.dataset.ate, x.acesso_bloqueado); await loadPessoas(); render(); toast('Acesso liberado até ' + fmtDia(t.dataset.ate)); } catch (e) { toast(e.message); }
   }
   else if (act === 'patro-editar') { S.patro.editando = true; S.patro.form = { ...(S.patro.dados.respostas?.respostas || {}) }; render(); window.scrollTo(0, 0); }
+  else if (act === 'patro-apagar') { S.patro.confirmApagar = true; render(); }
+  else if (act === 'patro-apagar-cancel') { S.patro.confirmApagar = false; render(); }
+  else if (act === 'patro-apagar-ok') {
+    const P = S.patro; const row = P?.dados?.respostas; if (!P || !P.fac || !row) return;
+    S.busy = true; render();
+    try { await store.apagarPatrocinioFac(row); P.confirmApagar = false; P.form = null; S.busy = false; await carregarPatrocinio(); window.scrollTo(0, 0); toast('Respostas do patrocinador apagadas'); }
+    catch (x) { S.busy = false; render(); toast(x.message); }
+  }
   else if (act === 'patro-cancelar') { S.patro.editando = false; render(); window.scrollTo(0, 0); }
   else if (act === 'patro-pdf') { exportPatroPDF(); }
   else if (act === 'patro-demo') { S.session = await store.signInPatrocinadorDemo(Boolean(t.dataset.pre)); go('painel'); }
@@ -5116,6 +5319,7 @@ document.addEventListener('submit', async (ev) => {
   } else if (f.id === 'f-patro') {
     const P = S.patro; const resp = lerFormPatro(); P.form = resp;
     const erro = validarPatro(resp);
+    if (!erro) { resp.regras = REGRAS_ATUAL; resp.regras_em = new Date().toISOString(); }
     if (erro) { const el = $('#pt-msg'); if (el) { el.innerHTML = `<div class="msg msg-err" role="alert">${esc(erro)}</div>`; el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } return; }
     S.busy = true; render();
     try { await store.salvarPatrocinio(P.turma.id, resp); P.dados = P.turma.id ? await store.getPatrocinio(P.turma.id) : { respostas: (await store.meuPatrocinio()).respostas, relatorios: [] }; P.editando = false; S.busy = false; try { S.patroTurmas = await store.minhasTurmasPatrocinadas(); S.patroPre = await store.meuPatrocinio(); } catch (x) { /* */ } render(); window.scrollTo(0, 0); toast('Respostas salvas'); }
