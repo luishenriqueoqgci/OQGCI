@@ -398,7 +398,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .foot-logo { width: 48px; height: auto; flex: none; }
 .foot-text { display: grid; gap: 6px; font-size: 13px; color: var(--ink-3); min-width: 0; }
 .report-head { flex-wrap: nowrap; align-items: flex-start; }
-.report-logo { width: 56px; height: auto; flex: none; }
+.report-logo { width: 56px; height: auto; flex: none; display: block; }
+.report-logo svg { width: 100%; height: auto; display: block; }
 .install { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -6px 16px rgba(15,14,20,.06); padding-bottom: env(safe-area-inset-bottom, 0px); }
 .install .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 12px; }
 .toast { position: fixed; left: 50%; top: calc(76px + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 32px); text-align: center; transform: translateX(-50%); background: var(--grafite); color: #FFFFFF; padding: 12px 18px; border-radius: var(--r-sm); font-weight: 700; font-size: 14px; z-index: 40; box-shadow: 0 12px 24px -12px rgba(15,14,20,.4); }
@@ -1764,7 +1765,7 @@ async function pdfQuestionario(cab, titulo, subtitulo, desenhar) {
   const T = RICO ? pdfTextRico : pdfText;
   const W = 210, M = 18, CW = W - 2 * M, BOTTOM = 276;
   const C = { ink: [42, 44, 51], ink2: [86, 90, 101], ink3: [138, 142, 152], line: [216, 211, 200], line2: [233, 229, 220], white: [255, 255, 255],
-    warm: [181, 112, 26], warmL: [235, 200, 143], cool: [60, 120, 194], coolL: [169, 198, 234], baseL: [207, 209, 216], ambar: [240, 179, 94], azul: [141, 184, 238] };
+    warm: [181, 112, 26], warmTx: [154, 91, 18], warmL: [235, 200, 143], cool: [60, 120, 194], coolL: [169, 198, 234], baseL: [207, 209, 216], ambar: [240, 179, 94], azul: [141, 184, 238] };
   const color = (c, kind = 'text') => kind === 'text' ? doc.setTextColor(...c) : kind === 'fill' ? doc.setFillColor(...c) : doc.setDrawColor(...c);
   const font = (size, role = 'body', c = C.ink) => {
     const map = RICO ? { title: ['Urbanist', 'bold'], light: ['Urbanist', 'light'], body: ['Manrope', 'normal'], semi: ['Manrope', 'semibold'], bold: ['Manrope', 'bold'] }
@@ -1775,14 +1776,15 @@ async function pdfQuestionario(cab, titulo, subtitulo, desenhar) {
   const linhas = (tx, size, role, width) => { font(size, role); return doc.splitTextToSize(T(tx), width); };
   const altura = (tx, size, role, width) => linhas(tx, size, role, width).length * (lh(size) + 0.6);
   const escrever = (tx, x, yy, size, role, c, width) => { const ls = linhas(tx, size, role, width); font(size, role, c); ls.forEach((ln, i) => doc.text(ln, x, yy + lh(size) + i * (lh(size) + 0.6))); return ls.length * (lh(size) + 0.6); };
-  const eyebrow = (tx, x, yy, c = C.warm, size = 6.8) => { font(size, 'bold', c); doc.setCharSpace(0.35); doc.text(T(tx).toUpperCase(), x, yy); doc.setCharSpace(0); };
+  const eyebrow = (tx, x, yy, c = C.warmTx, size = 6.8) => { font(size, 'bold', c); doc.setCharSpace(0.35); doc.text(T(tx).toUpperCase(), x, yy); doc.setCharSpace(0); };
   const simbolo = (cx, cy, rr) => {
-    color(C.line, 'draw'); doc.setLineWidth(rr * 0.08); doc.circle(cx, cy, rr * 12.5 / 11.5, 'S');
-    color(C.ambar, 'fill'); doc.circle(cx, cy, rr, 'F'); color(C.white, 'fill'); doc.rect(cx, cy - rr - 0.2, rr + 0.3, 2 * rr + 0.4, 'F');
-    const b = rr * 7.5 / 11.5; color(C.azul, 'fill'); doc.circle(cx, cy, b, 'F'); color(C.ambar, 'fill'); doc.rect(cx - b - 0.05, cy - b - 0.05, b + 0.05, 2 * b + 0.1, 'F');
+    // Mesmo desenho do símbolo da tela: anel da linha de base, meio disco âmbar à esquerda e meio disco azul menor à direita.
+    const meio = (r0, lado, cor) => { const n = 40; let px = cx, py = cy - r0; const seg = []; for (let i = 1; i <= n; i++) { const t = -Math.PI / 2 + Math.PI * i / n; const x = cx + lado * r0 * Math.cos(t), yy = cy + r0 * Math.sin(t); seg.push([x - px, yy - py]); px = x; py = yy; } color(cor, 'fill'); doc.lines(seg, cx, cy - r0, [1, 1], 'F', true); };
+    const k = rr / 11.5; color(C.line, 'draw'); doc.setLineWidth(Math.max(0.15, k * 0.7)); doc.circle(cx, cy, 12.5 * k, 'S');
+    meio(11.5 * k, -1, C.ambar); meio(7.5 * k, 1, [158, 195, 241]);
   };
   const ctx = { doc, C, M, CW, W, font, color, altura, escrever, eyebrow, y: 0 };
-  const rodape = () => { font(6.4, 'body', C.ink3); doc.text(T(COPYRIGHT), M, 289); font(8, 'bold', C.warm); doc.text(String(doc.getNumberOfPages()), W - M, 289, { align: 'right' }); };
+  const rodape = () => { color(C.line2, 'draw'); doc.setLineWidth(0.25); doc.line(M, 281, W - M, 281); if (logo) { try { doc.addImage(logo, 'PNG', M, 283.2, 7.3, 8); } catch (e) { /* segue sem o logo */ } } font(6.4, 'body', C.ink3); doc.text(T(COPYRIGHT), M + (logo ? 10 : 0), 288.4); font(8, 'bold', C.warmTx); doc.text(String(doc.getNumberOfPages()), W - M, 288.4, { align: 'right' }); };
   const cabecalho = () => { simbolo(M + 2.2, 11.2, 2.2); font(7.4, 'semi', C.ink3); doc.text(T(cab), M + 6.6, 12.4); doc.text(T('Metodologia OQGCI'), W - M, 12.4, { align: 'right' }); color(C.line2, 'draw'); doc.setLineWidth(0.25); doc.line(M, 16, W - M, 16); };
   ctx.novaPagina = () => { rodape(); doc.addPage(); cabecalho(); ctx.y = 24; };
   ctx.precisa = h => { if (ctx.y + h > BOTTOM) ctx.novaPagina(); };
@@ -1820,7 +1822,7 @@ async function pdfQuestionario(cab, titulo, subtitulo, desenhar) {
   ctx.nota = tx => { const h = altura(tx, 8.2, 'body', CW - 9); ctx.precisa(h + 2); ctx.y += escrever(tx, M + 9, ctx.y, 8.2, 'body', C.ink2, CW - 9) + 2; };
 
   // Capa resumida na primeira página
-  if (logo) { try { doc.addImage(logo, 'PNG', W - M - 15, 14, 15, 16.6); } catch (e) { /* */ } }
+  simbolo(W - M - 7.6, 22.3, 6.8);
   [[C.warmL, 0], [C.coolL, 1], [C.baseL, 2]].forEach(([c, i]) => { color(c, 'fill'); doc.roundedRect(M + i * 15, 18, 12, 1.4, 0.7, 0.7, 'F'); });
   eyebrow('Venda com Neurociência · Metodologia OQGCI', M, 28);
   font(22, 'title', C.ink); doc.text(T(titulo), M, 40);
@@ -3386,7 +3388,7 @@ function viewResultado() {
     <button class="btn btn-quiet btn-sm" data-act="copiar-resumo">Copiar resumo</button>`;
 
   return `<main class="page"><div class="wrap stack-lg">
-    <div class="hello report-head"><div class="stack" style="gap:6px;min-width:0"><span class="eyebrow">${rec.exemploPatro ? 'Exemplo · ' : ''}Diagnóstico completo · ${fmtDate(rec.created_at)}${rec.nome && !isMine && !rec.exemploPatro ? ' · ' + esc(rec.nome) : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">${isMine ? 'Seu Diagnóstico OQGCI' : 'Diagnóstico OQGCI'}</h1>${negocioLinha(rec) ? `<p class="muted small">${esc(negocioLinha(rec))}</p>` : ''}</div><img src="${LOGO_ESCURO}" alt="Logo de ${AUTOR}" class="report-logo" width="64" height="71" onerror="this.hidden=true"></div>
+    <div class="hello report-head"><div class="stack" style="gap:6px;min-width:0"><span class="eyebrow">${rec.exemploPatro ? 'Exemplo · ' : ''}Diagnóstico completo · ${fmtDate(rec.created_at)}${rec.nome && !isMine && !rec.exemploPatro ? ' · ' + esc(rec.nome) : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">${isMine ? 'Seu Diagnóstico OQGCI' : 'Diagnóstico OQGCI'}</h1>${negocioLinha(rec) ? `<p class="muted small">${esc(negocioLinha(rec))}</p>` : ''}</div><span class="report-logo" aria-hidden="true">${LOGO.replace('width="28" height="28"', 'width="56" height="56"')}</span></div>
     ${rec.exemploPatro ? '<div class="msg" role="note"><b>Exemplo com dados fictícios.</b> É o relatório que cada pessoa do time recebe logo depois de responder o diagnóstico. Só ela vê o próprio relatório.</div>' : ''}
     <textarea id="resumo-fallback" hidden readonly style="width:100%;min-height:160px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px"></textarea>
 
@@ -3499,7 +3501,7 @@ async function buildPDF(rec) {
   // Paleta do caderno, econômica em tinta.
   const C = {
     ink: [42, 44, 51], ink2: [86, 90, 101], ink3: [138, 142, 152], line: [216, 211, 200], line2: [233, 229, 220], white: [255, 255, 255],
-    warm: [181, 112, 26], warmL: [235, 200, 143], warmT: [252, 244, 232], cool: [60, 120, 194], coolL: [169, 198, 234], coolT: [239, 245, 252],
+    warm: [181, 112, 26], warmTx: [154, 91, 18], warmL: [235, 200, 143], warmT: [252, 244, 232], cool: [60, 120, 194], coolL: [169, 198, 234], coolT: [239, 245, 252],
     base: [110, 114, 128], baseL: [207, 209, 216], baseT: [243, 243, 245], good: [59, 148, 104], goodT: [238, 247, 242],
     crit: [191, 79, 92], critT: [251, 239, 241], warn: [176, 128, 22], warnT: [252, 246, 230], mag: [169, 84, 138], magT: [251, 241, 247],
     ambar: [240, 179, 94], azul: [141, 184, 238]
@@ -3518,7 +3520,7 @@ async function buildPDF(rec) {
   const linhas = (t, size, role, width) => { font(size, role); return doc.splitTextToSize(T(t), width); };
   const altura = (t, size, role, width) => linhas(t, size, role, width).length * (lh(size) + 0.6);
   const escrever = (t, x, yy, size, role, c, width) => { const ls = linhas(t, size, role, width); font(size, role, c); ls.forEach((ln, i) => doc.text(ln, x, yy + lh(size) + i * (lh(size) + 0.6))); return ls.length * (lh(size) + 0.6); };
-  const eyebrow = (t, x, yy, c = C.warm, size = 6.8, align) => { font(size, 'bold', c); doc.setCharSpace(0.35); doc.text(T(t).toUpperCase(), x, yy, align ? { align } : undefined); doc.setCharSpace(0); };
+  const eyebrow = (t, x, yy, c = C.warmTx, size = 6.8, align) => { font(size, 'bold', c); doc.setCharSpace(0.35); doc.text(T(t).toUpperCase(), x, yy, align ? { align } : undefined); doc.setCharSpace(0); };
   const caixa = (x, yy, w, h, fill, stroke, lw = 0.3) => { if (fill) color(fill, 'fill'); if (stroke) { color(stroke, 'draw'); doc.setLineWidth(lw); } doc.roundedRect(x, yy, w, h, 2.6, 2.6, fill && stroke ? 'FD' : fill ? 'F' : 'S'); };
   const barra = (x, yy, w, h, v, c, marcas) => {
     color(C.line2, 'fill'); doc.roundedRect(x, yy, w, h, h / 2, h / 2, 'F');
@@ -3527,14 +3529,12 @@ async function buildPDF(rec) {
   };
   // Símbolo do método: metade âmbar (Aproximação), meia lua azul (Afastamento) e o anel da linha de base.
   const simbolo = (cx, cy, rr) => {
-    color(C.line, 'draw'); doc.setLineWidth(rr * 0.08); doc.circle(cx, cy, rr * 12.5 / 11.5, 'S');
-    color(C.ambar, 'fill'); doc.circle(cx, cy, rr, 'F'); color(C.white, 'fill'); doc.rect(cx, cy - rr - 0.2, rr + 0.3, 2 * rr + 0.4, 'F');
-    const b = rr * 7.5 / 11.5; color(C.azul, 'fill'); doc.circle(cx, cy, b, 'F'); color(C.ambar, 'fill'); doc.rect(cx - b - 0.05, cy - b - 0.05, b + 0.05, 2 * b + 0.1, 'F');
+    // Mesmo desenho do símbolo da tela: anel da linha de base, meio disco âmbar à esquerda e meio disco azul menor à direita.
+    const meio = (r0, lado, cor) => { const n = 40; let px = cx, py = cy - r0; const seg = []; for (let i = 1; i <= n; i++) { const t = -Math.PI / 2 + Math.PI * i / n; const x = cx + lado * r0 * Math.cos(t), yy = cy + r0 * Math.sin(t); seg.push([x - px, yy - py]); px = x; py = yy; } color(cor, 'fill'); doc.lines(seg, cx, cy - r0, [1, 1], 'F', true); };
+    const k = rr / 11.5; color(C.line, 'draw'); doc.setLineWidth(Math.max(0.15, k * 0.7)); doc.circle(cx, cy, 12.5 * k, 'S');
+    meio(11.5 * k, -1, C.ambar); meio(7.5 * k, 1, [158, 195, 241]);
   };
-  const rodape = () => {
-    font(6.4, 'body', C.ink3); doc.text(T(COPYRIGHT), M, 289);
-    font(8, 'bold', C.warm); doc.text(String(doc.getNumberOfPages()), W - M, 289, { align: 'right' });
-  };
+  const rodape = () => { color(C.line2, 'draw'); doc.setLineWidth(0.25); doc.line(M, 281, W - M, 281); if (logo) { try { doc.addImage(logo, 'PNG', M, 283.2, 7.3, 8); } catch (e) { /* segue sem o logo */ } } font(6.4, 'body', C.ink3); doc.text(T(COPYRIGHT), M + (logo ? 10 : 0), 288.4); font(8, 'bold', C.warmTx); doc.text(String(doc.getNumberOfPages()), W - M, 288.4, { align: 'right' }); };
   const cabecalho = () => {
     simbolo(M + 2.2, 11.2, 2.2);
     font(7.4, 'semi', C.ink3); doc.text(T('Diagnóstico OQGCI'), M + 6.6, 12.4);
@@ -3554,7 +3554,7 @@ async function buildPDF(rec) {
   /* ---------------- Capa ---------------- */
   color(C.warmL, 'draw'); doc.setLineWidth(0.35); [74, 62, 50].forEach(rr => doc.circle(W + 18, 64, rr, 'S'));
   color(C.coolL, 'draw'); [38, 26, 14].forEach(rr => doc.circle(W + 18, 64, rr, 'S'));
-  if (logo) { try { doc.addImage(logo, 'PNG', M, 16, 19, 21); } catch (e) { /* segue sem o logo */ } }
+  simbolo(M + 9.2, 26.5, 8.4);
   [[C.warmL, 0], [C.coolL, 1], [C.baseL, 2]].forEach(([c, i]) => { color(c, 'fill'); doc.roundedRect(M + i * 15, 64, 12, 1.4, 0.7, 0.7, 'F'); });
   eyebrow('Venda com Neurociência · Metodologia OQGCI', M, 74);
   font(34, 'title', C.ink); doc.text(T('Diagnóstico OQGCI'), M, 89);
@@ -3979,7 +3979,7 @@ function viewEvolucao() {
   const titulo = interno ? 'Prévia e workshop' : isMine ? 'Sua evolução no Diagnóstico OQGCI' : 'Evolução no Diagnóstico OQGCI';
 
   return `<main class="page"><div class="wrap stack-lg">
-    <div class="hello report-head"><div class="stack" style="gap:6px;min-width:0"><span class="eyebrow">${interno ? 'Relatório interno' : 'Relatório de evolução'}${!isMine && ev.nome ? ' · ' + esc(ev.nome) : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">${titulo}</h1>${negocioLinha(rea) ? `<p class="muted small">${esc(negocioLinha(rea))}</p>` : ''}</div><img src="${LOGO_ESCURO}" alt="Logo de ${AUTOR}" class="report-logo" width="64" height="71" onerror="this.hidden=true"></div>
+    <div class="hello report-head"><div class="stack" style="gap:6px;min-width:0"><span class="eyebrow">${interno ? 'Relatório interno' : 'Relatório de evolução'}${!isMine && ev.nome ? ' · ' + esc(ev.nome) : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">${titulo}</h1>${negocioLinha(rea) ? `<p class="muted small">${esc(negocioLinha(rea))}</p>` : ''}</div><span class="report-logo" aria-hidden="true">${LOGO.replace('width="28" height="28"', 'width="56" height="56"')}</span></div>
     ${banner}${sinais}
     <p class="evo-resumo">${esc(cmp.resumo)} <span class="muted">De ${fmtDate(ini.created_at)} a ${fmtDate(rea.created_at)}, ${cmp.dias} dias.</span></p>
 
@@ -4053,7 +4053,7 @@ async function buildEvoPDF(ev) {
   const W = 210, M = 18, CW = W - 2 * M, BOTTOM = 274;
   const C = {
     ink: [42, 44, 51], ink2: [86, 90, 101], ink3: [138, 142, 152], line: [216, 211, 200], line2: [233, 229, 220], white: [255, 255, 255],
-    warm: [181, 112, 26], warmL: [235, 200, 143], warmT: [252, 244, 232], cool: [60, 120, 194], coolL: [169, 198, 234], coolT: [239, 245, 252],
+    warm: [181, 112, 26], warmTx: [154, 91, 18], warmL: [235, 200, 143], warmT: [252, 244, 232], cool: [60, 120, 194], coolL: [169, 198, 234], coolT: [239, 245, 252],
     base: [110, 114, 128], baseL: [207, 209, 216], baseT: [243, 243, 245], good: [59, 148, 104], goodT: [238, 247, 242],
     crit: [191, 79, 92], critT: [251, 239, 241], warn: [176, 128, 22], warnT: [252, 246, 230], mag: [169, 84, 138], magT: [251, 241, 247],
     ambar: [240, 179, 94], azul: [141, 184, 238]
@@ -4072,7 +4072,7 @@ async function buildEvoPDF(ev) {
   const linhas = (t, size, role, width) => { font(size, role); return doc.splitTextToSize(T(t), width); };
   const altura = (t, size, role, width) => linhas(t, size, role, width).length * (lh(size) + 0.6);
   const escrever = (t, x, yy, size, role, c, width) => { const ls = linhas(t, size, role, width); font(size, role, c); ls.forEach((ln, i) => doc.text(ln, x, yy + lh(size) + i * (lh(size) + 0.6))); return ls.length * (lh(size) + 0.6); };
-  const eyebrow = (t, x, yy, c = C.warm, size = 6.8, align) => { font(size, 'bold', c); doc.setCharSpace(0.35); doc.text(T(t).toUpperCase(), x, yy, align ? { align } : undefined); doc.setCharSpace(0); };
+  const eyebrow = (t, x, yy, c = C.warmTx, size = 6.8, align) => { font(size, 'bold', c); doc.setCharSpace(0.35); doc.text(T(t).toUpperCase(), x, yy, align ? { align } : undefined); doc.setCharSpace(0); };
   const caixa = (x, yy, w, h, fill, stroke, lw = 0.3) => { if (fill) color(fill, 'fill'); if (stroke) { color(stroke, 'draw'); doc.setLineWidth(lw); } doc.roundedRect(x, yy, w, h, 2.6, 2.6, fill && stroke ? 'FD' : fill ? 'F' : 'S'); };
   const barra = (x, yy, w, h, v, c, marcas = []) => {
     color(C.line2, 'fill'); doc.roundedRect(x, yy, w, h, h / 2, h / 2, 'F');
@@ -4082,11 +4082,12 @@ async function buildEvoPDF(ev) {
   // Barras de cada ponto: primeiro em cinza, intermediário em tom claro, último na cor do eixo.
   const barras = (x, yy, w, vals, c, cl) => { vals.forEach((v, i) => barra(x, yy + i * 2.8, w, 2, v, i === 0 ? C.baseL : i < vals.length - 1 ? cl : c)); return vals.length * 2.8; };
   const simbolo = (cx, cy, rr) => {
-    color(C.line, 'draw'); doc.setLineWidth(rr * 0.08); doc.circle(cx, cy, rr * 12.5 / 11.5, 'S');
-    color(C.ambar, 'fill'); doc.circle(cx, cy, rr, 'F'); color(C.white, 'fill'); doc.rect(cx, cy - rr - 0.2, rr + 0.3, 2 * rr + 0.4, 'F');
-    const b = rr * 7.5 / 11.5; color(C.azul, 'fill'); doc.circle(cx, cy, b, 'F'); color(C.ambar, 'fill'); doc.rect(cx - b - 0.05, cy - b - 0.05, b + 0.05, 2 * b + 0.1, 'F');
+    // Mesmo desenho do símbolo da tela: anel da linha de base, meio disco âmbar à esquerda e meio disco azul menor à direita.
+    const meio = (r0, lado, cor) => { const n = 40; let px = cx, py = cy - r0; const seg = []; for (let i = 1; i <= n; i++) { const t = -Math.PI / 2 + Math.PI * i / n; const x = cx + lado * r0 * Math.cos(t), yy = cy + r0 * Math.sin(t); seg.push([x - px, yy - py]); px = x; py = yy; } color(cor, 'fill'); doc.lines(seg, cx, cy - r0, [1, 1], 'F', true); };
+    const k = rr / 11.5; color(C.line, 'draw'); doc.setLineWidth(Math.max(0.15, k * 0.7)); doc.circle(cx, cy, 12.5 * k, 'S');
+    meio(11.5 * k, -1, C.ambar); meio(7.5 * k, 1, [158, 195, 241]);
   };
-  const rodape = () => { font(6.4, 'body', C.ink3); doc.text(T(COPYRIGHT), M, 289); font(8, 'bold', C.warm); doc.text(String(doc.getNumberOfPages()), W - M, 289, { align: 'right' }); };
+  const rodape = () => { color(C.line2, 'draw'); doc.setLineWidth(0.25); doc.line(M, 281, W - M, 281); if (logo) { try { doc.addImage(logo, 'PNG', M, 283.2, 7.3, 8); } catch (e) { /* segue sem o logo */ } } font(6.4, 'body', C.ink3); doc.text(T(COPYRIGHT), M + (logo ? 10 : 0), 288.4); font(8, 'bold', C.warmTx); doc.text(String(doc.getNumberOfPages()), W - M, 288.4, { align: 'right' }); };
   const cabecalho = () => {
     simbolo(M + 2.2, 11.2, 2.2);
     font(7.4, 'semi', C.ink3); doc.text(T(interno ? 'Relatório interno · prévia e workshop' : 'Relatório de evolução OQGCI'), M + 6.6, 12.4);
@@ -4120,7 +4121,7 @@ async function buildEvoPDF(ev) {
   /* ---------------- Capa ---------------- */
   color(C.warmL, 'draw'); doc.setLineWidth(0.35); [74, 62, 50].forEach(rr => doc.circle(W + 18, 64, rr, 'S'));
   color(C.coolL, 'draw'); [38, 26, 14].forEach(rr => doc.circle(W + 18, 64, rr, 'S'));
-  if (logo) { try { doc.addImage(logo, 'PNG', M, 16, 19, 21); } catch (e) { /* segue sem o logo */ } }
+  simbolo(M + 9.2, 26.5, 8.4);
   [[C.warmL, 0], [C.coolL, 1], [C.baseL, 2]].forEach(([c, i]) => { color(c, 'fill'); doc.roundedRect(M + i * 15, 64, 12, 1.4, 0.7, 0.7, 'F'); });
   eyebrow(interno ? 'Relatório interno · Metodologia OQGCI' : 'Venda com Neurociência · Metodologia OQGCI', M, 74);
   font(32, 'title', C.ink); doc.text(T(interno ? 'Prévia e workshop' : 'Relatório de evolução'), M, 88);
@@ -4516,7 +4517,7 @@ function viewPatrocinio() {
   if (!P.dados) return `<main class="page"><div class="wrap narrow"><p class="muted">Carregando…</p></div></main>`;
   const resp = P.dados.respostas?.respostas || null;
   const voltar = `<div class="actions no-print"><button class="btn btn-primary" data-go="${P.fac ? 'facilitador' : 'painel'}">${P.fac ? 'Voltar ao painel do facilitador' : 'Voltar ao meu painel'}</button></div>`;
-  const head = `<div class="hello report-head"><div class="stack" style="gap:6px;min-width:0"><span class="eyebrow">Área do patrocinador${t.nome ? ' · ' + esc(t.nome) : ''}${P.fac && P.pessoa ? ' · ' + esc(P.pessoa.nome || P.pessoa.email || '') : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">${!resp || P.editando ? 'Questionário do patrocinador' : 'Relatório do patrocinador'}</h1></div><img src="${LOGO_ESCURO}" alt="Logo de ${AUTOR}" class="report-logo" width="64" height="71" onerror="this.hidden=true"></div>`;
+  const head = `<div class="hello report-head"><div class="stack" style="gap:6px;min-width:0"><span class="eyebrow">Área do patrocinador${t.nome ? ' · ' + esc(t.nome) : ''}${P.fac && P.pessoa ? ' · ' + esc(P.pessoa.nome || P.pessoa.email || '') : ''}</span><h1 style="font-size:clamp(28px,5vw,40px)">${!resp || P.editando ? 'Questionário do patrocinador' : 'Relatório do patrocinador'}</h1></div><span class="report-logo" aria-hidden="true">${LOGO.replace('width="28" height="28"', 'width="56" height="56"')}</span></div>`;
   if (!P.fac && (!resp || P.editando)) {
     return `<main class="page"><div class="wrap narrow stack-lg">${head}
       <p class="muted">Cerca de 10 minutos. As respostas mostram como você enxerga o time e o que mais pesa no resultado do negócio, e geram o seu relatório na hora. Ao longo do programa, o relatório recebe a leitura consolidada e anônima do time na prévia, no workshop e aos 45 dias.</p>
@@ -4646,7 +4647,7 @@ async function buildPatroPDF() {
   const T = RICO ? pdfTextRico : pdfText;
   const W = 210, M = 18, CW = W - 2 * M, BOTTOM = 274;
   const C = { ink: [42, 44, 51], ink2: [86, 90, 101], ink3: [138, 142, 152], line: [216, 211, 200], line2: [233, 229, 220], white: [255, 255, 255],
-    warm: [181, 112, 26], warmL: [235, 200, 143], warmT: [252, 244, 232], cool: [60, 120, 194], coolL: [169, 198, 234], coolT: [239, 245, 252],
+    warm: [181, 112, 26], warmTx: [154, 91, 18], warmL: [235, 200, 143], warmT: [252, 244, 232], cool: [60, 120, 194], coolL: [169, 198, 234], coolT: [239, 245, 252],
     base: [110, 114, 128], baseL: [207, 209, 216], baseT: [243, 243, 245], good: [59, 148, 104], goodT: [238, 247, 242], crit: [191, 79, 92], critT: [251, 239, 241],
     warn: [176, 128, 22], warnT: [252, 246, 230], ambar: [240, 179, 94], azul: [141, 184, 238] };
   const EIXO = { aprox: [C.warm, C.warmL], afast: [C.cool, C.coolL], base: [C.base, C.baseL] };
@@ -4661,15 +4662,16 @@ async function buildPatroPDF() {
   const linhas = (tx, size, role, width) => { font(size, role); return doc.splitTextToSize(T(tx), width); };
   const altura = (tx, size, role, width) => linhas(tx, size, role, width).length * (lh(size) + 0.6);
   const escrever = (tx, x, yy, size, role, c, width) => { const ls = linhas(tx, size, role, width); font(size, role, c); ls.forEach((ln, i) => doc.text(ln, x, yy + lh(size) + i * (lh(size) + 0.6))); return ls.length * (lh(size) + 0.6); };
-  const eyebrow = (tx, x, yy, c = C.warm, size = 6.8) => { font(size, 'bold', c); doc.setCharSpace(0.35); doc.text(T(tx).toUpperCase(), x, yy); doc.setCharSpace(0); };
+  const eyebrow = (tx, x, yy, c = C.warmTx, size = 6.8) => { font(size, 'bold', c); doc.setCharSpace(0.35); doc.text(T(tx).toUpperCase(), x, yy); doc.setCharSpace(0); };
   const caixa = (x, yy, w, h, fill, stroke) => { if (fill) color(fill, 'fill'); if (stroke) { color(stroke, 'draw'); doc.setLineWidth(0.3); } doc.roundedRect(x, yy, w, h, 2.6, 2.6, fill && stroke ? 'FD' : fill ? 'F' : 'S'); };
   const barra = (x, yy, w, h, val, c) => { color(C.line2, 'fill'); doc.roundedRect(x, yy, w, h, h / 2, h / 2, 'F'); color(c, 'fill'); doc.roundedRect(x, yy, Math.max(h, w * val / 100), h, h / 2, h / 2, 'F'); };
   const simbolo = (cx, cy, rr) => {
-    color(C.line, 'draw'); doc.setLineWidth(rr * 0.08); doc.circle(cx, cy, rr * 12.5 / 11.5, 'S');
-    color(C.ambar, 'fill'); doc.circle(cx, cy, rr, 'F'); color(C.white, 'fill'); doc.rect(cx, cy - rr - 0.2, rr + 0.3, 2 * rr + 0.4, 'F');
-    const b = rr * 7.5 / 11.5; color(C.azul, 'fill'); doc.circle(cx, cy, b, 'F'); color(C.ambar, 'fill'); doc.rect(cx - b - 0.05, cy - b - 0.05, b + 0.05, 2 * b + 0.1, 'F');
+    // Mesmo desenho do símbolo da tela: anel da linha de base, meio disco âmbar à esquerda e meio disco azul menor à direita.
+    const meio = (r0, lado, cor) => { const n = 40; let px = cx, py = cy - r0; const seg = []; for (let i = 1; i <= n; i++) { const t = -Math.PI / 2 + Math.PI * i / n; const x = cx + lado * r0 * Math.cos(t), yy = cy + r0 * Math.sin(t); seg.push([x - px, yy - py]); px = x; py = yy; } color(cor, 'fill'); doc.lines(seg, cx, cy - r0, [1, 1], 'F', true); };
+    const k = rr / 11.5; color(C.line, 'draw'); doc.setLineWidth(Math.max(0.15, k * 0.7)); doc.circle(cx, cy, 12.5 * k, 'S');
+    meio(11.5 * k, -1, C.ambar); meio(7.5 * k, 1, [158, 195, 241]);
   };
-  const rodape = () => { font(6.4, 'body', C.ink3); doc.text(T(COPYRIGHT), M, 289); font(8, 'bold', C.warm); doc.text(String(doc.getNumberOfPages()), W - M, 289, { align: 'right' }); };
+  const rodape = () => { color(C.line2, 'draw'); doc.setLineWidth(0.25); doc.line(M, 281, W - M, 281); if (logo) { try { doc.addImage(logo, 'PNG', M, 283.2, 7.3, 8); } catch (e) { /* segue sem o logo */ } } font(6.4, 'body', C.ink3); doc.text(T(COPYRIGHT), M + (logo ? 10 : 0), 288.4); font(8, 'bold', C.warmTx); doc.text(String(doc.getNumberOfPages()), W - M, 288.4, { align: 'right' }); };
   const cabecalho = () => { simbolo(M + 2.2, 11.2, 2.2); font(7.4, 'semi', C.ink3); doc.text(T('Relatório do patrocinador'), M + 6.6, 12.4); doc.text(T(t.nome || 'Área do patrocinador'), W - M, 12.4, { align: 'right' }); color(C.line2, 'draw'); doc.setLineWidth(0.25); doc.line(M, 16, W - M, 16); };
   const novaPagina = () => { rodape(); doc.addPage(); cabecalho(); y = 24; };
   const precisa = h => { if (y + h > BOTTOM) novaPagina(); };
@@ -4705,7 +4707,7 @@ async function buildPatroPDF() {
   // Capa
   color(C.warmL, 'draw'); doc.setLineWidth(0.35); [74, 62, 50].forEach(rr => doc.circle(W + 18, 64, rr, 'S'));
   color(C.coolL, 'draw'); [38, 26, 14].forEach(rr => doc.circle(W + 18, 64, rr, 'S'));
-  if (logo) { try { doc.addImage(logo, 'PNG', M, 16, 19, 21); } catch (e) { /* segue sem o logo */ } }
+  simbolo(M + 9.2, 26.5, 8.4);
   [[C.warmL, 0], [C.coolL, 1], [C.baseL, 2]].forEach(([c, i]) => { color(c, 'fill'); doc.roundedRect(M + i * 15, 64, 12, 1.4, 0.7, 0.7, 'F'); });
   eyebrow('Venda com Neurociência · Metodologia OQGCI', M, 74);
   font(32, 'title', C.ink); doc.text(T('Relatório do patrocinador'), M, 88);
